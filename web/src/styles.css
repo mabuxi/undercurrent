@@ -1145,3 +1145,53 @@ button.kcard.dim{opacity:.62}
 .upsteps li{display:flex;gap:8px;align-items:center}
 .upsteps li.done svg{color:var(--ok)}
 .uplog summary{cursor:pointer;color:var(--text-2);font-size:13px;margin:6px 0}
+
+/* ---------- 0.15.0: model chooser ---------- */
+.mc{display:flex;flex-direction:column;gap:10px}
+.mc-sys{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-3);font-family:var(--mono)}
+.mc-sys svg{width:13px;height:13px;color:var(--flame-2)}
+.mc-card{display:flex;flex-direction:column;gap:10px;padding:14px 16px;border-radius:16px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.06)}
+.mc-card.good .ob-dot{background:var(--ok);box-shadow:0 0 0 4px rgba(127,196,155,.15)}
+.mc-head{display:flex;align-items:center;gap:14px}
+.mc-head b{display:block;font-size:14px}
+.mc-head .ob-grow>span{font-size:12px;color:var(--text-3)}
+.mc-head .ob-pct{display:inline-flex;align-items:center;gap:4px}
+.mc-head .ob-pct svg{width:13px;height:13px;color:var(--ok)}
+.mc-opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px}
+.mc-opt{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:3px;padding:9px 11px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid transparent;transition:all .18s}
+.mc-opt:hover{background:rgba(255,255,255,.07)}
+.mc-opt.on{background:rgba(227,154,131,.14);border-color:rgba(227,154,131,.6)}
+.mc-opt.heavy{opacity:.6}
+.mc-opt.heavy.on{opacity:1}
+.mc-name{font-size:13px;font-weight:600;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.mc-rec{font-style:normal;font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:1px 6px;border-radius:999px;background:var(--accent);color:var(--accent-ink)}
+.mc-have{font-style:normal;font-size:10px;padding:1px 6px;border-radius:999px;background:rgba(127,196,155,.18);color:var(--ok)}
+.mc-note{font-size:11.5px;color:var(--text-3);line-height:1.35}
+.mc-other{all:unset;cursor:pointer;font-size:12px;color:var(--text-3);padding:9px 11px;border-radius:12px;border:1px dashed rgba(255,255,255,.12)}
+.mc-other:hover{color:var(--text)}
+.mc-custom{display:flex;gap:6px;grid-column:1/-1}
+.mc-custom input{flex:1;padding:9px 12px;border-radius:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:var(--text)}
+
+/* 0.15.0: the gender slider in the welcome steps, centred, with the hetero band marked */
+.ob-slidewrap{position:relative;width:min(520px,100%);margin:10px auto 0;display:flex;align-items:center;height:28px}
+.ob-slidewrap .ob-slider{display:block;width:100%;max-width:none;min-width:0;margin:0;flex:none}
+.ob-band{position:absolute;top:2px;bottom:2px;border-radius:8px;border:1px dashed rgba(255,255,255,.35);background:rgba(255,255,255,.06);pointer-events:none}
+.ob-scale{width:min(520px,100%);margin:2px auto 0;display:flex;justify-content:space-between;font-size:11px;color:var(--text-3)}
+.ob-scale span:nth-child(2){position:relative;left:5%}
+.ob-who{align-items:center}
+.ob-plus{font-family:var(--display);font-size:44px;color:var(--text-2);margin:0 -14px}
+.ob-center b{font-weight:600;color:var(--text)}
+
+/* 0.15.0: profiles */
+.proflist{display:flex;flex-direction:column;gap:6px;margin:8px 0}
+.profrow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.profrow.current{border-color:color-mix(in srgb,var(--c) 55%,transparent);background:color-mix(in srgb,var(--c) 8%,transparent)}
+.profrow.small{grid-template-columns:minmax(0,1fr) auto}
+.profinfo{display:flex;flex-direction:column;gap:2px;min-width:0}
+.profinfo strong{display:flex;gap:8px;align-items:center;font-size:14px}
+.profinfo input{padding:4px 8px;border-radius:8px;background:var(--surface-3);border:1px solid var(--line-2);color:var(--text)}
+.profacts{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.profdot{width:22px;height:22px;border-radius:50%;background:var(--c);overflow:hidden;cursor:pointer;display:block}
+.profdot input{opacity:0;width:100%;height:100%;cursor:pointer}
+.ghost-btn.danger{color:#F2B2B2;border-color:rgba(224,122,122,.5)}
+@media (max-width:640px){.profrow{grid-template-columns:auto minmax(0,1fr)}.profrow .profacts{grid-column:1/-1;justify-content:flex-start}}

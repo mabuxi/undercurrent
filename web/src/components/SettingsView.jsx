@@ -1,4 +1,6 @@
 import { VersionCard } from './Updates.jsx';
+import { ModelsCard } from './ModelChooser.jsx';
+import { ProfilesCard } from './Profiles.jsx';
 import { useEffect, useState } from 'react';
 import { api, fmtBytes } from '../api.js';
 import { useApp } from '../context.jsx';
@@ -160,14 +162,12 @@ function ModelSection({ s, reload }) {
     toast(`Now using ${name}.`);
     load();
   }
-  const rec = m?.system?.recommendation;
   return (
     <div className="card2">
-      <h3>Local AI model</h3>
+      <h3>Installed models</h3>
       {m ? (
         <>
-          <p className="wtext">This computer: {m.system.memoryGb} GB memory, {m.system.cores} cores ({m.system.cpu}). {rec?.note}</p>
-          {rec?.tag ? <p className="wnote">Suggested: <code>ollama pull orcarouter/Qwen3.8-27B-Uncensored:{rec.tag}</code></p> : null}
+          <p className="wtext">Every model Ollama has on this Mac. "Use this" makes it the assistant model.</p>
           {m.error ? <p className="diag bad">{m.error}</p> : null}
           <div className="follist">
             {m.models.map((x) => (
@@ -178,7 +178,7 @@ function ModelSection({ s, reload }) {
                 {x.name === m.active ? <span className="okpill">active</span> : <button type="button" className="ghost-btn small" onClick={() => pick(x.name)}>Use this</button>}
               </div>
             ))}
-            {!m.models.length && !m.error ? <p className="wnote">No models installed yet. Run the pull command above in a terminal.</p> : null}
+            {!m.models.length && !m.error ? <p className="wnote">No models installed yet. Choose them above and press Download.</p> : null}
           </div>
           <form className="rowline wrapline" onSubmit={(e) => { e.preventDefault(); if (custom.trim()) pick(custom.trim()); }}>
             <input id="modelIn" value={custom} onChange={(e) => setCustom(e.target.value)} placeholder={`Or type a model name (active: ${m.active})`} aria-label="Model name" style={{ flex: 2 }} />
@@ -371,12 +371,14 @@ export default function SettingsView() {
   return (
     <section className="center" style={{ paddingTop: 0 }}>
       <div className="jhead"><div><h2>Settings</h2><p>Sources, filters, the local model and accounts.</p></div></div>
+      <ProfilesCard />
       <VersionCard />
       <ProvidersSection />
       <ScraperSection />
       <ExtremeSection />
       <LimitsSection />
       <TaggerSection s={settings} reload={reload} />
+      <ModelsCard />
       <ModelSection s={settings} reload={reload} />
       <WebSearchSection />
       <RedditSection s={settings} reload={reload} />

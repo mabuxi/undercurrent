@@ -13,9 +13,16 @@ import { restartServer } from './ai/lifecycle.js';
 const ENV = {
   ...process.env,
   PATH: [path.dirname(process.execPath), '/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin', process.env.PATH || ''].join(':'),
-  GIT_TERMINAL_PROMPT: '0',
-  GIT_SSH_COMMAND: 'ssh -o BatchMode=yes -o ConnectTimeout=15'
+  GIT_TERMINAL_PROMPT: '0'
 };
+// The key this copy uses for GitHub (set in its own git settings), never asking for a password in the background.
+let sshReady = false;
+async function prepareSsh() {
+  if (sshReady) return;
+  sshReady = true;
+  const own = await new Promise((resolve) => execFile('git', ['config', '--get', 'core.sshCommand'], { cwd: config.root }, (e, out) => resolve(e ? '' : String(out).trim())));
+  ENV.GIT_SSH_COMMAND = `${own || 'ssh'} -o BatchMode=yes -o ConnectTimeout=15`;
+}
 
 function run(cmd, args, { timeout = 120000 } = {}) {
   return new Promise((resolve, reject) => {
@@ -62,6 +69,7 @@ export async function updateStatus({ fresh = false } = {}) {
   if (config.mock || !fs.existsSync(path.join(config.root, '.git'))) { cache = { at: now(), v: { ...base, error: 'This copy is not linked to GitHub, so it cannot update itself.' } }; return cache.v; }
   base.git = true;
   try {
+    await prepareSsh();
     base.remote = await git('remote', 'get-url', 'origin').catch(() => null);
     if (!base.remote) throw new Error('No GitHub address set for this copy.');
     await git('fetch', '--tags', '--force', '--quiet', 'origin');
@@ -84,6 +92,18 @@ export async function updateStatus({ fresh = false } = {}) {
   return base;
 }
 
+// Packages only need installing when the dependencies changed, not when only the version number did.
+async function depsChanged(before, changed) {
+  if (changed.some((f) => /(^|\/)package-lock\.json$/.test(f))) return true;
+  for (const f of changed.filter((x) => /(^|\/)package\.json$/.test(x))) {
+    const deps = (txt) => { try { const j = JSON.parse(txt); return JSON.stringify([j.dependencies || {}, j.devDependencies || {}, j.workspaces || []]); } catch { return ''; } };
+    const a = await git('show', `${before}:${f}`).catch(() => '');
+    const b = await git('show', `HEAD:${f}`).catch(() => '');
+    if (deps(a) !== deps(b)) return true;
+  }
+  return false;
+}
+
 export const job = { state: 'idle', steps: [], error: null, version: null, restart: false, appRebuilt: false };
 const step = (label, state = 'run') => {
   const cur = job.steps.find((s) => s.label === label);
@@ -104,7 +124,7 @@ export async function applyUpdate() {
       await git('merge', '--ff-only', '--quiet', `v${st.latest}`);
       step(`Getting version ${st.latest}`, 'done');
       const changed = (await git('diff', '--name-only', before, 'HEAD')).split('\n');
-      if (changed.some((f) => /(^|\/)package(-lock)?\.json$/.test(f))) {
+      if (await depsChanged(before, changed)) {
         step('Installing what the new version needs');
         await run(fs.existsSync(path.join(path.dirname(process.execPath), 'npm')) ? path.join(path.dirname(process.execPath), 'npm') : 'npm', ['install', '--no-audit', '--no-fund'], { timeout: 600000 });
         step('Installing what the new version needs', 'done');
@@ -112,13 +132,15 @@ export async function applyUpdate() {
       step('Building the app');
       await run(path.join(path.dirname(process.execPath), 'node'), [path.join(config.root, 'node_modules', 'vite', 'bin', 'vite.js'), 'build', path.join(config.root, 'web')], { timeout: 300000 });
       step('Building the app', 'done');
-      if (changed.some((f) => f.startsWith('mac/')) && process.platform === 'darwin') {
+      // The Mac app is rebuilt when its code changed or the version did (so About shows the right one).
+      if (changed.some((f) => f.startsWith('mac/') || f === 'package.json') && process.platform === 'darwin' && fs.existsSync(path.join(config.root, 'mac', 'build.sh'))) {
         step('Updating the Mac app');
         await run('/bin/bash', [path.join(config.root, 'mac', 'build.sh'), '--install'], { timeout: 600000 });
         job.appRebuilt = true;
         step('Updating the Mac app', 'done');
       }
       setSetting('updatedFrom', config.version);
+      if (!getSetting('versionSeen', null)) setSetting('versionSeen', config.version);
       job.state = 'done';
       job.restart = true;
       log('info', `Updated to ${st.latest}; restarting`);

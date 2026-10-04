@@ -41,7 +41,8 @@ import { performerInfo } from './sources/stars.js';
 import { tagsForItems, tagSpecificity } from './store.js';
 import { lustUrl, lustTest, TUBE_CDNS, tubeReferer } from './sources/lustpress.js';
 import { invalidatePool } from './searchstate.js';
-import { setupStatus, pullModels, installOllama, conceptCatalog, suggestFor, SOURCE_ORDER } from './setup.js';
+import { setupStatus, pullModels, installOllama, conceptCatalog, suggestFor, SOURCE_ORDER, modelOptions, chooseModels } from './setup.js';
+import { listProfiles, createProfile, renameProfile, setProfileColor, switchProfile, deleteProfile, backupProfile, restoreBackup, deleteBackup, revealInFinder } from './profiles.js';
 import { updateStatus, applyUpdate, job as updateJob, whatsNew, markSeen, changelog } from './update.js';
 import { conceptName as cName, knownVariants, familyOf } from './concepts.js';
 import { boostTags } from './profile.js';
@@ -396,6 +397,7 @@ api.put('/settings/gender', wrap((req, res) => {
   if (b.male !== undefined) patch.male = Number(b.male);
   if (b.auto !== undefined) patch.auto = !!b.auto;
   if (b.trans !== undefined) patch.trans = !!b.trans;
+  if (b.everyone !== undefined) patch.everyone = !!b.everyone;
   res.json({ ...setGenderPrefs(patch), autoValue: autoMale() });
 }));
 
@@ -827,6 +829,12 @@ api.post('/models/test', wrap(async (req, res) => {
 // ---------- First run ----------
 api.get('/setup/status', wrap(async (req, res) => res.json(await setupStatus())));
 api.post('/setup/models', wrap(async (req, res) => res.json(await pullModels())));
+api.get('/setup/models/options', wrap(async (req, res) => res.json(await modelOptions())));
+api.put('/setup/models/choice', wrap(async (req, res) => {
+  chooseModels(req.body || {});
+  const pull = req.body?.pull ? await pullModels() : null;
+  res.json({ ...(await modelOptions()), pull });
+}));
 api.post('/setup/ollama', wrap(async (req, res) => res.json(await installOllama())));
 api.get('/setup/concepts', wrap((req, res) => {
   const mine = new Set(listKinks({ includeHidden: false }).filter((k) => !k.isGroup).flatMap((k) => k.concepts || []));
@@ -888,17 +896,36 @@ api.post('/setup/finish', wrap(async (req, res) => {
     const ids = (f.concepts || []).map((c) => idFor.get(c)).filter(Boolean);
     if (f.name && ids.length) saveFantasy({ name: String(f.name).slice(0, 60), description: String(f.description || '').slice(0, 300), kinks: ids, saved: 1, origin: 'user' });
   }
-  if (b.gender) setGenderPrefs({ male: Number(b.gender.male ?? 50), auto: !!b.gender.auto, trans: b.gender.trans !== false });
+  if (b.gender) setGenderPrefs({ male: Number(b.gender.male ?? 50), auto: !!b.gender.auto, trans: b.gender.trans !== false, everyone: !!b.gender.everyone });
   for (const [id, on] of Object.entries(b.sources || {})) if (PROVIDERS[id]) setProvider(id, { enabled: !!on });
   for (const t of (b.limits || []).map((x) => normalizeTag(x)).filter(Boolean)) db.prepare('INSERT OR IGNORE INTO limits(tag, created) VALUES(?, ?)').run(t, now());
   if (b.limits?.length) recheckBlocks();
   try { syncGroups(); } catch {}
   setSetting('onboarded', true);
+  if (!config.mock) pullModels().catch(() => {});
   invalidatePool();
   runIngest({ force: true }).catch(() => {});
   res.json({ ok: true, kinks: idFor.size });
 }));
 api.post('/setup/reset', wrap((req, res) => { setSetting('onboarded', false); res.json({ ok: true }); }));
+
+// ---------- Profiles ----------
+api.get('/profiles', wrap((req, res) => res.json(listProfiles())));
+api.post('/profiles', wrap((req, res) => {
+  const p = createProfile(req.body?.name, { switchTo: req.body?.switch !== false });
+  res.json({ profile: p, ...(req.body?.switch !== false ? switchProfile(p.id) : {}) });
+}));
+api.patch('/profiles/:id', wrap((req, res) => {
+  if (req.body?.name) renameProfile(req.params.id, req.body.name);
+  if (req.body?.color) setProfileColor(req.params.id, req.body.color);
+  res.json(listProfiles());
+}));
+api.post('/profiles/:id/switch', wrap((req, res) => res.json(switchProfile(req.params.id))));
+api.delete('/profiles/:id', wrap((req, res) => res.json(deleteProfile(req.params.id))));
+api.post('/profiles/:id/backup', wrap(async (req, res) => res.json(await backupProfile(req.params.id))));
+api.post('/backups/:file/restore', wrap((req, res) => res.json({ profile: restoreBackup(req.params.file, req.body?.name) })));
+api.delete('/backups/:file', wrap((req, res) => res.json(deleteBackup(req.params.file))));
+api.post('/profiles/reveal', wrap((req, res) => res.json(revealInFinder(req.body?.what))));
 
 // ---------- Versions and updates ----------
 api.get('/update/status', wrap(async (req, res) => res.json(await updateStatus({ fresh: req.query.fresh === '1' }))));
@@ -916,6 +943,7 @@ api.get('/status', wrap(async (req, res) => {
   res.json({
     version: config.version,
     app: config.app,
+    profile: config.profile,
     webSearch: !!webKey(),
     mock: config.mock,
     model: config.mock ? 'test model (mock mode)' : activeModel(),

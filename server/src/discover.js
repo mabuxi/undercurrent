@@ -196,7 +196,8 @@ function discoverReddit(terms) {
   let room = LIMITS.reddit - have;
   const added = [];
   const wanted = subsFor(terms);
-  const mode = genderMode();
+  const gm = genderMode();
+  const mode = gm === 'men' || gm === 'women' ? gm : null;
   if (mode) for (const sub of mode === 'men' ? GAY_SUBS : LESBIAN_SUBS) wanted.unshift([sub, mode === 'men' ? 'men only' : 'women only']);
   if (have < 6 && !mode) {
     for (const s of BASE_SUBS) wanted.push([s, 'popular']);

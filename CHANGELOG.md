@@ -3,6 +3,30 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.15.0 · 4 October 2026
+
+### Profiles
+- Settings has profiles now: each one with its own kinks, history, sources and settings. The local AI is shared.
+- Add a profile and it opens with the welcome steps; switch between profiles with one click (Undercurrent restarts on the other one).
+- Rename profiles, give them a colour, back them up, restore a backup as a new profile, and delete profiles you don't need.
+
+### Choosing the AI models
+- For each job (tagging, the closer look, the assistant) Undercurrent recommends the model that fits this Mac, from its chip and memory, and shows what every other option needs.
+- Pick another one, or type any model Ollama knows. The same choice is in Settings, Local AI models.
+
+### Everything downloads by itself
+- The first time, Ollama is installed automatically when it is missing.
+- The models download as soon as you have chosen them, while you go through the rest of the welcome steps.
+- Downloads that were cut off continue by themselves the next time Undercurrent starts.
+
+### Who you see
+- The slider starts at 50%. From 45% to 65% it means hetero only: a man and a woman together.
+- New "Everyone" option: posts with anyone, whatever the slider says.
+- The slider in the welcome steps is centred, with the hetero range marked on it.
+
+### Fixes
+- Checking for updates uses this Mac's own key for the repository.
+
 ## 0.14.0 · 4 October 2026
 
 ### A real Mac app

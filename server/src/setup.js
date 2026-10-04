@@ -11,34 +11,105 @@ import { log } from './log.js';
 // First run: the local AI (Ollama and its models), then what you like. Everything here can be done again later
 // from Settings; nothing leaves this computer except downloading Ollama and the models themselves.
 
-const MODELS = {
-  fast: { name: 'huihui_ai/qwen3.5-abliterated:4b', size: 3.4, what: 'Looks at every post and tags it' },
-  deep: { name: 'huihui_ai/qwen3.5-abliterated:9b', size: 6.6, what: 'Looks closer at the posts you love' },
-  main: { name: 'orcarouter/Qwen3.8-27B-Uncensored:q4_K_M', size: 17, what: 'The assistant you talk to' }
+// The models Undercurrent can use for each job, with what they need. The recommendation is the best one this Mac
+// can run comfortably (memory decides; Apple chips share it between the processor and graphics). You can pick another,
+// or any model name Ollama knows.
+const Q = 'orcarouter/Qwen3.8-27B-Uncensored';
+const H = 'huihui_ai/qwen3.5-abliterated';
+export const CATALOG = {
+  fast: {
+    label: 'Tagging', what: 'Looks at every post and its picture, and tags it. Runs all the time, so it should be quick.',
+    options: [
+      { name: `${H}:4b`, size: 3.4, minGb: 8, note: 'Sees pictures. Quick enough to keep up while you scroll.' },
+      { name: `${H}:9b`, size: 6.6, minGb: 32, note: 'Sees pictures. More accurate tags, but tagging gets slower.' }
+    ]
+  },
+  deep: {
+    label: 'Closer look', what: 'Looks again, at several frames, at the posts you love.',
+    options: [
+      { name: `${H}:9b`, size: 6.6, minGb: 16, note: 'Sees pictures. Much more detail than the quick look.' },
+      { name: `${H}:4b`, size: 3.4, minGb: 8, note: 'Lighter, for Macs with less memory.' }
+    ]
+  },
+  main: {
+    label: 'Assistant', what: 'Answers your questions, writes fantasies and understands what you search for.',
+    options: [
+      { name: `${Q}:q8_0`, size: 29, minGb: 64, note: 'The best answers. Needs a lot of memory.' },
+      { name: `${Q}:q6_K`, size: 22, minGb: 40, note: 'Nearly the best answers.' },
+      { name: `${Q}:q4_K_M`, size: 17, minGb: 30, note: 'Very good answers at a good speed.' },
+      { name: `${Q}:iq4_xs`, size: 15, minGb: 24, note: 'Good answers, the smallest version of the big model.' },
+      { name: `${H}:9b`, size: 6.6, minGb: 12, note: 'Uses the closer-look model for this too. Light and quick.' },
+      { name: `${H}:4b`, size: 3.4, minGb: 8, note: 'Uses the tagging model for this too. For Macs with little memory.' }
+    ]
+  }
 };
+const SETTING = { fast: 'fastModel', deep: 'deepModel', main: 'model' };
 
 export function memoryGb() {
   return Math.round(os.totalmem() / 1024 ** 3);
 }
 
-// The big assistant model needs about 32 GB of memory; on smaller Macs the 9B model does that job too.
+export function systemSummary() {
+  const cpu = os.cpus()[0]?.model || os.arch();
+  return { memoryGb: memoryGb(), chip: cpu.replace(/\s+/g, ' ').trim(), cores: os.cpus().length, appleSilicon: os.platform() === 'darwin' && os.arch() === 'arm64' };
+}
+
+// The best option this Mac runs comfortably. Without Apple Silicon (no shared graphics memory) one step lighter.
+export function recommendFor(role, mem = memoryGb()) {
+  const opts = CATALOG[role].options;
+  const usable = os.platform() === 'darwin' && os.arch() === 'arm64' ? mem : mem * 0.75;
+  if (role === 'fast') return opts[0].name;
+  return (opts.find((o) => o.minGb <= usable) || opts[opts.length - 1]).name;
+}
+
 export function recommendedModels() {
-  const big = memoryGb() >= 30;
-  return {
-    fast: { role: 'fast', ...MODELS.fast },
-    deep: { role: 'deep', ...MODELS.deep },
-    main: big ? { role: 'main', ...MODELS.main } : { role: 'main', ...MODELS.deep, what: MODELS.main.what, shared: true }
-  };
+  const out = {};
+  for (const role of Object.keys(CATALOG)) {
+    const name = recommendFor(role);
+    const o = CATALOG[role].options.find((x) => x.name === name);
+    out[role] = { role, name, size: o.size, what: CATALOG[role].what };
+  }
+  return out;
+}
+
+export function chosenModel(role) {
+  return getSetting(SETTING[role], null) || recommendFor(role);
 }
 
 function wanted() {
-  const rec = recommendedModels();
-  const set = (role, fallback) => getSetting(role === 'main' ? 'model' : `${role}Model`, null) || fallback;
-  return {
-    fast: { ...rec.fast, name: set('fast', rec.fast.name) },
-    deep: { ...rec.deep, name: set('deep', rec.deep.name) },
-    main: { ...rec.main, name: getSetting('model', null) || rec.main.name }
-  };
+  const out = {};
+  for (const role of Object.keys(CATALOG)) {
+    const name = chosenModel(role);
+    const o = CATALOG[role].options.find((x) => x.name === name);
+    out[role] = { role, name, size: o?.size ?? null, what: CATALOG[role].what, label: CATALOG[role].label };
+  }
+  return out;
+}
+
+export async function modelOptions() {
+  const have = config.mock ? new Set(Object.values(CATALOG).flatMap((r) => r.options.map((o) => o.name))) : (await localModels()) || new Set();
+  const sys = systemSummary();
+  const roles = {};
+  for (const [role, r] of Object.entries(CATALOG)) {
+    const rec = recommendFor(role);
+    const chosen = chosenModel(role);
+    const options = r.options.map((o) => ({ ...o, installed: have.has(o.name), recommended: o.name === rec, fits: o.minGb <= sys.memoryGb }));
+    if (!options.some((o) => o.name === chosen)) options.push({ name: chosen, size: null, minGb: null, note: 'Your own choice.', installed: have.has(chosen), recommended: false, fits: true, custom: true });
+    roles[role] = { label: r.label, what: r.what, chosen, recommended: rec, options };
+  }
+  return { system: sys, roles, installed: [...have] };
+}
+
+// Saves which model does which job. Names that are not in the list are fine too: any model Ollama knows.
+export function chooseModels(choice = {}) {
+  for (const role of Object.keys(CATALOG)) {
+    const name = String(choice[role] || '').trim();
+    if (!name) continue;
+    if (!/^[\w./:-]{2,120}$/.test(name)) throw Object.assign(new Error(`"${name}" is not a model name.`), { status: 400 });
+    if (role === 'main') setModel(name); else setSetting(SETTING[role], name);
+  }
+  setSetting('modelsChosen', true);
+  return wanted();
 }
 
 function ollamaInstalled() {
@@ -65,14 +136,14 @@ export async function setupStatus() {
   const models = [];
   for (const m of Object.values(w)) {
     const p = pulls.get(m.name);
-    models.push({ role: m.role, name: m.name, size: m.size, what: m.what, shared: !!m.shared || seen.has(m.name), present: config.mock ? true : have ? have.has(m.name) : false,
+    models.push({ role: m.role, label: m.label, name: m.name, size: m.size, what: m.what, shared: !!m.shared || seen.has(m.name), present: config.mock ? true : have ? have.has(m.name) : false,
       pull: p ? { status: p.status, completed: p.completed, total: p.total, error: p.error, done: p.done } : null });
     seen.add(m.name);
   }
   return {
     version: config.version, app: config.app, mock: config.mock,
     ollama: { installed: config.mock || ollamaInstalled(), running: !!h.ok, version: h.version || null, install: { ...install } },
-    models, memoryGb: memoryGb(), onboarded: !!getSetting('onboarded', false),
+    models, memoryGb: memoryGb(), system: systemSummary(), pulling: !!pulling, onboarded: !!getSetting('onboarded', false),
     ready: config.mock || (h.ok && models.every((m) => m.present))
   };
 }
@@ -120,9 +191,11 @@ export async function pullModels() {
   const w = wanted();
   setSetting('fastModel', w.fast.name);
   setSetting('deepModel', w.deep.name);
-  if (!getSetting('model', null)) setModel(w.main.name);
+  setModel(w.main.name);
+  setSetting('modelsChosen', true);
   if (pulling) return { started: false, busy: true };
-  const have = (await localModels()) || new Set();
+  const have = await localModels();
+  if (!have) return { started: false, error: 'Ollama is not running yet.' };
   const missing = [...new Set(Object.values(w).map((m) => m.name))].filter((n) => !have.has(n));
   pulling = (async () => { for (const n of missing) await pullOne(n); })().finally(() => { pulling = null; });
   return { started: missing.length > 0, missing };

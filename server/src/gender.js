@@ -88,7 +88,7 @@ export function sureOf(it) {
 
 export function genderPrefs() {
   const p = getSetting('genderPrefs', null) || {};
-  const out = { male: Number.isFinite(p.male) ? p.male : 50, auto: !!p.auto, trans: p.trans !== false };
+  const out = { male: Number.isFinite(p.male) ? p.male : 50, auto: !!p.auto, trans: p.trans !== false, everyone: !!p.everyone };
   if (out.auto) out.male = autoMale();
   return out;
 }
@@ -133,8 +133,19 @@ export function autoMale() {
 // How much of each kind of post is let through at a given balance. At 50/50 everything is.
 // Toward one side, posts with only the other gender become rare, and that gender mostly appears together with the favoured one.
 // From 90% on it is a mode of its own: only posts clearly with just men (or just women) are shown, plus very rarely something else.
-export function allowance(male, kind, trans, allowTrans, sure = 0.5) {
+// Between 45% and 65% men the slider means hetero only: posts with a man and a woman together.
+export const HETERO = [45, 65];
+export const isHetero = (male) => male >= HETERO[0] && male <= HETERO[1];
+
+export function allowance(male, kind, trans, allowTrans, sure = 0.5, everyone = false) {
   if (trans && !allowTrans) return 0;
+  if (everyone) return 1;
+  if (isHetero(male)) {
+    if (kind === 'mixed') return sure >= 0.8 ? 1 : 0.85;
+    if (kind === 'men?' || kind === 'women?') return 0.3;
+    if (kind === 'unknown') return 0.2;
+    return 0;
+  }
   const pm = male / 100;
   const pf = 1 - pm;
   const extreme = Math.max(pm, pf) >= 0.9;
@@ -163,7 +174,8 @@ export function allowance(male, kind, trans, allowTrans, sure = 0.5) {
 // Search words and communities that fit a balance of 90% or more.
 export function genderMode() {
   const g = genderPrefs();
-  return g.male >= 90 ? 'men' : g.male <= 10 ? 'women' : null;
+  if (g.everyone) return null;
+  return g.male >= 90 ? 'men' : g.male <= 10 ? 'women' : isHetero(g.male) ? 'hetero' : null;
 }
 
 export function genderTerm(term) {
@@ -171,6 +183,7 @@ export function genderTerm(term) {
   const t = String(term || '').trim();
   if (mode === 'men' && !/\b(gay|men|twinks?|male)\b/i.test(t)) return `gay ${t}`.trim();
   if (mode === 'women' && !/\b(lesbians?|girls?|women|solo)\b/i.test(t)) return `lesbian ${t}`.trim();
+  if (mode === 'hetero' && !/\b(straight|couples?|hetero)\b/i.test(t)) return `straight ${t}`.trim();
   return t;
 }
 

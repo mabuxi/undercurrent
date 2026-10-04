@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { Icon } from '../icons.jsx';
+import { ModelChooser } from './ModelChooser.jsx';
 
 const STEPS = ['Welcome', 'Local AI', 'Who', 'Kinks', 'Fantasies', 'Sources', 'Limits', 'Ready'];
-const GB = (b) => (b / 1024 ** 3).toFixed(1);
 const LIMIT_IDEAS = ['piss', 'feet', 'bondage', 'hentai', 'ai generated', 'toys', 'step family', 'cheating', 'bbw', 'trans'];
 
 function Blobs({ colors }) {
@@ -30,54 +30,23 @@ function Welcome({ ok, setOk }) {
   );
 }
 
-function LocalAi({ status, reload }) {
-  const [busy, setBusy] = useState(false);
+function LocalAi({ status, options, choice, setChoice }) {
   const st = status;
   if (!st) return <div className="ob-step"><p className="ob-lede">Checking this Mac…</p></div>;
-  const missing = st.models.filter((m) => !m.present && !m.shared);
-  const pulling = st.models.some((m) => m.pull && !m.pull.done);
-  const total = [...new Map(st.models.map((m) => [m.name, m])).values()].reduce((a, m) => a + (m.present ? 0 : m.size), 0);
-  async function go(path) {
-    setBusy(true);
-    try { await api(path, { method: 'POST', body: {} }); } catch {}
-    setBusy(false);
-    reload();
-  }
+  const inst = st.ollama.install;
   return (
     <div className="ob-step">
       <h2 className="ob-h">The local AI</h2>
-      <p className="ob-lede">Undercurrent uses Ollama to run AI models on this Mac. They tag posts, look at pictures and power the assistant. Nothing is sent anywhere.</p>
+      <p className="ob-lede">Undercurrent runs AI models on this Mac with Ollama. They tag posts, look at pictures and power the assistant. Nothing is sent anywhere. The recommended models fit this Mac; choose others if you like. They download when you continue, while you set up the rest.</p>
       <div className={`ob-card ${st.ollama.running ? 'good' : ''}`}>
-        <span className="ob-dot" /><div className="ob-grow"><b>Ollama</b><span>{st.ollama.running ? `Running${st.ollama.version ? `, version ${st.ollama.version}` : ''}` : st.ollama.installed ? 'Installed, starting it…' : 'Not on this Mac yet'}</span></div>
-        {!st.ollama.installed ? (
-          st.ollama.install.state === 'downloading' ? <span className="ob-pct">{st.ollama.install.total ? `${Math.round((st.ollama.install.received / st.ollama.install.total) * 100)}%` : 'downloading'}</span>
-            : st.ollama.install.state === 'unpacking' ? <span className="ob-pct">installing</span>
-              : <button type="button" className="ob-btn" onClick={() => go('/setup/ollama')} disabled={busy}>Install Ollama</button>
-        ) : null}
+        <span className="ob-dot" /><div className="ob-grow"><b>Ollama</b><span>{st.ollama.running ? `Running${st.ollama.version ? `, version ${st.ollama.version}` : ''}` : st.ollama.installed ? 'Installed, starting it…' : inst.state === 'downloading' ? 'Downloading from ollama.com…' : inst.state === 'unpacking' ? 'Installing in Applications…' : 'Getting it ready…'}</span>
+          {inst.state === 'downloading' && inst.total ? <div className="ob-bar"><i style={{ width: `${Math.round((inst.received / inst.total) * 100)}%` }} /></div> : null}
+        </div>
+        {st.ollama.running ? <span className="ob-pct"><Icon name="check" /></span> : <span className="spinner inline" />}
       </div>
-      {st.ollama.install.error ? <p className="ob-note bad">Installing Ollama failed: {st.ollama.install.error}. You can get it from ollama.com.</p> : null}
-      <div className="ob-models">
-        {st.models.map((m) => {
-          const p = m.pull;
-          const pct = p?.total ? Math.round((p.completed / p.total) * 100) : 0;
-          return (
-            <div key={m.role} className={`ob-card ${m.present ? 'good' : ''}`}>
-              <span className="ob-dot" />
-              <div className="ob-grow">
-                <b>{m.what}</b>
-                <span>{m.name} · {m.size} GB{m.shared ? ' · uses the same model' : ''}</span>
-                {p && !p.done ? <div className="ob-bar"><i style={{ width: `${pct}%` }} /></div> : null}
-                {p?.error ? <span className="bad">{p.error}</span> : null}
-              </div>
-              <span className="ob-pct">{m.present ? <Icon name="check" /> : p && !p.done ? `${pct}%${p.total ? ` of ${GB(p.total)} GB` : ''}` : 'missing'}</span>
-            </div>
-          );
-        })}
-      </div>
-      {missing.length && st.ollama.running ? (
-        <button type="button" className="ob-btn big" onClick={() => go('/setup/models')} disabled={busy || pulling}>{pulling ? 'Downloading… you can go on meanwhile' : `Download the models (${Math.round(total)} GB)`}</button>
-      ) : null}
-      {st.ready ? <p className="ob-note good">Everything is ready.</p> : <p className="ob-note">This Mac has {st.memoryGb} GB of memory{st.memoryGb < 30 ? ', so the assistant uses the 9B model instead of the big one' : ''}. Downloads keep going while you set up the rest.</p>}
+      {inst.error ? <p className="ob-note bad">Installing Ollama failed: {inst.error}. You can get it from ollama.com and open Undercurrent again.</p> : null}
+      <ModelChooser options={options} choice={choice} setChoice={setChoice} status={st} />
+      {st.ready ? <p className="ob-note good">Everything is on this Mac already.</p> : null}
     </div>
   );
 }
@@ -90,12 +59,18 @@ function Who({ gender, setGender }) {
       <p className="ob-lede">Slide toward who you're into. You can change it any time above the feed, or let it follow what you like.</p>
       <div className="ob-who">
         <div className="ob-face f" style={{ '--s': 0.55 + (100 - men) / 160 }}><Icon name="female" /><span>{100 - men}%</span></div>
+        {men >= 45 && men <= 65 ? <div className="ob-plus" aria-hidden="true">+</div> : null}
         <div className="ob-face m" style={{ '--s': 0.55 + men / 160 }}><Icon name="male" /><span>{men}%</span></div>
       </div>
-      <input className="uslider gender ob-slider" type="range" min="0" max="100" step="5" value={men} disabled={gender.auto} onChange={(e) => setGender({ ...gender, male: Number(e.target.value) })} aria-label="Balance between women and men" />
-      <p className="ob-center">{men >= 90 ? 'Men only' : men <= 10 ? 'Women only' : `${100 - men}% women · ${men}% men`}</p>
+      <div className="ob-slidewrap">
+        <span className="ob-band" style={{ left: '45%', width: '20%' }} aria-hidden="true" />
+        <input className="uslider gender ob-slider" type="range" min="0" max="100" step="5" value={men} disabled={gender.auto || gender.everyone} onChange={(e) => setGender({ ...gender, male: Number(e.target.value) })} aria-label="Balance between women and men" />
+      </div>
+      <div className="ob-scale" aria-hidden="true"><span>Women only</span><span>Hetero</span><span>Men only</span></div>
+      <p className="ob-center"><b>{gender.everyone ? 'Everyone: men, women and both together' : men >= 90 ? 'Men only' : men <= 10 ? 'Women only' : men >= 45 && men <= 65 ? 'Hetero only: a man and a woman together' : `${100 - men}% women · ${men}% men`}</b></p>
       <div className="ob-toggles">
         <button type="button" className={`ob-toggle${gender.auto ? ' on' : ''}`} onClick={() => setGender({ ...gender, auto: !gender.auto })}><Icon name="auto" />Follow what I like</button>
+        <button type="button" className={`ob-toggle${gender.everyone ? ' on' : ''}`} onClick={() => setGender({ ...gender, everyone: !gender.everyone })}><Icon name="grid" />Everyone, any mix</button>
         <button type="button" className={`ob-toggle${gender.trans ? ' on' : ''}`} onClick={() => setGender({ ...gender, trans: !gender.trans })}><Icon name="trans" />Trans content {gender.trans ? 'on' : 'off'}</button>
       </div>
     </div>
@@ -255,25 +230,33 @@ export default function Onboarding({ onDone }) {
   const [picked, setPicked] = useState([]);
   const [fantList, setFantList] = useState(null);
   const [chosen, setChosen] = useState([]);
-  const [gender, setGender] = useState({ male: 50, auto: false, trans: true });
+  const [gender, setGender] = useState({ male: 50, auto: false, trans: true, everyone: false });
   const [sources, setSources] = useState([]);
   const [srcOn, setSrcOn] = useState({});
   const [limits, setLimits] = useState([]);
   const [saving, setSaving] = useState(false);
   const [dir, setDir] = useState(1);
   const [err, setErr] = useState(null);
+  const [modelOpts, setModelOpts] = useState(null);
+  const [choice, setChoice] = useState({});
+  const askedInstall = useRef(false);
 
-  const reload = () => api('/setup/status').then(setStatus).catch(() => {});
+  const reload = () => api('/setup/status').then((st) => {
+    setStatus(st);
+    // Ollama is installed by itself the first time: no button to press.
+    if (!st.ollama.installed && !askedInstall.current && !st.mock) { askedInstall.current = true; api('/setup/ollama', { method: 'POST', body: {} }).then(() => setTimeout(reload, 800)).catch(() => {}); }
+  }).catch(() => {});
   useEffect(() => {
     reload();
     api('/setup/concepts').then((r) => { setFamilies(r.families); setPicked(r.picked || []); }).catch(() => {});
-    api('/settings/gender').then((g) => setGender({ male: g.male ?? 50, auto: !!g.auto, trans: g.trans !== false })).catch(() => {});
+    api('/settings/gender').then((g) => setGender({ male: g.male ?? 50, auto: !!g.auto, trans: g.trans !== false, everyone: !!g.everyone })).catch(() => {});
     api('/setup/sources').then((r) => setSources(r.sources)).catch(() => {});
     api('/limits').then((r) => setLimits((r.limits || []).map((x) => x.tag || x))).catch(() => {});
+    api('/setup/models/options').then(setModelOpts).catch(() => {});
   }, []);
   // While models download, keep the progress fresh.
   useEffect(() => {
-    const busy = status && (status.models.some((m) => m.pull && !m.pull.done) || ['downloading', 'unpacking'].includes(status.ollama.install.state) || (!status.ollama.running && status.ollama.installed));
+    const busy = status && (status.pulling || status.models.some((m) => m.pull && !m.pull.done) || ['downloading', 'unpacking'].includes(status.ollama.install.state) || !status.ollama.running);
     if (!busy) return undefined;
     const t = setInterval(reload, 1500);
     return () => clearInterval(t);
@@ -281,6 +264,7 @@ export default function Onboarding({ onDone }) {
 
   // Skips the fantasies step when there is nothing to tie together.
   const go = (d) => {
+    if (step === 1 && d > 0) startDownloads();
     setDir(d);
     setStep((s) => {
       let n = Math.max(0, Math.min(STEPS.length - 1, s + d));
@@ -288,7 +272,21 @@ export default function Onboarding({ onDone }) {
       return n;
     });
   };
+  // Leaving the local AI step saves the choice and starts the downloads; if Ollama is still being installed,
+  // they start as soon as it runs.
+  const downloadsAsked = useRef(false);
+  function startDownloads() {
+    downloadsAsked.current = true;
+    api('/setup/models/choice', { method: 'PUT', body: { ...choice, pull: true } }).then((r) => { setModelOpts(r); reload(); }).catch(() => {});
+  }
+  useEffect(() => {
+    if (downloadsAsked.current && status?.ollama.running && !status.ready && !status.pulling && !status.models.some((m) => m.pull)) {
+      api('/setup/models', { method: 'POST', body: {} }).then(reload).catch(() => {});
+    }
+  }, [status?.ollama.running]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function finish() {
+    if (!downloadsAsked.current) { downloadsAsked.current = true; await api('/setup/models/choice', { method: 'PUT', body: { ...choice } }).catch(() => {}); }
     setSaving(true);
     const sourcesOut = Object.fromEntries(sources.filter((s) => s.hasKeys).map((s) => [s.id, srcOn[s.id] ?? s.enabled]));
     try {
@@ -314,7 +312,7 @@ export default function Onboarding({ onDone }) {
         </header>
         <main className={`ob-body dir${dir > 0 ? 'f' : 'b'}`} key={step}>
           {step === 0 ? <Welcome ok={ok} setOk={setOk} /> : null}
-          {step === 1 ? <LocalAi status={status} reload={reload} /> : null}
+          {step === 1 ? <LocalAi status={status} options={modelOpts} choice={choice} setChoice={setChoice} /> : null}
           {step === 2 ? <Who gender={gender} setGender={setGender} /> : null}
           {step === 3 ? <Kinks families={families} picked={picked} setPicked={setPicked} /> : null}
           {step === 4 ? <Fantasies picked={picked} chosen={chosen} setChosen={setChosen} list={fantList} setList={setFantList} /> : null}

@@ -71,11 +71,12 @@ function Balance() {
       <span className="tlabel">Gender</span>
       <div className="uslider-row">
         <span className="gsym f" title="Women"><Icon name="female" /></span>
-        <input className="uslider gender" type="range" min="0" max="100" step="5" value={male} disabled={g.auto} aria-label="Balance between women and men" onChange={(e) => save({ male: Number(e.target.value) })} />
+        <input className="uslider gender" type="range" min="0" max="100" step="5" value={male} disabled={g.auto || g.everyone} aria-label="Balance between women and men" onChange={(e) => save({ male: Number(e.target.value) })} />
         <span className="gsym m" title="Men"><Icon name="male" /></span>
-        <output>{male >= 90 ? 'men only' : male <= 10 ? 'women only' : `${100 - male}% women · ${male}% men`}</output>
+        <output>{g.everyone ? 'everyone' : male >= 90 ? 'men only' : male <= 10 ? 'women only' : male >= 45 && male <= 65 ? 'hetero only' : `${100 - male}% women · ${male}% men`}</output>
       </div>
       <TChip on={g.auto} icon="auto" color="#B6A8B0" label="Auto" sub={g.auto ? 'from what you like' : null} onClick={() => save({ auto: !g.auto }, !g.auto ? 'The balance now follows what you like, heat and save.' : 'Balance set by hand again.')} title="Let the balance follow what you interact with" />
+      <TChip on={g.everyone} icon="grid" color="#E8C66B" label="Everyone" sub={g.everyone ? 'all of it' : null} onClick={() => save({ everyone: !g.everyone }, !g.everyone ? 'Showing everyone: men, women and both together.' : 'The balance decides again.')} title="Show posts with anyone, whatever the balance says" />
       <TChip on={g.trans} icon="trans" color="#C9A7E8" label="Trans" sub={g.trans ? 'allowed' : 'hidden'} onClick={() => save({ trans: !g.trans })} title="Allow trans content" />
     </div>
   );

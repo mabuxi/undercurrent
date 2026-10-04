@@ -230,7 +230,7 @@ function build(type, r, ctx) {
       const kk = k;
       const rows = getDb().prepare(`SELECT i.* FROM items i LEFT JOIN item_state s ON s.item_id = i.id WHERE i.blocked = 0 AND COALESCE(s.hidden,0) = 0 AND COALESCE(s.seen,0) = 0 AND i.created_utc > ? ORDER BY i.score DESC LIMIT 80`).all(Math.round(now() / 1000) - 7 * 86400);
       const gp = genderPrefs();
-      let items = rows.filter((row) => !EXCLUDE.includes(row.id)).map(hydrate).filter((it) => stableRand(it.id) < allowance(gp.male, kindOf(it), it.gTrans, gp.trans, sureOf(it))).map((it) => presentOne(it));
+      let items = rows.filter((row) => !EXCLUDE.includes(row.id)).map(hydrate).filter((it) => stableRand(it.id) < allowance(gp.male, kindOf(it), it.gTrans, gp.trans, sureOf(it), gp.everyone)).map((it) => presentOne(it));
       if (kk) {
         const f = items.filter((it) => it.kinks.some((x) => x.id === kk.id));
         if (f.length >= 3) items = f;

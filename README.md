@@ -19,6 +19,10 @@ npm run app
 
 Quitting the app (⌘Q, or closing its window) stops the server, unloads the models and quits Ollama.
 
+## Profiles
+
+Settings, Profiles: each profile has its own kinks, history, sources and settings (the AI models are shared). Add one and it opens with the welcome steps; switch, rename, back up, restore a backup as a new profile, or delete. Backups are in `~/Library/Application Support/Undercurrent/backups`.
+
 ## Your data
 
 - Your database, settings, history and logs live in `~/Library/Application Support/Undercurrent`, never in this folder, so they are never committed or pushed and updates never touch them.
@@ -29,7 +33,7 @@ Quitting the app (⌘Q, or closing its window) stops the server, unloads the mod
 
 Every version is a git tag (`v0.14.0`, `v0.15.0`, …) with its notes in [CHANGELOG.md](CHANGELOG.md). The app checks GitHub every few hours. When there is a newer version, an **Update to …** button appears in the top bar: it shows what changed, installs it, rebuilds the app and restarts. Settings, Version and updates has a check button and the full change history.
 
-Updating needs this Mac to be able to read the repository (the SSH key of this Mac added to the GitHub account that owns the repository).
+Updating needs this Mac to be able to read the repository: add this Mac's SSH key as a deploy key of the repository and point this copy at it with `git config core.sshCommand "ssh -i ~/.ssh/<key> -o IdentitiesOnly=yes -F /dev/null"`.
 
 ### Making a new version
 

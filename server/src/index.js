@@ -161,6 +161,8 @@ const server = app.listen(config.port, config.host, async () => {
   startJudge();
   startLooker();
   setTimeout(() => refreshKinks().catch((e) => { if (!e.yielded) log('warn', 'Kink refresh failed', e.message); }), 90000);
+  // Model downloads that were cut off (the app was quit halfway) carry on by themselves.
+  setTimeout(async () => { try { const { pullModels } = await import('./setup.js'); if (getSetting('modelsChosen', false)) { const r = await pullModels(); if (r.missing?.length) log('info', `Downloading the models that are still missing: ${r.missing.join(', ')}`); } } catch {} }, 15000);
   setTimeout(async () => { try { const { backfillGender } = await import('./gender.js'); const { getSetting: gs, setSetting: ss, getDb: gd } = await import('./db.js'); if ((gs('genderGuessV', 1) || 1) < 2) { gd().exec("UPDATE items SET g_src = NULL WHERE g_src IN ('guess', 'none')"); ss('genderGuessV', 2); } const n = backfillGender(30000); if (n) log('info', `Guessed who is in ${n} posts (men, women, trans) until the AI looks closer`); } catch (e) { log('warn', 'Gender backfill failed', e.message); } }, 5000);
   setInterval(() => refreshKinks().catch((e) => log('warn', 'Kink refresh failed', e.message)), 15 * 60000);
 });

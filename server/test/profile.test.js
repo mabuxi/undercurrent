@@ -9,6 +9,9 @@ import { addMemory, listMemory, updateMemory } from '../src/memory.js';
 import { fallbackParse } from '../src/ai/assistant.js';
 
 openDb(':memory:');
+// These ranking tests are about taste, not the men and women balance: show everyone.
+const { setGenderPrefs: setGP } = await import('../src/gender.js');
+setGP({ everyone: true });
 
 function make(i, tags, format = 'image') {
   return upsertItem({ source: 'reddit', ext_id: `t${i}`, title: `Post ${i}`, author: `a${i % 5}`, community: `r/c${i % 3}`, format, tags, score: 50, created_utc: Math.round(Date.now() / 1000) - 3600, media: { kind: 'image', src: 'x' } }).id;
@@ -178,8 +181,12 @@ test('original content markers become a badge and moderator posts are caught', (
 
 import { allowance, guessGender } from '../src/gender.js';
 
-test('the men and women balance lets everything through at 50/50 and narrows toward one side', () => {
-  for (const k of ['men', 'women', 'mixed', 'unknown']) assert.equal(allowance(50, k, false, true), 1);
+test('the balance: 45 to 65% is hetero only, Everyone lets all through, and it narrows toward one side', () => {
+  assert.equal(allowance(50, 'mixed', false, true, 1), 1);
+  assert.equal(allowance(50, 'men', false, true, 1), 0, 'hetero only: no men-only posts');
+  assert.equal(allowance(60, 'women', false, true, 1), 0, 'hetero only: no women-only posts');
+  for (const k of ['men', 'women', 'mixed', 'unknown']) assert.equal(allowance(50, k, false, true, 1, true), 1, 'Everyone lets everything through');
+  assert.ok(allowance(40, 'women', false, true) === 1 && allowance(40, 'men', false, true) < 1);
   assert.equal(allowance(100, 'women', false, true), 0);
   assert.equal(allowance(100, 'mixed', false, true), 0, 'at 100% men only men');
   assert.ok(allowance(90, 'mixed', false, true) > 0.05, 'at 90% men something else very rarely');
@@ -189,7 +196,7 @@ test('the men and women balance lets everything through at 50/50 and narrows tow
   assert.ok(allowance(95, 'men?', false, true) > 0.2, 'a man is there, the rest not known yet: allowed until the image says otherwise');
   assert.ok(allowance(80, 'men', false, true) === 1 && allowance(80, 'women', false, true) < 0.15 && allowance(80, 'mixed', false, true) > 0.4);
   assert.ok(allowance(20, 'men', false, true) < 0.15 && allowance(20, 'mixed', false, true) > 0.4);
-  assert.equal(allowance(50, 'women', true, false), 0, 'trans content hidden when not allowed');
+  assert.equal(allowance(30, 'women', true, false), 0, 'trans content hidden when not allowed');
   assert.deepEqual(guessGender('Twinks kissing in the shower'), { men: 2, women: 0, trans: false });
   assert.deepEqual(guessGender('[F] my new lingerie selfie'), { men: 0, women: 1, trans: false });
   assert.deepEqual(guessGender('busty milf takes a big cock'), { men: 1, women: 1, trans: false });

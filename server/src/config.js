@@ -8,6 +8,17 @@ const mock = process.argv.includes('--mock') || process.env.MOCK === '1';
 // Your data (database, settings, history, logs) lives outside the code: the Mac app keeps it in
 // ~/Library/Application Support/Undercurrent, so updating or re-downloading the code never touches it.
 const dataDir = process.env.UC_DATA_DIR || path.join(root, 'data');
+// Profiles: each one is its own database in the data folder; profiles.json says which one is open.
+export function readProfiles() {
+  const file = path.join(dataDir, 'profiles.json');
+  try {
+    const p = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (p && Array.isArray(p.list) && p.list.length) return p;
+  } catch {}
+  return { active: 'main', list: [{ id: 'main', name: 'Main', file: 'undercurrent.db', color: '#E39A83', created: Date.now() }] };
+}
+const profiles = readProfiles();
+const activeProfile = profiles.list.find((x) => x.id === profiles.active) || profiles.list[0];
 let version = '0.0.0';
 try { version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version || version; } catch {}
 
@@ -22,7 +33,8 @@ export const config = {
   // Bind to the local network by default so the UI can be opened from another
   // device on the same network. Set HOST=127.0.0.1 to keep the server local-only.
   host: process.env.HOST || '0.0.0.0',
-  dbPath: process.env.DB_PATH || path.join(dataDir, mock ? 'mock.db' : 'undercurrent.db'),
+  profile: process.env.DB_PATH || mock ? { id: 'main', name: mock ? 'Test' : 'Main' } : { id: activeProfile.id, name: activeProfile.name },
+  dbPath: process.env.DB_PATH || path.join(dataDir, mock ? 'mock.db' : activeProfile.file),
   webDist: path.join(root, 'web', 'dist'),
   mock,
   ollamaUrl: (process.env.OLLAMA_URL || 'http://127.0.0.1:11434').replace(/\/$/, ''),

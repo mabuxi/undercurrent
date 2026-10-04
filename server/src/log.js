@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { config } from './config.js';
 
-const file = path.join(config.dbPath === ':memory:' ? config.dataDir : path.dirname(config.dbPath), 'server.log');
+const file = path.join(config.dbPath === ':memory:' || !process.env.DB_PATH ? config.dataDir : path.dirname(config.dbPath), 'server.log');
 let checked = 0;
 
 function rotate() {

@@ -269,9 +269,10 @@ export async function runIngest({ force = false, only = null } = {}) {
       const p = PROVIDERS[id];
       if (!p.can.trending) continue;
       if (!force && (stats[id]?.lastTrending || 0) > cutoff) continue;
-      const gmode = genderMode();
-      const r = gmode && p.can.search && id !== 'reddit'
-        ? await runTarget({ provider: id, mode: 'search', value: gmode === 'men' ? 'gay' : 'lesbian' }, `${p.label} ${gmode === 'men' ? 'gay' : 'lesbian'} ${sort}`, 1 + (Math.floor(cycle / SORTS.length) % 3), sort)
+      const gm = genderMode();
+      const gterm = gm === 'men' ? 'gay' : gm === 'women' ? 'lesbian' : null;
+      const r = gterm && p.can.search && id !== 'reddit'
+        ? await runTarget({ provider: id, mode: 'search', value: gterm }, `${p.label} ${gterm} ${sort}`, 1 + (Math.floor(cycle / SORTS.length) % 3), sort)
         : await runTarget({ provider: id, mode: 'trending', value: '' }, `${p.label} ${sort}`, 1 + (Math.floor(cycle / SORTS.length) % 2), sort);
       stat(id, { lastTrending: now() });
       added += r.added; blocked += r.blocked;

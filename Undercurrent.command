@@ -7,4 +7,10 @@ echo "Building the app…"
 npm run build --silent >/dev/null 2>&1 || npm run build
 echo "Starting Undercurrent. Close this window or press Ctrl+C to stop it and the local models."
 (sleep 5; open "http://127.0.0.1:4317") &
-exec node --env-file-if-exists=.env server/src/index.js
+# Exit code 75 means "start again" (after switching profiles or updating).
+while true; do
+  node --env-file-if-exists=.env server/src/index.js
+  code=$?
+  [ "$code" -eq 75 ] || exit "$code"
+  echo "Restarting…"
+done

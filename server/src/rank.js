@@ -224,7 +224,7 @@ export function buildFeed(filters = {}, { exclude = [], limit = 12, mix = 15 } =
       if (it.gTrans && sq.trans === false) continue;
       if (it.gTrans && !gp.trans && sq.trans !== true) continue;
     } else {
-      const allow = allowance(gp.male, gk, it.gTrans, gp.trans, sureOf(it));
+      const allow = allowance(gp.male, gk, it.gTrans, gp.trans, sureOf(it), gp.everyone);
       if (!explicit && stableRand(it.id) >= allow) continue;
     }
     if (popCut && popOf(it) < (popCut.get(it.source) || 0)) continue;
