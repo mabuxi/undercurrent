@@ -1,0 +1,57 @@
+# Every version tag (v0.16.0, …) builds the downloadable Mac app on GitHub's Macs and attaches it to a GitHub Release.
+# The app checks those releases to update itself, and install.sh downloads the newest one.
+name: Release the Mac app
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Version tag to build again, for example v0.16.0'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  mac:
+    runs-on: macos-15
+    timeout-minutes: 40
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install the packages
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run the tests
+        run: npm test
+      - name: Build Undercurrent.app
+        run: bash mac/package.sh
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="${TAG#v}"
+          awk -v v="$V" '$0 ~ "^## "v {on=1; next} /^## / {on=0} on' CHANGELOG.md > notes.md
+          cat >> notes.md <<'NOTES'
+
+          ---
+          **Install:** download **Undercurrent.dmg**, open it and drag Undercurrent into Applications. The first time, macOS asks you to allow it in System Settings, Privacy and Security, "Open Anyway". Or paste this in Terminal, which installs and opens it in one go:
+
+          ```
+          curl -fsSL https://raw.githubusercontent.com/mabuxi/undercurrent/main/install.sh | bash
+          ```
+
+          Already installed? Undercurrent updates itself: use the "Update to" button in the app.
+          NOTES
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" mac/dist/Undercurrent-mac.zip mac/dist/Undercurrent.dmg --clobber
+          else
+            gh release create "$TAG" mac/dist/Undercurrent-mac.zip mac/dist/Undercurrent.dmg --title "Undercurrent $V" --notes-file notes.md --verify-tag
+          fi

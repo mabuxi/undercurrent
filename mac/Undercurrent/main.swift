@@ -24,12 +24,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         return dir
     }()
 
-    // Where the code is: set when the app was built, can be changed in ~/Library/Application Support/Undercurrent/install-path.
+    // The downloaded app carries everything inside it: the code in Resources/app and its own Node in Resources/node.
+    lazy var bundledApp: String? = {
+        guard let res = Bundle.main.resourcePath else { return nil }
+        let p = res + "/app"
+        return FileManager.default.fileExists(atPath: p + "/server/src/index.js") ? p : nil
+    }()
+    var packaged: Bool { bundledApp != nil && installPathOverride == nil }
+
+    // A code folder set by hand in ~/Library/Application Support/Undercurrent/install-path wins (for development).
+    lazy var installPathOverride: String? = {
+        guard let custom = try? String(contentsOf: dataDir.appendingPathComponent("install-path"), encoding: .utf8) else { return nil }
+        let p = custom.trimmingCharacters(in: .whitespacesAndNewlines)
+        return FileManager.default.fileExists(atPath: p + "/server/src/index.js") ? p : nil
+    }()
+
+    // Where the code is: inside the app when it was downloaded, otherwise the code folder it was built from.
     lazy var installPath: String = {
-        if let custom = try? String(contentsOf: dataDir.appendingPathComponent("install-path"), encoding: .utf8) {
-            let p = custom.trimmingCharacters(in: .whitespacesAndNewlines)
-            if FileManager.default.fileExists(atPath: p + "/server/src/index.js") { return p }
-        }
+        if let p = installPathOverride { return p }
+        if let p = bundledApp { return p }
         return (Bundle.main.object(forInfoDictionaryKey: "UCInstallPath") as? String) ?? ""
     }()
 
@@ -78,6 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     func nodePath() -> String? {
         let fm = FileManager.default
         var candidates: [String] = []
+        if packaged, let res = Bundle.main.resourcePath { candidates.append(res + "/node/node") }
         if let p = Bundle.main.object(forInfoDictionaryKey: "UCNodePath") as? String { candidates.append(p) }
         let nvm = NSHomeDirectory() + "/.nvm/versions/node"
         if let versions = try? fm.contentsOfDirectory(atPath: nvm) {
@@ -89,7 +103,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     func startServer() {
         guard !installPath.isEmpty, FileManager.default.fileExists(atPath: installPath + "/server/src/index.js") else {
-            showError("Undercurrent's code folder was not found.", detail: "Expected it at \(installPath). Build the app again from the code folder (mac/build.sh --install).")
+            showError("Parts of Undercurrent are missing.", detail: "Download Undercurrent again from github.com/mabuxi/undercurrent and replace this copy. Your data is kept.")
             return
         }
         guard let node = nodePath() else {
@@ -101,12 +115,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: node)
-        p.arguments = ["--env-file-if-exists=\(installPath)/.env", "\(installPath)/server/src/index.js"]
+        // Settings for the server can go in a .env file: next to the code, or in the data folder for the downloaded app.
+        p.arguments = ["--env-file-if-exists=\(packaged ? dataDir.path : installPath)/.env", "\(installPath)/server/src/index.js"]
         p.currentDirectoryURL = URL(fileURLWithPath: installPath + "/server")
         var env = ProcessInfo.processInfo.environment
         env["UC_APP"] = "1"
         env["UC_DATA_DIR"] = dataDir.path
         env["PORT"] = String(PORT)
+        if packaged {
+            env["UC_PACKAGED"] = "1"
+            env["UC_APP_BUNDLE"] = Bundle.main.bundlePath
+        }
         env["PATH"] = (node as NSString).deletingLastPathComponent + ":/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
         p.environment = env
         let logURL = dataDir.appendingPathComponent("app.log")
@@ -137,7 +156,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             startServer()
             return
         }
+        // 76: the app itself was replaced by a new version. Quit and open the new one.
+        if code == 76 {
+            showSplash("Opening the new version…")
+            relaunch()
+            return
+        }
         showError("Undercurrent stopped unexpectedly.", detail: "Exit code \(code). The log is in ~/Library/Application Support/Undercurrent/app.log.")
+    }
+
+    func relaunch() {
+        let path = Bundle.main.bundlePath
+        let pid = ProcessInfo.processInfo.processIdentifier
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/sh")
+        p.arguments = ["-c", "while kill -0 \(pid) 2>/dev/null; do sleep 0.2; done; sleep 0.5; /usr/bin/open \"$0\"", path]
+        try? p.run()
+        quitting = true
+        NSApp.terminate(nil)
     }
 
     func serverUp() -> Bool {
@@ -177,7 +213,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         let fm = FileManager.default
         let target = dataDir.appendingPathComponent("undercurrent.db")
         let old = installPath + "/data/undercurrent.db"
-        guard !fm.fileExists(atPath: target.path), fm.fileExists(atPath: old) else { return }
+        guard !packaged, !fm.fileExists(atPath: target.path), fm.fileExists(atPath: old) else { return }
         DispatchQueue.main.async { self.showSplash("Moving your data to its new place…") }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")

@@ -47,10 +47,11 @@ let stopping = false;
 let restartCode = 0;
 let stopFn = null;
 // After an update the server stops with code 75; the Mac app sees that and starts it again on the new code.
-export function restartServer() {
-  restartCode = 75;
+// Code 76 means the whole app was replaced by a new version: the Mac app quits and opens the new one.
+export function restartServer(code = 75) {
+  restartCode = code;
   if (stopFn) stopFn('update');
-  else process.exit(75);
+  else process.exit(code);
 }
 export function stopWithServer(server) {
   const stop = async (sig) => {

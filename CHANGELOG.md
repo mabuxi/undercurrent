@@ -3,6 +3,22 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.16.0 · 4 October 2026
+
+### Download it like any other app
+- Undercurrent now comes ready-made on the GitHub Releases page: a disk image to drag into Applications, or one line to paste in Terminal that installs and opens it.
+- Nothing to install first: no Node.js, npm, Xcode or git. The app carries its own Node.js.
+- It runs on Apple Silicon and Intel Macs with macOS 13 or newer.
+- The first start still installs Ollama and downloads the models that fit your Mac by itself.
+
+### Updates
+- The downloaded app updates itself from GitHub Releases: it downloads the new version with a progress bar, swaps itself and opens again on the new version. No git or GitHub account needed.
+- Every new version is built and published by GitHub automatically as soon as it is tagged.
+- An app built from a code folder keeps updating with git, as before.
+
+### Other
+- The downloaded app reads optional server settings from a .env file in its data folder.
+
 ## 0.15.0 · 4 October 2026
 
 ### Profiles

@@ -148,6 +148,7 @@ app.use((err, req, res, next) => {
 
 const server = app.listen(config.port, config.host, async () => {
   stopWithServer(server);
+  import('./update.js').then((u) => u.cleanupUpdate()).catch(() => {});
   await ensureOllama().then((r) => { if (!r.ok) log('warn', r.error); });
   const h = await health();
   const lan = Object.values(os.networkInterfaces()).flat().filter((n) => n && n.family === 'IPv4' && !n.internal).map((n) => `http://${n.address}:${config.port}`);

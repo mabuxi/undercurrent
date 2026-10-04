@@ -1,9 +1,16 @@
 {
   "name": "undercurrent",
   "private": true,
-  "version": "0.15.0",
+  "version": "0.16.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mabuxi/undercurrent.git"
+  },
   "type": "module",
-  "workspaces": ["server", "web"],
+  "workspaces": [
+    "server",
+    "web"
+  ],
   "scripts": {
     "dev": "concurrently -n server,web -c magenta,cyan \"npm run dev -w server\" \"npm run dev -w web\"",
     "dev:mock": "concurrently -n server,web -c magenta,cyan \"npm run dev:mock -w server\" \"npm run dev -w web\"",
@@ -11,7 +18,8 @@
     "start": "npm run build && npm run start -w server",
     "test": "npm test -w server",
     "app": "bash mac/build.sh --install",
-    "release": "bash scripts/release.sh"
+    "release": "bash scripts/release.sh",
+    "package": "bash mac/package.sh"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

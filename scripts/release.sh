@@ -2,7 +2,7 @@
 # Cuts a new version: npm run release -- 0.15.0
 # 1. CHANGELOG.md must already have a "## 0.15.0 · date" section with the notes.
 # 2. Sets the version in every package.json, commits, tags v0.15.0 with those notes and pushes both to GitHub.
-# Every Undercurrent that is linked to the repository then offers the update.
+# 3. GitHub Actions then builds the downloadable app and attaches it to a Release; every installed app offers the update.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 V="${1:-}"
@@ -18,4 +18,5 @@ git commit -m "Release v$V" -m "$NOTES" || true
 git tag -a "v$V" -m "Undercurrent $V" -m "$NOTES"
 git push origin main
 git push origin "v$V"
-echo "Released v$V."
+echo "Released v$V. GitHub now builds the Mac app and publishes it on the Releases page (about ten minutes):"
+echo "https://github.com/mabuxi/undercurrent/actions"

@@ -6,16 +6,17 @@ Current version: see [CHANGELOG.md](CHANGELOG.md).
 
 ## Install on a Mac
 
-You need macOS 13 or newer, [Node.js](https://nodejs.org) 22 or newer and Xcode or the Xcode Command Line Tools (`xcode-select --install`). Ollama and the models are installed from inside the app.
+Undercurrent is a normal Mac app. Nothing has to be installed first: Node.js is inside the app, and on the first start the app installs Ollama and downloads the AI models that fit your Mac, with progress. It runs on Apple Silicon and Intel Macs with macOS 13 or newer.
+
+**The quickest way:** open Terminal and paste this line. It downloads the newest version into Applications and opens it.
 
 ```bash
-git clone git@github.com:mabuxi/undercurrent.git
-cd undercurrent
-npm install
-npm run app
+curl -fsSL https://raw.githubusercontent.com/mabuxi/undercurrent/main/install.sh | bash
 ```
 
-`npm run app` builds **Undercurrent.app** and puts it in Applications. Open it like any other app. The first time, the welcome steps walk you through the local AI (Ollama and the models download with progress), who you want to see, your kinks, fantasies, sources and hard limits.
+**Or download it:** on the [Releases page](https://github.com/mabuxi/undercurrent/releases/latest), download **Undercurrent.dmg**, open it and drag Undercurrent into Applications. The app is not signed with a paid Apple developer certificate, so the first time macOS says it cannot verify it. Click Done, then open System Settings, Privacy and Security, scroll down and click **Open Anyway** next to Undercurrent. You only do this once; updates open normally.
+
+The first time, the welcome steps walk you through the local AI, who you want to see, your kinks, fantasies, sources and hard limits.
 
 Quitting the app (⌘Q, or closing its window) stops the server, unloads the models and quits Ollama.
 
@@ -31,18 +32,31 @@ Settings, Profiles: each profile has its own kinks, history, sources and setting
 
 ## Updates
 
-Every version is a git tag (`v0.14.0`, `v0.15.0`, …) with its notes in [CHANGELOG.md](CHANGELOG.md). The app checks GitHub every few hours. When there is a newer version, an **Update to …** button appears in the top bar: it shows what changed, installs it, rebuilds the app and restarts. Settings, Version and updates has a check button and the full change history.
-
-Updating needs this Mac to be able to read the repository: add this Mac's SSH key as a deploy key of the repository and point this copy at it with `git config core.sshCommand "ssh -i ~/.ssh/<key> -o IdentitiesOnly=yes -F /dev/null"`.
+The app checks GitHub every few hours. When there is a newer version, an **Update to …** button appears in the top bar: it shows what changed, downloads the new app, swaps it in and opens it again. Your data is not inside the app, so it is never touched. Settings, Version and updates has a check button and the full change history.
 
 ### Making a new version
 
-1. Add a section to `CHANGELOG.md`, for example `## 0.15.0 · 12 October 2026`, with the changes as `- ` lines under `### ` headings.
-2. Run `npm run release -- 0.15.0`. It sets the version everywhere, commits, tags `v0.15.0` with the notes and pushes both.
+1. Add a section to `CHANGELOG.md`, for example `## 0.16.0 · 4 October 2026`, with the changes as `- ` lines under `### ` headings.
+2. Run `npm run release -- 0.16.0`. It sets the version everywhere, commits, tags `v0.16.0` with the notes and pushes both.
+3. GitHub then builds the app on its own Macs (`.github/workflows/release.yml`, about ten minutes) and publishes it as a Release with `Undercurrent.dmg` and `Undercurrent-mac.zip`. Every installed Undercurrent offers the update as soon as the files are there.
 
 Version numbers are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH.
 
-## Without the app
+## Working on the code
+
+You need Node.js 22 or newer and Xcode or the Command Line Tools (`xcode-select --install`).
+
+```bash
+git clone https://github.com/mabuxi/undercurrent.git
+cd undercurrent
+npm install
+npm run app          # builds Undercurrent.app from this folder and puts it in Applications
+npm run package      # builds the downloadable app: mac/dist/Undercurrent.dmg and Undercurrent-mac.zip
+```
+
+An app built with `npm run app` runs the code in this folder and updates it with git (it needs to be able to fetch the repository). The downloadable app updates from the Releases.
+
+### Without the app
 
 ```bash
 npm run dev:mock     # test mode at http://127.0.0.1:5173: fake posts and a fake model, no accounts
@@ -89,7 +103,9 @@ A built-in filter removes anything that suggests a person under 18 before it is 
 ## Project layout
 
 ```
-mac/                 the Mac app (Swift, a window around the local web app) and build.sh
+mac/                 the Mac app (Swift, a window around the local web app), build.sh and package.sh
+.github/workflows/   builds and publishes the downloadable app for every version
+install.sh           the one-line installer
 server/src/          the local server: sources, tagging, ranking, kinks, setup, updates
 web/src/             the interface (React)
 scripts/             release.sh, browser tests

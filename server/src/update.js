@@ -1,14 +1,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { config } from './config.js';
 import { getSetting, setSetting, now } from './db.js';
 import { log } from './log.js';
 import { restartServer } from './ai/lifecycle.js';
 
 // Updates come from GitHub: every version is a tag (v0.14.0, v0.15.0, …) with its notes in CHANGELOG.md.
-// Checking fetches the tags; updating moves this copy to the newest tag, installs what changed, rebuilds the app
-// and restarts. Your data is not in this folder, so an update never touches it.
+// The downloaded app (packaged) reads the newest GitHub Release, downloads its Undercurrent-mac.zip, swaps the app
+// and opens the new one. A code folder (git) fetches the tags, moves to the newest one, rebuilds and restarts.
+// Your data is in ~/Library/Application Support/Undercurrent, never in the app, so an update never touches it.
+const ASSET = 'Undercurrent-mac.zip';
+const UA = { 'User-Agent': 'Undercurrent-updater', Accept: 'application/vnd.github+json' };
 
 const ENV = {
   ...process.env,
@@ -62,10 +67,59 @@ export function changelogSince(text, since, upTo = null) {
   return out;
 }
 
+// The newest release that has the Mac app attached (a release whose app is still being built is skipped).
+export function pickRelease(releases, current) {
+  let best = null;
+  for (const r of Array.isArray(releases) ? releases : [releases]) {
+    if (!r || r.draft || r.prerelease) continue;
+    const v = String(r.tag_name || '').replace(/^v/, '');
+    if (!parseVersion(v)) continue;
+    const asset = (r.assets || []).find((a) => a.name === ASSET && (!a.state || a.state === 'uploaded'));
+    if (!asset) continue;
+    if (!best || newer(v, best.version)) best = { version: v, tag: r.tag_name, url: asset.browser_download_url, size: asset.size || 0, body: r.body || '' };
+  }
+  return best && newer(best.version, current) ? best : null;
+}
+
+async function getJson(url) {
+  const res = await fetch(url, { headers: UA, signal: AbortSignal.timeout(15000) });
+  if (!res.ok) throw Object.assign(new Error(`GitHub answered ${res.status}`), { status: res.status });
+  return res.json();
+}
+
+async function releaseStatus(base) {
+  base.mode = 'release';
+  try {
+    const list = await getJson(`https://api.github.com/repos/${config.repo}/releases?per_page=10`);
+    base.connected = true;
+    const rel = pickRelease(list, config.version);
+    if (rel) {
+      base.latest = rel.version;
+      base.available = true;
+      base.release = rel;
+      let text = '';
+      try {
+        const r = await fetch(`https://raw.githubusercontent.com/${config.repo}/${rel.tag}/CHANGELOG.md`, { headers: { 'User-Agent': UA['User-Agent'] }, signal: AbortSignal.timeout(15000) });
+        if (r.ok) text = await r.text();
+      } catch {}
+      base.notes = changelogSince(text, config.version, rel.version);
+      if (!base.notes.length && rel.body) base.notes = [{ version: rel.version, date: '', text: rel.body }];
+    }
+  } catch (err) {
+    base.error = err.status === 403 || err.status === 429
+      ? 'GitHub is limiting update checks for a while. Try again in an hour.'
+      : err.status === 404 ? 'The Undercurrent repository is not public on GitHub, so this app cannot check for updates.'
+      : `Could not reach GitHub to check for updates (${err.message}).`;
+  }
+  cache = { at: now(), v: base };
+  return base;
+}
+
 let cache = { at: 0, v: null };
 export async function updateStatus({ fresh = false } = {}) {
   if (!fresh && cache.v && now() - cache.at < 30 * 60000) return cache.v;
-  const base = { current: config.version, latest: config.version, available: false, notes: [], connected: false, git: false, dirty: false, error: null, checkedAt: now() };
+  const base = { current: config.version, latest: config.version, available: false, notes: [], connected: false, git: false, dirty: false, error: null, checkedAt: now(), packaged: config.packaged };
+  if (config.packaged && !config.mock) return releaseStatus(base);
   if (config.mock || !fs.existsSync(path.join(config.root, '.git'))) { cache = { at: now(), v: { ...base, error: 'This copy is not linked to GitHub, so it cannot update itself.' } }; return cache.v; }
   base.git = true;
   try {
@@ -104,16 +158,100 @@ async function depsChanged(before, changed) {
   return false;
 }
 
-export const job = { state: 'idle', steps: [], error: null, version: null, restart: false, appRebuilt: false };
+export const job = { state: 'idle', steps: [], error: null, version: null, restart: false, appRebuilt: false, relaunch: false, progress: null };
 const step = (label, state = 'run') => {
   const cur = job.steps.find((s) => s.label === label);
   if (cur) cur.state = state; else job.steps.push({ label, state });
 };
 
+// ---------- The downloaded app: swap the whole app for the new one ----------
+
+const sh = (cmd, args, timeout = 300000) => new Promise((resolve, reject) => execFile(cmd, args, { timeout, maxBuffer: 20 * 1024 * 1024 }, (e, out, err) => (e ? reject(new Error(String(err || e.message).trim().slice(-300))) : resolve(String(out).trim()))));
+
+// Leftovers of the previous update, removed on the next start.
+export function cleanupUpdate() {
+  if (!config.packaged || !config.appBundle) return;
+  const dir = path.dirname(config.appBundle);
+  for (const name of ['.Undercurrent-update', '.Undercurrent-previous.app']) {
+    try { fs.rmSync(path.join(dir, name), { recursive: true, force: true }); } catch {}
+  }
+}
+
+async function download(url, file, size) {
+  const res = await fetch(url, { headers: { 'User-Agent': UA['User-Agent'] }, redirect: 'follow' });
+  if (!res.ok || !res.body) throw new Error(`The download failed (GitHub answered ${res.status}).`);
+  const total = Number(res.headers.get('content-length')) || size || 0;
+  let got = 0;
+  const body = Readable.fromWeb(res.body);
+  body.on('data', (c) => { got += c.length; job.progress = total ? Math.min(100, Math.round((got / total) * 100)) : null; });
+  await pipeline(body, fs.createWriteStream(file));
+  if (size && fs.statSync(file).size !== size) throw new Error('The download was incomplete. Try again.');
+}
+
+async function applyRelease(st) {
+  const rel = st.release;
+  const target = config.appBundle;
+  const dir = path.dirname(target);
+  const work = path.join(dir, '.Undercurrent-update');
+  const previous = path.join(dir, '.Undercurrent-previous.app');
+  let swapped = false;
+  try {
+    fs.accessSync(dir, fs.constants.W_OK);
+  } catch {
+    throw new Error(`Undercurrent cannot write to ${dir}. Move Undercurrent.app to your Applications folder and try again.`);
+  }
+  try {
+    fs.rmSync(work, { recursive: true, force: true });
+    fs.mkdirSync(work, { recursive: true });
+    const zip = path.join(work, ASSET);
+    step(`Downloading version ${rel.version}`);
+    await download(rel.url, zip, rel.size);
+    step(`Downloading version ${rel.version}`, 'done');
+    step('Checking the new app');
+    await sh('/usr/bin/ditto', ['-x', '-k', zip, work]);
+    const fresh = path.join(work, 'Undercurrent.app');
+    const pkg = JSON.parse(fs.readFileSync(path.join(fresh, 'Contents', 'Resources', 'app', 'package.json'), 'utf8'));
+    if (pkg.version !== rel.version) throw new Error(`The download is version ${pkg.version}, not ${rel.version}.`);
+    if (!fs.existsSync(path.join(fresh, 'Contents', 'Resources', 'node', 'node'))) throw new Error('The download is missing parts of the app.');
+    await sh('/usr/bin/xattr', ['-dr', 'com.apple.quarantine', fresh]).catch(() => {});
+    step('Checking the new app', 'done');
+    step('Installing it');
+    fs.rmSync(previous, { recursive: true, force: true });
+    fs.renameSync(target, previous);
+    swapped = true;
+    fs.renameSync(fresh, target);
+    step('Installing it', 'done');
+  } catch (err) {
+    if (swapped && !fs.existsSync(target)) { try { fs.renameSync(previous, target); } catch {} }
+    fs.rmSync(work, { recursive: true, force: true });
+    throw err;
+  }
+}
+
 export async function applyUpdate() {
   if (job.state === 'running') return job;
   const st = await updateStatus({ fresh: true });
   if (!st.available) return { ...job, state: 'none', error: st.error || 'You already have the newest version.' };
+  if (st.mode === 'release') {
+    if (!config.appBundle) return { ...job, state: 'failed', error: 'Open Undercurrent from the app to update it.' };
+    Object.assign(job, { state: 'running', steps: [], error: null, version: st.latest, restart: false, appRebuilt: false, relaunch: false, progress: null });
+    (async () => {
+      try {
+        await applyRelease(st);
+        setSetting('updatedFrom', config.version);
+        if (!getSetting('versionSeen', null)) setSetting('versionSeen', config.version);
+        Object.assign(job, { state: 'done', restart: true, relaunch: true });
+        log('info', `Installed ${st.latest}; opening the new app`);
+        cache = { at: 0, v: null };
+        setTimeout(() => restartServer(76), 1500);
+      } catch (err) {
+        job.state = 'failed';
+        job.error = String(err.message || err).slice(0, 300);
+        log('warn', `Update failed: ${job.error}`);
+      }
+    })();
+    return job;
+  }
   if (st.dirty) return { ...job, state: 'failed', error: 'There are changes in the code folder that are not on GitHub, so updating could lose them.' };
   Object.assign(job, { state: 'running', steps: [], error: null, version: st.latest, restart: false, appRebuilt: false });
   (async () => {

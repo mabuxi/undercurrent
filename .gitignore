@@ -2,6 +2,7 @@
 node_modules/
 web/dist/
 mac/build/
+mac/dist/
 
 # Your own data: database, settings, history, logs. Never in git.
 data/

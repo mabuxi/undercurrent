@@ -20,7 +20,14 @@ export function readProfiles() {
 const profiles = readProfiles();
 const activeProfile = profiles.list.find((x) => x.id === profiles.active) || profiles.list[0];
 let version = '0.0.0';
-try { version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version || version; } catch {}
+let repo = 'mabuxi/undercurrent';
+try {
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  version = pkg.version || version;
+  const url = typeof pkg.repository === 'string' ? pkg.repository : pkg.repository?.url;
+  const m = String(url || '').match(/github\.com[/:]([^/]+\/[^/.]+)/);
+  if (m) repo = m[1];
+} catch {}
 
 export const config = {
   root,
@@ -29,6 +36,10 @@ export const config = {
   // Started from the Mac app: quitting the app also quits the local models, even when Ollama was already running.
   app: process.env.UC_APP === '1',
   quitOllama: process.env.UC_QUIT_OLLAMA === '1' || process.env.UC_APP === '1',
+  // The downloaded app carries its own Node and code; it updates itself from GitHub Releases.
+  packaged: process.env.UC_PACKAGED === '1',
+  appBundle: process.env.UC_APP_BUNDLE || null,
+  repo,
   port: Number(process.env.PORT || 4317),
   // Bind to the local network by default so the UI can be opened from another
   // device on the same network. Set HOST=127.0.0.1 to keep the server local-only.

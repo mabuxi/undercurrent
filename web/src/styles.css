@@ -1144,6 +1144,8 @@ button.kcard.dim{opacity:.62}
 .upsteps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:13px}
 .upsteps li{display:flex;gap:8px;align-items:center}
 .upsteps li.done svg{color:var(--ok)}
+.upbar{height:6px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}
+.upbar span{display:block;height:100%;background:linear-gradient(90deg,#E39A83,#C98BC4);transition:width .4s}
 .uplog summary{cursor:pointer;color:var(--text-2);font-size:13px;margin:6px 0}
 
 /* ---------- 0.15.0: model chooser ---------- */

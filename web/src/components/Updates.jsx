@@ -62,7 +62,8 @@ export function UpdateModal({ info, onClose }) {
         </div>
         <Notes notes={info.notes || []} />
         {job?.steps?.length ? <ul className="upsteps">{job.steps.map((s) => <li key={s.label} className={s.state}>{s.state === 'done' ? <Icon name="check" /> : <span className="spin" />}{s.label}</li>)}</ul> : null}
-        {job?.state === 'done' ? <p className="ob-note good">Updated. Restarting{job.appRebuilt ? '. The Mac app itself was updated too: quit and open it again when this window is back' : ''}…</p> : null}
+        {job?.state === 'running' && job.progress != null ? <div className="upbar"><span style={{ width: `${job.progress}%` }} /></div> : null}
+        {job?.state === 'done' ? <p className="ob-note good">{job.relaunch ? 'Installed. Undercurrent closes and opens again on the new version in a moment…' : `Updated. Restarting${job.appRebuilt ? '. The Mac app itself was updated too: quit and open it again when this window is back' : ''}…`}</p> : null}
         {err || job?.error ? <p className="ob-note bad">{err || job.error}</p> : null}
         <div className="wbtns">
           <button type="button" className="ghost-btn accent" onClick={start} disabled={job?.state === 'running' || job?.state === 'done'}>{job?.state === 'running' ? 'Updating…' : 'Update now'}</button>
