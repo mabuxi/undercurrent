@@ -22,10 +22,10 @@ curl -fL --progress-bar "$URL" -o "$TMP/Undercurrent-mac.zip"
 ditto -x -k "$TMP/Undercurrent-mac.zip" "$TMP"
 [ -d "$TMP/Undercurrent.app" ] || { echo "The download did not contain the app. Try again in a few minutes."; exit 1; }
 
-if pgrep -xq Undercurrent; then
+if pgrep -x Undercurrent >/dev/null; then
   echo "Closing the running Undercurrent…"
   osascript -e 'quit app "Undercurrent"' >/dev/null 2>&1 || true
-  for _ in $(seq 1 40); do pgrep -xq Undercurrent || break; sleep 0.5; done
+  for _ in $(seq 1 40); do pgrep -x Undercurrent >/dev/null || break; sleep 0.5; done
 fi
 rm -rf "$DEST/Undercurrent.app"
 ditto "$TMP/Undercurrent.app" "$DEST/Undercurrent.app"

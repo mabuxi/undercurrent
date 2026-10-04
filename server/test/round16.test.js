@@ -31,4 +31,5 @@ test('the installer and the release workflow point at the same file', () => {
   const pack = fs.readFileSync(new URL('../../mac/package.sh', import.meta.url), 'utf8');
   for (const t of [install, flow, pack]) assert.match(t, /Undercurrent-mac\.zip/);
   assert.match(install, /mabuxi\/undercurrent/);
+  assert.doesNotMatch(install, /pgrep -\w*q/, 'pgrep on macOS has no -q');
 });

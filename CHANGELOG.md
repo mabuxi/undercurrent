@@ -3,6 +3,11 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.16.1 · 4 October 2026
+
+### Fixes
+- The Terminal installer now closes a running Undercurrent properly before it puts the new version in place.
+
 ## 0.16.0 · 4 October 2026
 
 ### Download it like any other app
