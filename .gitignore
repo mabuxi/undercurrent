@@ -1,0 +1,17 @@
+# Dependencies and builds
+node_modules/
+web/dist/
+mac/build/
+
+# Your own data: database, settings, history, logs. Never in git.
+data/
+*.db
+*.db-wal
+*.db-shm
+*.log
+.env
+
+# Mac and editor files
+.DS_Store
+.vscode/
+.idea/

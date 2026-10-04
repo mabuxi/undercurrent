@@ -1,0 +1,17 @@
+{
+  "name": "undercurrent-server",
+  "private": true,
+  "version": "0.14.0",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=../.env src/index.js",
+    "dev:mock": "node --watch --env-file-if-exists=../.env src/index.js --mock",
+    "start": "node --env-file-if-exists=../.env src/index.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "express": "^4.21.2"
+  }
+}
