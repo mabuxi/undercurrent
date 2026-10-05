@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { PostFx, HeatFx } from './PostFx.jsx';
 import { ago, api, fmtNum, formatMeta, LABELS, rgba, track, imgSrc } from '../api.js';
 import { useApp } from '../context.jsx';
 import { Icon } from '../icons.jsx';
@@ -156,6 +157,15 @@ export default function Post({ item: initial, focus = false, onStrong }) {
   const [panel, setPanel] = useState(null);
   const [gone, setGone] = useState(false);
   const [allTags, setAllTags] = useState(false);
+  const [fx, setFx] = useState(null);
+  const [heat, setHeat] = useState(null);
+  const [leaving, setLeaving] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const [over, setOver] = useState(false);
+  const chipsRef = useRef(null);
+  const menuRef = useRef(null);
+  const play = (kind) => setFx({ kind, key: Date.now() + Math.random() });
+  const onHeat = (v, phase) => setHeat((cur) => ({ v, phase, key: cur && cur.phase === 'live' ? cur.key : Date.now() }));
   const fired = useRef(false);
   const strong = (why) => {
     if (fired.current) return;
@@ -175,6 +185,7 @@ export default function Post({ item: initial, focus = false, onStrong }) {
 
   async function vote(dir) {
     const next = item.vote === dir ? 0 : dir;
+    play(next > 0 ? 'up' : next < 0 ? 'down' : item.vote > 0 ? 'unup' : 'undown');
     setItem({ ...item, vote: next, autoUp: false, score: item.score - item.vote + next, upvotes: item.upvotes != null ? item.upvotes - (item.vote > 0 ? 1 : 0) + (next > 0 ? 1 : 0) : null });
     if (next > 0) strong('up');
     setDownNote(next < 0);
@@ -187,6 +198,7 @@ export default function Post({ item: initial, focus = false, onStrong }) {
 
   async function save() {
     const on = !item.saved;
+    play(on ? 'save' : 'unsave');
     setItem({ ...item, saved: on });
     if (on) strong('save');
     try {
@@ -196,7 +208,9 @@ export default function Post({ item: initial, focus = false, onStrong }) {
   }
 
   async function less() {
-    setGone(true);
+    play('hide');
+    setLeaving(true);
+    setTimeout(() => setGone(true), window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 720);
     try {
       await api(`/items/${item.id}/less`, { method: 'POST', body: {} });
       toast(t('Hidden. The bigger model is looking at what you did not like in it.'));
@@ -248,7 +262,24 @@ export default function Post({ item: initial, focus = false, onStrong }) {
   const trTitle = useTranslate(item, 'title');
   const trBody = useTranslate(item, 'body');
   const [downNote, setDownNote] = useState(false);
-  if (gone) return <div className="post gone"><span>{t('Hidden. The feed will show less like this.')}</span><DislikeNote id={item.id} /></div>;
+  // On a phone the kinks and tags stay on one line; a button at its end opens them all.
+  useEffect(() => {
+    const el = chipsRef.current;
+    if (!el) return undefined;
+    const check = () => setOver(el.scrollWidth > el.clientWidth + 2);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [allTags, item.tags, item.kinks]);
+  // The ⋯ menu on a phone closes when you tap anywhere else.
+  useEffect(() => {
+    if (!menu) return undefined;
+    const off = (e) => { if (!menuRef.current?.contains(e.target)) setMenu(false); };
+    document.addEventListener('pointerdown', off, true);
+    return () => document.removeEventListener('pointerdown', off, true);
+  }, [menu]);
+  if (gone) return <div className="post gone fxin"><span>{t('Hidden. The feed will show less like this.')}</span><DislikeNote id={item.id} /></div>;
   const id = identity(item);
   const isText = item.media?.kind === 'text';
   const liked = item.media?.rating;
@@ -258,7 +289,7 @@ export default function Post({ item: initial, focus = false, onStrong }) {
   const sub = [...id.sub, item.media?.repostedBy ? t('reposted by @{name}', { name: item.media.repostedBy }) : null, item.media?.views ? tn(item.media.views, '{n} view', '{n} views', { n: fmtNum(item.media.views) }) : null, ago(item.created)].filter(Boolean).join(' · ');
 
   return (
-    <article ref={ref} className={`post${focus ? ' focus' : ''}`} data-id={item.id}>
+    <article ref={ref} className={`post${focus ? ' focus' : ''}${leaving ? ' leaving' : ''}`} data-id={item.id}>
       <header className="ph">
         <button type="button" className="who" onClick={() => (id.handle ? toggle('profile') : id.performer ? toggle(`performer:${id.performer}`) : null)} aria-label={t('Show profile of {name}', { name: id.name })}>
           {item.media?.avatar ? <img className="avatar av-m avimg" src={item.media.avatar} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.display = 'none'; }} /> : <Avatar name={id.name} />}
@@ -285,10 +316,10 @@ export default function Post({ item: initial, focus = false, onStrong }) {
         </div>
       ) : null}
       {!isText ? <p className="ptitle"><Linkify text={trTitle.text || item.title} source={item.source} onPerson={openPerson} /><TranslateButton tr={trTitle} small /><TranslatedNote tr={trTitle} /></p> : null}
-      <div ref={mediaRef}><Media item={item} active={active} near={near} height={lastH.current} onPlay={() => strong('play')} onReady={() => setReady(true)} onPerson={openPerson} /></div>
+      <div ref={mediaRef} className="pmedia"><PostFx fx={fx} /><HeatFx heat={heat} /><Media item={item} active={active} near={near} height={lastH.current} onPlay={() => strong('play')} onReady={() => setReady(true)} onPerson={openPerson} /></div>
       {!isText && item.body ? <p className="ptext caption"><Linkify text={trBody.text || item.body} source={item.source} onPerson={openPerson} /><TranslateButton tr={trBody} small /><TranslatedNote tr={trBody} /></p> : null}
       {item.aiSummary && !isText ? <p className="aisum">{item.aiSummary}</p> : null}
-      <div className="chiprow">
+      <div ref={chipsRef} className={`chiprow${allTags ? ' all' : ' one'}${over && !allTags ? ' over' : ''}`}>
         {item.gender && (item.gender.women || item.gender.men || item.gender.trans) ? (
           <span className="gicons" title={`${item.gender.women ? tn(item.gender.women, '{n} woman', '{n} women') : ''}${item.gender.women && item.gender.men ? ', ' : ''}${item.gender.men ? tn(item.gender.men, '{n} man', '{n} men') : ''}${item.gender.trans ? ', trans' : ''}${item.gender.sure ? '' : t(' (guess until the AI looks closer)')}`}>
             {item.gender.women ? <><span className="gf"><Icon name="female" /></span>{item.gender.women > 1 ? <em>{item.gender.women}</em> : null}</> : null}
@@ -309,28 +340,32 @@ export default function Post({ item: initial, focus = false, onStrong }) {
           </select>
         ) : <button type="button" className="chip ghost more addkink" onClick={() => setKinkPick(true)} title={t('Add this post to one of your kinks')}>{t('+ kink')}</button>}
         {shownTags.map((tag) => <button type="button" key={tag} className={`chip ghost link${item.liked?.includes(tag) ? ' mine' : ''}`} onClick={() => runSearch(tag).catch(() => setFilters({ tags: [tag] }))} title={t('Search everything for {tag}', { tag })}>{tag}</button>)}
-        {tagList.length > 9 ? <button type="button" className="chip ghost more" onClick={() => setAllTags((x) => !x)}>{allTags ? t('fewer') : t('+{n} tags', { n: tagList.length - 9 })}</button> : null}
+        {tagList.length > 9 || allTags ? <button type="button" className="chip ghost more" onClick={() => setAllTags((x) => !x)}>{allTags ? t('fewer') : t('+{n} tags', { n: tagList.length - 9 })}</button> : null}
         <span className="chip ghost meta">{formatMeta(item)}</span>
+        {over && !allTags ? <button type="button" className="chipmore" onClick={() => setAllTags(true)} aria-label={t('Show all kinks and tags')} title={t('Show all kinks and tags')}><Icon name="chevD" /></button> : null}
       </div>
       <div className="pbar">
         <div className="grp">
           <div className="votewrap" title={liked ? (votes ? t('{p}% of {n} votes were likes', { p: Math.round(liked), n: fmtNum(votes) }) : t('{p}% of the votes were likes', { p: Math.round(liked) })) : undefined}>
             <div className="vote">
-              <button type="button" className={item.vote > 0 ? 'on' : ''} onClick={() => vote(1)} aria-label={t('I like this')}><Icon name="up" /></button>
+              <button type="button" className={`vup${item.vote > 0 ? ' on' : ''}`} onClick={() => vote(1)} aria-label={t('I like this')}><Icon name="up" /></button>
               {item.upvotes != null ? <span>{fmtNum(item.upvotes)}</span> : null}
-              <button type="button" className={item.vote < 0 ? 'on' : ''} onClick={() => vote(-1)} aria-label={t("I don't like this")}><Icon name="down" /></button>
+              <button type="button" className={`vdown${item.vote < 0 ? ' on' : ''}`} onClick={() => vote(-1)} aria-label={t("I don't like this")}><Icon name="down" /></button>
             </div>
             {liked ? <div className="likebar" aria-label={t('{p}% liked', { p: Math.round(liked) })}><i style={{ width: `${Math.max(0, Math.min(100, liked))}%` }} /></div> : null}
           </div>
           {HAS_COMMENTS.has(item.source) ? <button type="button" className={`pb${panel === 'comments' ? ' on' : ''}`} onClick={() => { toggle('comments'); strong('comments'); }} aria-label={t('Comments')}><Icon name="comment" />{item.comments ? fmtNum(item.comments) : null}</button> : null}
         </div>
-        <HeatSlider value={item.rating || 0} onChange={rate} />
-        <div className="grp end">
-          <button type="button" className={`pb icon${panel === 'ask' ? ' on' : ''}`} onClick={() => toggle('ask')} aria-label={t('Ask or tell the assistant about this post')} title={t('Ask or tell the assistant')}><Icon name="ask" /></button>
-          <button type="button" className={`pb icon${panel === 'why' ? ' on' : ''}`} onClick={() => toggle('why')} aria-label={t('Why this')} title={t('Why this')}><Icon name="why" /></button>
-          <button type="button" className={`pb icon${item.saved ? ' on' : ''}`} onClick={save} aria-label={item.saved ? t('Unsave') : t('Save')} title={item.saved ? plain(t('Saved [button state]')) : t('Save')}><Icon name="save" filled={item.saved} /></button>
-          <button type="button" className="pb icon" onClick={less} aria-label={t('Less like this')} title={t('Less like this')}><Icon name="less" /></button>
-          {item.url ? <a className="pb icon" href={item.url} target="_blank" rel="noreferrer noopener" aria-label={t('Open on source')} title={t('Open on the original site')} onClick={() => track(item.id, 'open')}><Icon name="open" /></a> : null}
+        <HeatSlider value={item.rating || 0} onChange={rate} onLive={onHeat} />
+        <div className={`pmenu${menu ? ' open' : ''}`} ref={menuRef}>
+        <button type="button" className={`pb icon dotsbtn${menu ? ' on' : ''}`} onClick={() => setMenu((x) => !x)} aria-label={t('More actions')} aria-expanded={menu} title={t('More actions')}><Icon name="dots" filled /></button>
+        <div className="grp end" onClick={(e) => { if (menu && e.target.closest('button, a')) setTimeout(() => setMenu(false), 120); }}>
+          <button type="button" className={`pb icon${panel === 'ask' ? ' on' : ''}`} onClick={() => toggle('ask')} aria-label={t('Ask or tell the assistant about this post')} title={t('Ask or tell the assistant')}><Icon name="ask" /><span className="pblabel">{t('Ask the assistant')}</span></button>
+          <button type="button" className={`pb icon${panel === 'why' ? ' on' : ''}`} onClick={() => toggle('why')} aria-label={t('Why this')} title={t('Why this')}><Icon name="why" /><span className="pblabel">{t('Why this')}</span></button>
+          <button type="button" className={`pb icon${item.saved ? ' on' : ''}`} onClick={save} aria-label={item.saved ? t('Unsave') : t('Save')} title={item.saved ? plain(t('Saved [button state]')) : t('Save')}><Icon name="save" filled={item.saved} /><span className="pblabel">{item.saved ? t('Unsave') : t('Save')}</span></button>
+          <button type="button" className="pb icon" onClick={less} aria-label={t('Less like this')} title={t('Less like this')}><Icon name="less" /><span className="pblabel">{t('Less like this')}</span></button>
+          {item.url ? <a className="pb icon" href={item.url} target="_blank" rel="noreferrer noopener" aria-label={t('Open on source')} title={t('Open on the original site')} onClick={() => track(item.id, 'open')}><Icon name="open" /><span className="pblabel">{t('Open on the original site')}</span></a> : null}
+        </div>
         </div>
       </div>
       {downNote ? <DislikeNote id={item.id} compact /> : null}

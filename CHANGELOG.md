@@ -3,6 +3,35 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.19.0 · 5 October 2026
+
+### Reacting to a post
+- Liking a post plays a big, bouncy arrow rising in the middle of it, like a like on Instagram. Disliking plays the same arrow upside down, sinking.
+- Saving drops a golden bookmark into the post; unsaving and taking a like or dislike back play a small fading outline.
+- Sliding the heat bar puts a flame in the middle of the post that grows, warms up and flickers faster the hotter you set it. Letting go makes it flare up with embers; setting it back to zero puffs it out in smoke.
+- Hiding a post shows a crossed-out eye, the post dims and sinks away.
+- Like and dislike now get a coloured background when they are on: green for a like, red for a dislike.
+
+### Motion everywhere
+- Posts, cards, views, panels, toasts and windows come in with soft, short animations; buttons give a little when pressed; the search bar glows when you type.
+- On a phone the tab bar's light pill slides from tab to tab.
+- Everything respects the "Reduce motion" setting of the Mac or iPhone: with it on, the animations are left out.
+
+### Memory
+- "Everything you did" moved from Your map to Memory, unchanged.
+- Memory is organised: counters at the top (memories, to review, pinned, fantasies), a bar to jump to each section, and a "To review" section that gathers every suggestion in one place.
+- Each category has its own colour and icon, empty categories fold into one line with a quick add button, and the category is picked with coloured chips when you add a memory.
+- Fantasies are shown as cards.
+
+### Feed
+- The feed leans more to what is popular right now: every post is compared with the other posts of its own source, both on how well it was received and on how fast it is rising. Posts taking off now and fitting you come about every fifth post.
+- Posts that hardly anyone liked come less often, unless they fit your taste well. Discovery picks favour new things other people liked. Your taste still comes first.
+- Showing only some sources ("only bluesky") keeps the same ranking as the normal feed, and fetches more from those sources in the background: what is popular there and searches for your strongest tags.
+
+### iPhone
+- The less used buttons of a post (ask, why this, save, less like this, open) are in a ⋯ menu on the same line as the others.
+- Kinks and tags take one line; the arrow at its end opens them all.
+
 ## 0.18.1 · 5 October 2026
 
 ### iPhone

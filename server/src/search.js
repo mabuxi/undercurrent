@@ -11,7 +11,7 @@ import { chat, fastModel, deepModel, activeModel } from './ai/ollama.js';
 import { listKinks, createKink, updateKink, listFantasies, saveFantasy, deleteFantasy } from './kinks.js';
 import { addMemory, listMemory, updateMemory, memoryForPrompt, CATEGORIES, logPrompt } from './memory.js';
 import { boostTags, topTags, applyEvent } from './profile.js';
-import { follow, listFollows } from './ingest.js';
+import { follow, listFollows, fetchMore } from './ingest.js';
 import { genderPrefs, setGenderPrefs, genderMode } from './gender.js';
 import { JOBS, pruneJobs, invalidatePool } from './searchstate.js';
 import { postTagOk, displayTag } from './tagquality.js';
@@ -1086,6 +1086,9 @@ export function startSearch({ q, deep = false, sessionId = null }) {
         job.answer = tr('Showing only posts from {list} for now. Remove it above to see all your sources again.', { list });
         const off = src.ids.filter((id) => !providerState()[id]?.enabled);
         if (off.length) job.notes.push(tr('{list} is switched off in Settings: you see what was already fetched from it.', { list: sourceLabels(off).join(', ') }));
+        // The filtered feed is ranked like the normal one; fetch more from those sources in the background,
+        // what is popular there now and searches for your strongest tags, so there is enough that fits you.
+        if (!config.mock) fetchMore({ sources: src.ids }, { budgetMs: 9000 }).catch(() => {});
         return;
       }
       const text = query;

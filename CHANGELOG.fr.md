@@ -2,6 +2,35 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.19.0 · 5 octobre 2026
+
+### Réagir à une publication
+- Aimer une publication fait monter une grande flèche rebondissante au milieu, comme un « j’aime » sur Instagram. Ne pas aimer fait la même flèche à l’envers, qui descend.
+- Enregistrer fait tomber un marque-page doré dans la publication ; retirer un enregistrement, un « j’aime » ou un « je n’aime pas » joue un petit contour qui s’efface.
+- Faire glisser la barre de chaleur met une flamme au milieu de la publication, qui grandit, se réchauffe et vacille plus vite à mesure que vous montez. En relâchant, elle s’embrase avec des étincelles ; remise à zéro, elle s’éteint en fumée.
+- Masquer une publication affiche un œil barré, la publication s’assombrit puis s’efface.
+- « J’aime » et « je n’aime pas » ont maintenant un fond coloré quand ils sont actifs : vert pour aimer, rouge pour ne pas aimer.
+
+### Du mouvement partout
+- Les publications, cartes, vues, panneaux, messages et fenêtres arrivent avec des animations douces et courtes ; les boutons s’enfoncent un peu quand on appuie ; la barre de recherche s’illumine quand vous écrivez.
+- Sur un téléphone, la pastille claire de la barre d’onglets glisse d’un onglet à l’autre.
+- Tout respecte le réglage « Réduire les animations » du Mac ou de l’iPhone : s’il est activé, les animations sont retirées.
+
+### Mémoire
+- « Tout ce que vous avez fait » passe de Votre carte à Mémoire, sans changement.
+- La mémoire est organisée : des compteurs en haut (souvenirs, à valider, épinglés, fantasmes), une barre pour aller à chaque section, et une section « À valider » qui rassemble toutes les suggestions.
+- Chaque catégorie a sa couleur et son icône, les catégories vides tiennent sur une ligne avec un bouton d’ajout rapide, et la catégorie se choisit avec des pastilles colorées quand vous ajoutez un souvenir.
+- Les fantasmes s’affichent en cartes.
+
+### Fil
+- Le fil penche davantage vers ce qui est populaire en ce moment : chaque publication est comparée aux autres publications de sa propre source, sur l’accueil reçu et sur la vitesse à laquelle elle monte. Les publications qui décollent et vous correspondent arrivent environ toutes les cinq publications.
+- Les publications que presque personne n’a aimées arrivent moins souvent, sauf si elles correspondent bien à vos goûts. Les découvertes privilégient des nouveautés que d’autres ont aimées. Vos goûts passent toujours en premier.
+- N’afficher que certaines sources (« seulement bluesky ») garde le même classement que le fil normal, et va chercher davantage sur ces sources en arrière-plan : ce qui y est populaire et des recherches sur vos tags les plus forts.
+
+### iPhone
+- Les boutons moins utilisés d’une publication (demander, pourquoi ceci, enregistrer, moins comme ça, ouvrir) sont dans un menu ⋯ sur la même ligne que les autres.
+- Les kinks et les tags tiennent sur une ligne ; la flèche au bout les affiche tous.
+
 ## 0.18.1 · 5 octobre 2026
 
 ### iPhone

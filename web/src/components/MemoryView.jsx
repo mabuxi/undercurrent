@@ -1,10 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ago, api } from '../api.js';
 import { useApp } from '../context.jsx';
 import { Icon } from '../icons.jsx';
 import { t, tn } from '../i18n.js';
+import HistoryDb from './History.jsx';
 
-function MemoryItem({ m, categories, onChange }) {
+// Each memory category gets its own colour and icon, so the page reads at a glance.
+const CAT_META = {
+  'Right now': { icon: 'pulse', color: '#7FD0C2', hint: t('Moods and cravings for these days') },
+  'Kinks and interests': { icon: 'flame', color: '#F2894E', hint: t('What turns you on') },
+  Fantasies: { icon: 'spark', color: '#F6C35B', hint: t('Scenarios you think about') },
+  'Turn-offs and limits': { icon: 'less', color: '#E07070', hint: t('What you never want to see') },
+  'Formats and moods': { icon: 'video', color: '#B79BF0', hint: t('Videos, stories, length, pace') },
+  'Creators and communities': { icon: 'person', color: '#8EA6C9', hint: t('People and places you follow') },
+  Notes: { icon: 'book', color: '#B6A8B0', hint: t('Anything else') }
+};
+const metaOf = (c) => CAT_META[c] || { icon: 'edit', color: '#81737B', hint: '' };
+
+function MemoryItem({ m, categories, onChange, showCat = false }) {
   const [edit, setEdit] = useState(false);
   const [text, setText] = useState(m.content);
   const [cat, setCat] = useState(m.category);
@@ -24,7 +37,8 @@ function MemoryItem({ m, categories, onChange }) {
       ) : (
         <>
           <div className="memtext">
-            {m.status === 'proposed' ? <span className="sugg">{t('Suggested')}</span> : null}
+            {showCat ? <span className="memcat" style={{ '--c': metaOf(m.category).color }}><Icon name={metaOf(m.category).icon} />{t(m.category)}</span> : null}
+            {m.status === 'proposed' && !showCat ? <span className="sugg">{t('Suggested')}</span> : null}
             {m.pinned ? <span className="sugg pin">{t('Pinned')}</span> : null}
             <p>{m.content}</p>
             {m.evidence ? <span className="wnote">{t('Because: {evidence}', { evidence: m.evidence })}</span> : null}
@@ -56,8 +70,8 @@ function PromptLog() {
   useEffect(() => { load(); }, []);
   const shown = (list || []).filter((p) => !q || p.text.toLowerCase().includes(q.toLowerCase()));
   return (
-    <div className="card2">
-      <h3>{t('Prompt log')} <span className="count">{list?.length || 0}</span></h3>
+    <div className="card2 memsec" id="mem-log">
+      <h3><span className="secic" style={{ '--c': '#8EA6C9' }}><Icon name="thread" /></span>{t('Prompt log')} <span className="count">{list?.length || 0}</span></h3>
       <p className="wnote">{t('Everything you typed to the assistant. Searches, questions and feedback on posts stay here and are not memory; only things you say about your taste are saved to memory.')}</p>
       <div className="rowline wrapline">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('Search the log')} aria-label={t('Search the prompt log')} style={{ flex: 2 }} />
@@ -91,19 +105,23 @@ function FantasyIdeas({ onSaved }) {
   };
   return (
     <div className="card2">
-      <h3>{t("Fantasies the assistant thinks you'd like")} <span className="count">{list?.length || 0}</span></h3>
+      <h3><span className="secic" style={{ '--c': '#F6C35B' }}><Icon name="why" /></span>{t("Fantasies the assistant thinks you'd like")} <span className="count">{list?.length || 0}</span></h3>
       <p className="wnote">{t('Written from what you liked, heated and saved. Only ideas it is at least 75% sure about are shown.')}</p>
-      {(list || []).map((sg) => (
-        <div className="kinkrow" key={sg.id}>
-          <span className="win-dot" style={{ '--c': '#F6C35B' }} />
-          <div className="kinfo"><strong>{sg.title}</strong><span className="wtext">{sg.body}</span><span className="mini-meta">{(sg.data.kinks || []).map((k) => k.name).concat(sg.data.tags || []).join(' · ')}{sg.data.why ? ` · ${sg.data.why}` : ''}</span></div>
-          <span className="count">{sg.confidence}%</span>
-          <div className="memacts">
-            <button type="button" className="ghost-btn small accent" onClick={() => act(sg, 'save')}>{t('Save')}</button>
-            <button type="button" className="ghost-btn small" onClick={() => act(sg, 'dismiss')}>{t('Not for me')}</button>
-          </div>
+      {list?.length ? (
+        <div className="fantgrid">
+          {list.map((sg) => (
+            <div className="fantcard idea" key={sg.id}>
+              <div className="fc-head"><strong>{sg.title}</strong><span className="fc-pct">{sg.confidence}%</span></div>
+              <span className="wtext">{sg.body}</span>
+              <span className="mini-meta">{(sg.data.kinks || []).map((k) => k.name).concat(sg.data.tags || []).join(' · ')}{sg.data.why ? ` · ${sg.data.why}` : ''}</span>
+              <div className="memacts">
+                <button type="button" className="ghost-btn small accent" onClick={() => act(sg, 'save')}>{t('Save')}</button>
+                <button type="button" className="ghost-btn small" onClick={() => act(sg, 'dismiss')}>{t('Not for me')}</button>
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
+      ) : null}
       {list && !list.length ? <p className="wnote">{t('No ideas yet. They come as you like, heat and save posts.')}</p> : null}
       <div className="wbtns"><button type="button" className="ghost-btn small" disabled={busy} onClick={async () => { setBusy(true); try { await api('/suggestions/refresh', { method: 'POST', body: { kind: 'fantasy' } }); toast(t('Thinking about new fantasies in the background. They show up here in a minute or two.')); setTimeout(load, 60000); } finally { setBusy(false); } }}>{t('Suggest fantasies now')}</button></div>
     </div>
@@ -117,6 +135,8 @@ export default function MemoryView() {
   const [cat, setCat] = useState('Kinks and interests');
   const [busy, setBusy] = useState(false);
   const [newFant, setNewFant] = useState({ name: '', description: '', kinks: [] });
+  const [openCats, setOpenCats] = useState({});
+  const formRef = useRef(null);
 
   const load = () => api('/memory').then(setMem).catch((e) => toast(e.message));
   useEffect(() => { load(); }, []);
@@ -138,62 +158,134 @@ export default function MemoryView() {
     } catch (e) { toast(e.message); } finally { setBusy(false); }
   }
 
-  const proposedCount = mem?.groups.reduce((a, g) => a + g.items.filter((m) => m.status === 'proposed').length, 0) || 0;
+  const groups = mem?.groups || [];
+  const proposed = groups.flatMap((g) => g.items.filter((m) => m.status === 'proposed'));
+  const kept = groups.map((g) => ({ ...g, items: g.items.filter((m) => m.status !== 'proposed').sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)) }));
+  const filled = kept.filter((g) => g.items.length);
+  const empty = kept.filter((g) => !g.items.length);
+  const total = kept.reduce((a, g) => a + g.items.length, 0);
+  const pinned = kept.reduce((a, g) => a + g.items.filter((m) => m.pinned).length, 0);
+  const go = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const addTo = (c) => { setCat(c); formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => document.getElementById('newMem')?.focus({ preventScroll: true }), 350); };
+  const nav = [
+    proposed.length ? { id: 'mem-review', icon: 'check', label: t('To review'), n: proposed.length, hot: true } : null,
+    { id: 'mem-about', icon: 'brain', label: t('About you'), n: total },
+    { id: 'mem-fant', icon: 'spark', label: t('Fantasies'), n: fantasies.length },
+    { id: 'mem-history', icon: 'clock', label: t('Everything you did') },
+    { id: 'mem-log', icon: 'thread', label: t('Prompt log') }
+  ].filter(Boolean);
 
   return (
-    <section className="center" style={{ paddingTop: 0 }}>
+    <section className="center memview" style={{ paddingTop: 0 }}>
       <div className="jhead">
         <div><h2>{t('Memory')}</h2><p>{t("What the assistant knows about you, in your words and its own. Everything here is editable, and it's used for asking, tagging and recommendations. It never leaves this computer.")}</p></div>
-        <button type="button" className="ghost-btn accent" onClick={reflect} disabled={busy}>{busy ? t('Thinking') : t('Suggest new memories')}</button>
+        <button type="button" className="ghost-btn accent" onClick={reflect} disabled={busy}>{busy ? <><span className="spin" />{t('Thinking')}</> : <><Icon name="why" />{t('Suggest new memories')}</>}</button>
       </div>
 
-      <form className="card2 addmem" onSubmit={add}>
-        <h3>{t('Remember something')}</h3>
+      <div className="memtiles">
+        <button type="button" className="memtile" onClick={() => go('mem-about')} style={{ '--c': '#E39A83' }}><Icon name="brain" /><b>{total}</b><span>{tn(total, 'memory', 'memories')}</span></button>
+        <button type="button" className={`memtile${proposed.length ? ' hot' : ''}`} onClick={() => go(proposed.length ? 'mem-review' : 'mem-about')} style={{ '--c': '#F6C35B' }}><Icon name="check" /><b>{proposed.length}</b><span>{t('to review')}</span></button>
+        <button type="button" className="memtile" onClick={() => go('mem-about')} style={{ '--c': '#7FD0C2' }}><Icon name="pin" /><b>{pinned}</b><span>{t('pinned')}</span></button>
+        <button type="button" className="memtile" onClick={() => go('mem-fant')} style={{ '--c': '#B79BF0' }}><Icon name="spark" /><b>{fantasies.length}</b><span>{tn(fantasies.length, 'fantasy', 'fantasies')}</span></button>
+      </div>
+
+      <nav className="memnav" aria-label={t('Memory sections')}>
+        {nav.map((n) => <button type="button" key={n.id} className={`memnav-b${n.hot ? ' hot' : ''}`} onClick={() => go(n.id)}><Icon name={n.icon} />{n.label}{n.n != null ? <em>{n.n}</em> : null}</button>)}
+      </nav>
+
+      {proposed.length ? (
+        <div className="card2 memsec review" id="mem-review">
+          <h3><span className="secic" style={{ '--c': '#F6C35B' }}><Icon name="check" /></span>{t('To review')} <span className="count">{tn(proposed.length, '{n} suggestion', '{n} suggestions')}</span></h3>
+          <p className="wnote">{t('The assistant noticed these from what you did. Keep what is right, drop what is not.')}</p>
+          <div className="memlist">{proposed.map((m) => <MemoryItem key={m.id} m={m} categories={mem.categories} onChange={load} showCat />)}</div>
+        </div>
+      ) : null}
+
+      <form className="card2 addmem" onSubmit={add} ref={formRef}>
+        <h3><span className="secic" style={{ '--c': metaOf(cat).color }}><Icon name="plus" /></span>{t('Remember something')}</h3>
+        <div className="catpick" role="radiogroup" aria-label={t('Category')}>
+          {(mem?.categories || []).map((c) => (
+            <button type="button" key={c} role="radio" aria-checked={cat === c} className={`catchip${cat === c ? ' on' : ''}`} style={{ '--c': metaOf(c).color }} onClick={() => setCat(c)}><Icon name={metaOf(c).icon} />{t(c)}</button>
+          ))}
+        </div>
         <textarea id="newMem" value={text} onChange={(e) => setText(e.target.value)} rows={2} placeholder={t('I like slow builds more than anything fast. Never show me …')} aria-label={t('New memory')} />
         <div className="rowline">
-          <select value={cat} onChange={(e) => setCat(e.target.value)} aria-label={t('Category')}>{(mem?.categories || []).map((c) => <option key={c} value={c}>{t(c)}</option>)}</select>
-          <button type="submit" className="ghost-btn small accent">{t('Remember')}</button>
-          {proposedCount ? <span className="count">{tn(proposedCount, '{n} suggestion to review below', '{n} suggestions to review below')}</span> : null}
+          <span className="wnote">{metaOf(cat).hint}</span>
+          <button type="submit" className="ghost-btn small accent" style={{ marginLeft: 'auto' }}>{t('Remember')}</button>
         </div>
       </form>
 
-      {mem?.groups.map((g) => (
-        <div className="card2" key={g.category}>
-          <h3>{t(g.category)} <span className="count">{g.items.length}</span></h3>
-          {g.items.length ? g.items.map((m) => <MemoryItem key={m.id} m={m} categories={mem.categories} onChange={load} />) : <p className="wnote">{t('Nothing here yet.')}</p>}
+      <div className="memsec" id="mem-about">
+        <div className="sechead"><h3><span className="secic" style={{ '--c': '#E39A83' }}><Icon name="brain" /></span>{t('About you')}</h3><span className="count">{tn(total, '{n} memory', '{n} memories')}</span></div>
+        {mem === null ? <p className="wnote">{t('Loading…')}</p> : null}
+        <div className="catgrid">
+          {filled.map((g) => {
+            const meta = metaOf(g.category);
+            const open = openCats[g.category];
+            const shown = open ? g.items : g.items.slice(0, 6);
+            return (
+              <div className="card2 catcard" key={g.category} style={{ '--c': meta.color }}>
+                <div className="catcard-h">
+                  <span className="catic"><Icon name={meta.icon} /></span>
+                  <div><h3>{t(g.category)}</h3><span className="mini-meta">{meta.hint}</span></div>
+                  <span className="catn">{g.items.length}</span>
+                  <button type="button" className="icon-btn" onClick={() => addTo(g.category)} aria-label={t('Add to {name}', { name: t(g.category) })} title={t('Add to {name}', { name: t(g.category) })}><Icon name="plus" /></button>
+                </div>
+                <div className="memlist">{shown.map((m) => <MemoryItem key={m.id} m={m} categories={mem.categories} onChange={load} />)}</div>
+                {g.items.length > 6 ? <button type="button" className="linkbtn" onClick={() => setOpenCats((c) => ({ ...c, [g.category]: !open }))}>{open ? t('Show fewer') : t('Show all {n}', { n: g.items.length })}</button> : null}
+              </div>
+            );
+          })}
         </div>
-      ))}
-
-      <div className="card2">
-        <h3>{t('Kinks')}</h3>
-        <p className="wnote">{t('Your kinks and their groups live in Your map now: see them all, open one for everything about it, rename, regroup, combine or remove them there.')}</p>
-        <div className="wbtns"><button type="button" className="ghost-btn small accent" onClick={() => openMode('map')}><Icon name="map" />{t('Open your kinks')}</button></div>
+        {empty.length ? (
+          <div className="catempty">
+            <span className="wnote">{t('Nothing yet in:')}</span>
+            {empty.map((g) => <button type="button" key={g.category} className="catchip" style={{ '--c': metaOf(g.category).color }} onClick={() => addTo(g.category)}><Icon name={metaOf(g.category).icon} />{t(g.category)}<Icon name="plus" /></button>)}
+          </div>
+        ) : null}
       </div>
 
-      <FantasyIdeas onSaved={refreshMeta} />
+      <div className="card2 kinkslink">
+        <span className="catic" style={{ '--c': '#F2894E' }}><Icon name="map" /></span>
+        <div><h3>{t('Kinks')}</h3><p className="wnote">{t('Your kinks and their groups live in Your map now: see them all, open one for everything about it, rename, regroup, combine or remove them there.')}</p></div>
+        <button type="button" className="ghost-btn small accent" onClick={() => openMode('map')}><Icon name="map" />{t('Open your kinks')}</button>
+      </div>
 
-      <div className="card2">
-        <h3>{t('Fantasies')} <span className="count">{fantasies.length}</span></h3>
-        <p className="wnote">{t('Fantasies are bigger than kinks: a scenario that ties several together.')}</p>
-        {fantasies.map((f) => (
-          <div className="kinkrow" key={f.id}>
-            <span className="win-dot" style={{ '--c': '#F6C35B' }} />
-            <div className="kinfo"><strong>{f.name}</strong><span className="mini-meta">{f.kinks.map((k) => k.name).join(' + ') || t('no kinks linked')}</span>{f.description ? <span className="wnote">{f.description}</span> : null}</div>
-            <span className="count">{f.match}%</span>
-            <div className="memacts">
-              <button type="button" className="ghost-btn small" onClick={async () => { await api(`/fantasies/${f.id}`, { method: 'PATCH', body: { saved: !f.saved } }); refreshMeta(); }}>{f.saved ? t('Saved [button state]') : t('Save')}</button>
-              <button type="button" className="icon-btn" onClick={async () => { await api(`/fantasies/${f.id}`, { method: 'DELETE' }); refreshMeta(); }} aria-label={t('Delete fantasy')}><Icon name="trash" /></button>
+      <div className="memsec" id="mem-fant">
+        <div className="sechead"><h3><span className="secic" style={{ '--c': '#F6C35B' }}><Icon name="spark" /></span>{t('Fantasies')}</h3><span className="count">{fantasies.length}</span></div>
+        <FantasyIdeas onSaved={refreshMeta} />
+        <div className="card2">
+          <h3>{t('Your fantasies')} <span className="count">{fantasies.length}</span></h3>
+          <p className="wnote">{t('Fantasies are bigger than kinks: a scenario that ties several together.')}</p>
+          {fantasies.length ? (
+            <div className="fantgrid">
+              {fantasies.map((f) => (
+                <div className={`fantcard${f.saved ? ' saved' : ''}`} key={f.id}>
+                  <div className="fc-head"><strong>{f.name}</strong><span className="fc-pct" title={t('Match with you')}>{f.match}%</span></div>
+                  {f.description ? <span className="wtext">{f.description}</span> : null}
+                  <div className="fc-kinks">{f.kinks.length ? f.kinks.map((k) => <span key={k.id || k.name} className="chip" style={{ '--c': k.color || '#F6C35B', '--c2': `color-mix(in srgb, ${k.color || '#F6C35B'} 16%, transparent)` }}>{k.name}</span>) : <span className="mini-meta">{t('no kinks linked')}</span>}</div>
+                  <div className="memacts">
+                    <button type="button" className={`ghost-btn small${f.saved ? ' accent' : ''}`} onClick={async () => { await api(`/fantasies/${f.id}`, { method: 'PATCH', body: { saved: !f.saved } }); refreshMeta(); }}><Icon name="save" filled={!!f.saved} />{f.saved ? t('Saved [button state]') : t('Save')}</button>
+                    <button type="button" className="icon-btn" onClick={async () => { await api(`/fantasies/${f.id}`, { method: 'DELETE' }); refreshMeta(); }} aria-label={t('Delete fantasy')}><Icon name="trash" /></button>
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
-        ))}
-        <form className="fantform" onSubmit={async (e) => { e.preventDefault(); if (!newFant.name.trim()) { toast(t('Give the fantasy a name.')); return; } await api('/fantasies', { method: 'POST', body: newFant }); setNewFant({ name: '', description: '', kinks: [] }); refreshMeta(); }}>
-          <input id="newFantName" value={newFant.name} onChange={(e) => setNewFant({ ...newFant, name: e.target.value })} placeholder={t('Fantasy name')} aria-label={t('Fantasy name')} />
-          <textarea id="newFantDesc" value={newFant.description} onChange={(e) => setNewFant({ ...newFant, description: e.target.value })} rows={2} placeholder={t('Describe the scenario in your own words')} aria-label={t('Fantasy description')} />
-          <div className="chiprow">{kinks.filter((k) => k.status === 'active').map((k) => (
-            <button type="button" key={k.id} className={`chip btn${newFant.kinks.includes(k.id) ? ' on' : ''}`} onClick={() => setNewFant({ ...newFant, kinks: newFant.kinks.includes(k.id) ? newFant.kinks.filter((x) => x !== k.id) : [...newFant.kinks, k.id] })}>{k.name}</button>
-          ))}</div>
-          <button type="submit" className="ghost-btn small accent">{t('Add fantasy')}</button>
-        </form>
+          ) : null}
+          <form className="fantform" onSubmit={async (e) => { e.preventDefault(); if (!newFant.name.trim()) { toast(t('Give the fantasy a name.')); return; } await api('/fantasies', { method: 'POST', body: newFant }); setNewFant({ name: '', description: '', kinks: [] }); refreshMeta(); }}>
+            <span className="fb-label">{t('New fantasy')}</span>
+            <input id="newFantName" value={newFant.name} onChange={(e) => setNewFant({ ...newFant, name: e.target.value })} placeholder={t('Fantasy name')} aria-label={t('Fantasy name')} />
+            <textarea id="newFantDesc" value={newFant.description} onChange={(e) => setNewFant({ ...newFant, description: e.target.value })} rows={2} placeholder={t('Describe the scenario in your own words')} aria-label={t('Fantasy description')} />
+            <div className="chiprow">{kinks.filter((k) => k.status === 'active').map((k) => (
+              <button type="button" key={k.id} className={`chip btn${newFant.kinks.includes(k.id) ? ' on' : ''}`} onClick={() => setNewFant({ ...newFant, kinks: newFant.kinks.includes(k.id) ? newFant.kinks.filter((x) => x !== k.id) : [...newFant.kinks, k.id] })}>{k.name}</button>
+            ))}</div>
+            <button type="submit" className="ghost-btn small accent">{t('Add fantasy')}</button>
+          </form>
+        </div>
+      </div>
+
+      <div className="memsec" id="mem-history">
+        <HistoryDb />
       </div>
 
       <PromptLog />

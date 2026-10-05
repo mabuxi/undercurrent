@@ -154,6 +154,51 @@ function genderFits(need, kind, fetched) {
   return true;
 }
 
+// How a post does on its own source, as a percentile against the other posts of that source in the pool:
+// q is how well received it is overall (score and views), vel how fast it is getting there (popular right now).
+// A source without any score or view data gets a neutral 0.5, so it is never pushed down for that.
+export function popRaw(it) {
+  return Math.log10((Number(it.score) || 0) + 1) + 0.6 * Math.log10((Number(it.media?.views) || 0) + 1);
+}
+export function qualityRanks(list, t = now()) {
+  const bySrc = new Map();
+  for (const x of list) {
+    const raw = popRaw(x.it);
+    const ageH = Math.max(0, (t / 1000 - (x.it.created || t / 1000)) / 3600);
+    x._raw = raw;
+    x._vel = raw / Math.log2(ageH + 2);
+    if (!bySrc.has(x.it.source)) bySrc.set(x.it.source, []);
+    bySrc.get(x.it.source).push(x);
+  }
+  for (const group of bySrc.values()) {
+    const known = group.some((x) => x._raw > 0);
+    if (!known || group.length < 4) { for (const x of group) { x.q = 0.5; x.vel = 0.5; x.qKnown = false; } continue; }
+    const rank = (key, out) => {
+      const sorted = group.slice().sort((a, b) => a[key] - b[key]);
+      const n = sorted.length - 1;
+      let i = 0;
+      while (i <= n) {
+        let j = i;
+        while (j < n && sorted[j + 1][key] === sorted[i][key]) j++;
+        const pct = n ? ((i + j) / 2) / n : 0.5;
+        for (let k = i; k <= j; k++) sorted[k][out] = pct;
+        i = j + 1;
+      }
+    };
+    rank('_raw', 'q');
+    rank('_vel', 'vel');
+    for (const x of group) x.qKnown = true;
+  }
+  return list;
+}
+
+// What quality adds to a post's place in the feed: well received and rising posts move up a little, and a post
+// that hardly anyone liked moves down unless it fits your taste well. It never outweighs your taste.
+export function qualityBoost(x) {
+  if (!x.qKnown) return 0;
+  return 0.16 * (x.q - 0.5) + 0.14 * (x.vel - 0.5) - (x.q < 0.15 && x.s.tagPart < 0.25 ? 0.12 : 0);
+}
+
 export function buildFeed(filters = {}, { exclude = [], limit = 12, mix = 15 } = {}) {
   const t = now();
   const f = { ...(filters || {}) };
@@ -286,6 +331,8 @@ export function buildFeed(filters = {}, { exclude = [], limit = 12, mix = 15 } =
     }
     scored.push({ it, tags, s, ks, value: s.raw + bonus });
   }
+  qualityRanks(scored, t);
+  if (!f.saved) for (const x of scored) x.value += qualityBoost(x);
   // "Intense": only posts over the bar; when too few reach it, your very best matches right now.
   if (f.minMatch) {
     const over = scored.filter((x) => x.s.match >= f.minMatch);
@@ -295,18 +342,25 @@ export function buildFeed(filters = {}, { exclude = [], limit = 12, mix = 15 } =
   }
   const onlyNew = !!f.onlyNew;
   const followPool = f.following || f.author || f.community ? [] : scored.filter((x) => x.s.followNew).sort((a, b) => (b.it.created || 0) - (a.it.created || 0));
-  // Popular batches: the best-rated posts of each source, mixed in so the feed never drifts into only low quality.
+  // Popular right now: posts that are taking off on their source and fit you, mixed in about every fifth post so
+  // the feed leans to what people like now instead of random picks. Without that data, the best rated of each source.
   const bySrc = new Map();
   for (const x of scored) { if (!bySrc.has(x.it.source)) bySrc.set(x.it.source, []); bySrc.get(x.it.source).push(x.it.score || 0); }
   const p90 = new Map([...bySrc].map(([k, v]) => { v.sort((a, b) => a - b); return [k, v[Math.floor(v.length * 0.9)] || 0]; }));
-  const popularPool = f.following || f.author || f.community || f.saved ? [] : scored.filter((x) => (x.it.score || 0) >= (p90.get(x.it.source) || 0) && (x.it.score || 0) > 0 && x.s.match >= 50).sort((a, b) => b.value - a.value);
+  const noPopular = f.following || f.author || f.community || f.saved;
+  const popularPool = noPopular ? [] : scored.filter((x) => (x.qKnown
+    ? x.vel >= 0.8 && x.q >= 0.5 && x.s.match >= 45
+    : (x.it.score || 0) >= (p90.get(x.it.source) || 0) && (x.it.score || 0) > 0 && x.s.match >= 50))
+    .sort((a, b) => ((b.qKnown ? b.vel : 0.5) + b.value) - ((a.qKnown ? a.vel : 0.5) + a.value));
   let pi = 0;
   let fi = 0;
   let knownTags = 0;
   for (const [k, v] of aff) if (k.startsWith('t:') && v.n >= 3) knownTags++;
   const coldStart = knownTags < 15;
   const isNew = (x) => !coldStart && x.s.familiarity < 0.35 && x.tags.length > 0;
-  const discoveryPool = scored.filter((x) => (coldStart ? x.s.familiarity < 0.2 : isNew(x))).sort((a, b) => b.s.tagPart - a.s.tagPart || b.it.score - a.it.score);
+  // Discovery: new things for you, but ones other people liked; the worst received are left out when the source says so.
+  const discoveryPool = scored.filter((x) => (coldStart ? x.s.familiarity < 0.2 : isNew(x)) && (!x.qKnown || x.q >= 0.25))
+    .sort((a, b) => (b.s.tagPart + 0.35 * (b.q ?? 0.5)) - (a.s.tagPart + 0.35 * (a.q ?? 0.5)) || b.it.score - a.it.score);
   const mainPool = onlyNew ? discoveryPool : scored.filter((x) => !isNew(x) || x.s.followed || f.saved || f.author || f.community);
   mainPool.sort((a, b) => b.value - a.value);
   const out = [];
@@ -349,7 +403,7 @@ export function buildFeed(filters = {}, { exclude = [], limit = 12, mix = 15 } =
       while (fi < followPool.length && used.has(followPool[fi].it.id)) fi++;
       if (fi < followPool.length) { next = followPool[fi++]; used.add(next.it.id); label = 'following'; const at = mainPool.indexOf(next); if (at >= 0) mainPool.splice(at, 1); }
     }
-    if (!next && popularPool.length && (out.length + 4) % 7 === 0) {
+    if (!next && popularPool.length && (out.length + 3) % 5 === 0) {
       while (pi < popularPool.length && used.has(popularPool[pi].it.id)) pi++;
       if (pi < popularPool.length) { next = popularPool[pi++]; used.add(next.it.id); label = 'popular'; const at = mainPool.indexOf(next); if (at >= 0) mainPool.splice(at, 1); }
     }

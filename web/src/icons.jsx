@@ -28,6 +28,8 @@ const PATHS = {
   mute: 'M4 9v6h4l5 4V5L8 9zM17 9l5 6M22 9l-5 6',
   chevL: 'M15 5l-7 7 7 7',
   chevR: 'M9 5l7 7-7 7',
+  chevD: 'M6 9l6 6 6-6',
+  dots: 'M4 12a2 2 0 1 0 4 0 2 2 0 1 0-4 0zM10 12a2 2 0 1 0 4 0 2 2 0 1 0-4 0zM16 12a2 2 0 1 0 4 0 2 2 0 1 0-4 0z',
   pin: 'M9 4h6l-1 6 4 3H6l4-3zM12 13v7',
   check: 'M5 12l5 5 9-10',
   trash: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13',

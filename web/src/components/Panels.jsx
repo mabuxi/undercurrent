@@ -118,11 +118,15 @@ export function AskPanel({ item, onPatch }) {
 
 const HEAT_WORDS = [t('How hot?'), t('Warm'), t('Hot'), t('Very hot'), t('On fire'), t('Scorching')];
 
-export function HeatSlider({ value = 0, onChange, compact = false }) {
+// onLive(value, phase) follows the slider while it moves ('live') and once when it is let go ('end'), for the
+// flame in the middle of the post.
+export function HeatSlider({ value = 0, onChange, onLive, compact = false }) {
   const [v, setV] = useState(value);
   const [flick, setFlick] = useState(0);
   const timer = useRef(null);
   const last = useRef(value);
+  const live = useRef(false);
+  const held = useRef(false);
   useEffect(() => { setV(value); last.current = value; }, [value]);
   useEffect(() => () => clearTimeout(timer.current), []);
   function set(n, now = false) {
@@ -130,7 +134,12 @@ export function HeatSlider({ value = 0, onChange, compact = false }) {
     if (next > v) setFlick((x) => x + 1);
     setV(next);
     clearTimeout(timer.current);
-    const commit = () => { if (next !== last.current) { last.current = next; onChange(next); } };
+    if (now) { if (live.current || next !== last.current) onLive?.(next, 'end'); live.current = false; }
+    else if (next !== v || !live.current) { live.current = true; onLive?.(next, 'live'); }
+    const commit = () => {
+      if (live.current && !held.current) { live.current = false; onLive?.(next, 'end'); }
+      if (next !== last.current) { last.current = next; onChange(next); }
+    };
     if (now) commit(); else timer.current = setTimeout(commit, 450);
   }
   const size = 16 + v * 4.4;
@@ -140,7 +149,7 @@ export function HeatSlider({ value = 0, onChange, compact = false }) {
       <button type="button" className="heatflame" onClick={() => set(v > 0 ? 0 : 1, true)} aria-label={v > 0 ? t('Clear how hot this was') : t('Mark as hot')} title={v > 0 ? t('Click to clear') : t('Hot')}>
         <svg key={flick} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{ width: size, height: size }}><path d={FLAME_PATH} /></svg>
       </button>
-      <input type="range" min="0" max="5" step="0.5" value={v} onChange={(e) => set(Number(e.target.value))} onPointerUp={(e) => set(Number(e.currentTarget.value), true)} aria-label={t('How hot was this')} aria-valuetext={word} />
+      <input type="range" min="0" max="5" step="0.5" value={v} onChange={(e) => set(Number(e.target.value))} onPointerDown={() => { held.current = true; live.current = true; onLive?.(v, 'live'); }} onPointerUp={(e) => { held.current = false; set(Number(e.currentTarget.value), true); }} onPointerCancel={(e) => { held.current = false; set(Number(e.currentTarget.value), true); }} aria-label={t('How hot was this')} aria-valuetext={word} />
       {!compact ? <span className="heatword">{word}</span> : null}
     </div>
   );
