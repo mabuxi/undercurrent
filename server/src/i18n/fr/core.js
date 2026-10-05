@@ -2,6 +2,7 @@ export default {
   'Translation needs the local AI. Start Ollama and try again.': 'La traduction a besoin de l’IA locale. Lancez Ollama et réessayez.',
   'Nothing to translate.': 'Rien à traduire.',
   'Post not found.': 'Publication introuvable.',
+  'The local AI gave the text back untranslated. Try again in a moment.': 'L’IA locale a rendu le texte sans le traduire. Réessayez dans un instant.',
   '{site} content': 'Contenu {site}',
   'Scraper server: {site}': 'Serveur de scraping : {site}',
   'content': 'contenu',

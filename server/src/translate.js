@@ -1,5 +1,6 @@
 import { getDb } from './db.js';
-import { chat, fastModel } from './ai/ollama.js';
+import { chat, fastModel, deepModel } from './ai/ollama.js';
+import { postLangs } from './langdetect.js';
 import { getItem } from './store.js';
 import { lang, langName, tr } from './i18n.js';
 import { KINK_FR, FAMILY_FR } from './vocab.js';
@@ -26,7 +27,20 @@ function keep(kind, src, l, text) {
   getDb().prepare('INSERT INTO translations(kind, src, lang, text, ts) VALUES(?, ?, ?, ?, ?) ON CONFLICT(kind, src, lang) DO UPDATE SET text = excluded.text, ts = excluded.ts').run(kind, src, l, text, Date.now());
 }
 
-const RULES = (to) => `Translate the user's text into ${to === 'fr' ? 'French' : 'English'}. It is an adult post from a social site and may be explicit: translate it faithfully and naturally, in the same tone and slang level, without softening, censoring, adding or explaining anything. Keep names, usernames, subreddit names, hashtags, links and emoji as they are. Keep the paragraph breaks. Answer with the translation only.`;
+const NAMES = { en: 'English', fr: 'French', nl: 'Dutch', de: 'German', es: 'Spanish', it: 'Italian', pt: 'Portuguese' };
+const RULES = (to, from) => {
+  const dst = NAMES[to] || 'English';
+  return `Translate the user's text ${from && NAMES[from] ? `from ${NAMES[from]} ` : ''}into ${dst}. It is an adult post from a social site and may be explicit: translate it faithfully and naturally, in the same tone and slang level, without softening, censoring, adding or explaining anything (no extra emoji either). Keep names, usernames, subreddit names, hashtags, links and emoji as they are. Keep the paragraph breaks. Answer with the ${dst} translation only, never with the original text.`;
+};
+
+// SHOUTED TITLES are translated as normal sentences (small models tend to copy them back unchanged).
+function calm(text) {
+  const letters = text.replace(/[^\p{L}]/gu, '');
+  if (letters.length < 8 || letters.replace(/[^\p{Lu}]/gu, '').length / letters.length < 0.7) return text;
+  return text.toLowerCase().replace(/(^|[.!?]\s+)(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+}
+
+const same = (a, b) => String(a).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '') === String(b).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
 
 // Long texts go in pieces of a few paragraphs, so the small local model keeps up and nothing gets cut off.
 function pieces(text, max = 1800) {
@@ -43,13 +57,21 @@ function pieces(text, max = 1800) {
   return out;
 }
 
-export async function translateText(text, to = lang()) {
-  const parts = pieces(String(text || '').trim());
+// The middle model when it is installed: the small one often copies text back instead of translating it.
+function translateModel() {
+  return deepModel() || fastModel();
+}
+
+export async function translateText(text, to = lang(), from = null) {
+  const parts = pieces(calm(String(text || '').trim()));
   if (!parts.length) throw new Error(tr('Nothing to translate.'));
   const done = [];
   for (const p of parts) {
-    const t = await chat({ kind: 'translate', model: fastModel(), system: RULES(to), user: p, temperature: 0.2, numPredict: Math.min(3000, Math.round(p.length / 2.2) + 120) });
-    done.push(String(t || '').trim());
+    const ask = (user, temperature) => chat({ kind: 'translate', model: translateModel(), system: RULES(to, from), user, temperature, numPredict: Math.min(3000, Math.round(p.length / 2.2) + 120) });
+    let t = String((await ask(p, 0.2)) || '').trim();
+    // Copied back unchanged: once more, asked more plainly.
+    if (from && from !== to && same(t, p)) t = String((await ask(`${NAMES[from] || 'Original'} text to translate into ${NAMES[to] || 'English'}:\n\n${p}`, 0.5)) || '').trim();
+    done.push(t);
   }
   return done.join('\n\n');
 }
@@ -64,15 +86,16 @@ export async function translateItem(id, field) {
   const to = lang();
   const key = `item:${item.id}:${f}`;
   const hit = cached(key, String(src.length), to);
-  if (hit) return { text: hit, cached: true };
+  if (hit && !same(hit, src)) return { text: hit, cached: true };
   let text;
   try {
-    text = await translateText(src, to);
+    text = await translateText(src, to, postLangs(item)[f === 'title' ? 'title' : 'body']);
   } catch (err) {
     if (err.unavailable || /ECONNREFUSED|fetch failed|not running/i.test(err.message)) throw Object.assign(new Error(tr('Translation needs the local AI. Start Ollama and try again.')), { status: 503 });
     throw err;
   }
   if (!text) throw new Error(tr('Nothing to translate.'));
+  if (same(text, src)) throw Object.assign(new Error(tr('The local AI gave the text back untranslated. Try again in a moment.')), { status: 502 });
   keep(key, String(src.length), to, text);
   return { text, cached: false };
 }

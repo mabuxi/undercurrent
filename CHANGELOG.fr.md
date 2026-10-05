@@ -2,6 +2,13 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.17.1 · 5 octobre 2026
+
+### Corrections
+- Les traductions utilisent le modèle local intermédiaire (le 9B s’il est installé) et savent dans quelle langue est la publication : le petit modèle rendait souvent les titres sans les traduire.
+- Les titres en majuscules sont traduits comme des phrases normales.
+- Un texte rendu sans traduction n’est jamais gardé, et l’app vous propose de réessayer.
+
 ## 0.17.0 · 5 octobre 2026
 
 ### Français

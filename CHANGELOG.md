@@ -3,6 +3,13 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.17.1 · 5 October 2026
+
+### Fixes
+- Translations use the middle local model (the 9B one when it is installed) and are told which language the post is in: the small model often gave titles back untranslated.
+- Titles in capitals are translated as normal sentences.
+- A text that comes back untranslated is never kept, and you are told to try again.
+
 ## 0.17.0 · 5 October 2026
 
 ### French
