@@ -200,7 +200,8 @@ function termsForFiltersRaw(f = {}) {
 export async function fetchMore(filters = {}, { budgetMs = 14000 } = {}) {
   const started = now();
   const state = providerState();
-  const enabled = Object.keys(PROVIDERS).filter((id) => state[id].enabled || config.mock);
+  const named = Array.isArray(filters.sources) && filters.sources.length ? new Set(filters.sources) : null;
+  const enabled = Object.keys(PROVIDERS).filter((id) => (state[id].enabled || config.mock) && (!named || named.has(id)));
   const terms = termsForFilters(filters);
   const jobs = [];
   const wantFormats = filters.formats?.length ? new Set(filters.formats) : null;
@@ -224,6 +225,7 @@ export async function fetchMore(filters = {}, { budgetMs = 14000 } = {}) {
   if (!terms.length) {
     for (const tag of autoTags(3)) {
       for (const id of enabled) {
+        if (named && !named.has(id)) continue;
         const p = PROVIDERS[id];
         if (!p.can.search || id === 'reddit') continue;
         if (wantFormats && !p.formats.some((x) => wantFormats.has(x))) continue;

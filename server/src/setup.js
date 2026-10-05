@@ -226,7 +226,7 @@ export async function installOllama() {
       await new Promise((r) => out.end(r));
       install.state = 'unpacking';
       await new Promise((resolve, reject) => execFile('ditto', ['-x', '-k', tmp, '/Applications'], (e) => (e ? reject(e) : resolve())));
-      spawn('open', ['-g', '-a', 'Ollama'], { stdio: 'ignore', detached: true }).unref();
+      spawn('open', ['-g', '-j', '-a', 'Ollama'], { stdio: 'ignore', detached: true }).unref();
       install.state = 'done';
       log('info', 'Installed Ollama in Applications');
     } catch (err) {

@@ -1218,3 +1218,131 @@ button.kcard.dim{opacity:.62}
 .langswitch.compact{position:absolute;top:18px;right:18px;margin:0}
 .langswitch.compact button{padding:5px 11px;font-size:12px;letter-spacing:.04em}
 .ob-welcome{position:relative}
+
+/* ---------- Round 18: status dot, phone, tab bar, snapping ---------- */
+.brand span{display:none}
+.mac-app .top{padding-left:72px}
+
+/* What runs on this Mac: a small dot left of the search bar */
+.statusdot-wrap{position:relative;display:flex;align-items:center;flex:none}
+.statusdot{all:unset;cursor:pointer;width:22px;height:44px;display:grid;place-items:center;border-radius:10px}
+.statusdot i{width:9px;height:9px;border-radius:50%;background:var(--text-3);box-shadow:0 0 0 4px rgba(255,255,255,.04);transition:background .2s,box-shadow .2s}
+.statusdot.ok i{background:var(--ok);box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 18%,transparent)}
+.statusdot.off i{background:#E07070;box-shadow:0 0 0 4px rgba(224,112,112,.16);animation:dotpulse 1.6s ease-in-out infinite}
+.statusdot.mock i{background:#E8C66B;box-shadow:0 0 0 4px rgba(232,198,107,.16)}
+.statusdot:hover i,.statusdot:focus-visible i{box-shadow:0 0 0 6px rgba(255,255,255,.08)}
+.statusdot-wrap .statuspop{left:0;right:auto;top:calc(100% + 6px)}
+.sp-head{display:flex;flex-direction:column;gap:3px;padding-bottom:6px;border-bottom:1px solid var(--line);margin-bottom:2px}
+.sp-head .live{display:flex;align-items:center;gap:7px;font-weight:600;font-size:13px}
+.sp-head .live i{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.sp-head .live i.off{background:#E07070}
+.sp-head .bytes{font-family:var(--mono);font-size:11px;color:var(--text-3)}
+@keyframes dotpulse{50%{opacity:.45}}
+@media (prefers-reduced-motion:reduce){.statusdot.off i{animation:none}}
+
+/* Filters and search tags in one row, one look */
+.schip-filter{background:var(--surface-2);border-color:var(--line-2);font-weight:500}
+.schip-filter.schip-tag{background:color-mix(in srgb,var(--accent) 14%,var(--surface));border-color:color-mix(in srgb,var(--accent) 32%,transparent)}
+.schip-source{background:color-mix(in srgb,#93B4DF 18%,var(--surface));border-color:color-mix(in srgb,#93B4DF 40%,transparent)}
+.schip>span{white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis}
+
+/* Open on your iPhone */
+.phonebtn{all:unset;cursor:pointer;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;color:var(--text-2);background:var(--surface);border:1px solid var(--line)}
+.phonebtn:hover{color:var(--text);border-color:var(--line-2)}
+.phonebtn svg{width:18px;height:18px}
+.phonecard{width:min(640px,100%)}
+.qrwrap{display:grid;grid-template-columns:220px minmax(0,1fr);gap:20px;align-items:start}
+.qr{background:#fff;border-radius:16px;padding:10px;line-height:0}
+.qr svg{width:100%;height:auto;display:block}
+.qrside{display:flex;flex-direction:column;gap:10px;min-width:0}
+.qrurl{font-family:var(--mono);font-size:13px;padding:8px 10px;border-radius:10px;background:var(--surface-2);overflow-wrap:anywhere}
+.qrpick{display:flex;gap:6px;flex-wrap:wrap}
+.qrsteps{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--text-2);line-height:1.45}
+@media (max-width:600px){.qrwrap{grid-template-columns:1fr}.qr{max-width:240px}}
+
+/* Where the feed starts */
+.feedhead{display:flex;flex-direction:column;gap:12px;scroll-margin-top:calc(var(--toph,90px) + 8px)}
+.feedhead:empty{display:none}
+.fh-line{display:flex;flex-direction:column;gap:4px}
+.fh-answer{margin:0;font-family:var(--display);font-style:italic;font-size:19px;line-height:1.4;color:var(--text)}
+.fh-what{margin:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;font-size:13px;color:var(--text-2)}
+.fh-what em{font-style:normal;font-family:var(--mono);font-size:12px;color:var(--text-3)}
+.fh-wait{display:inline-flex;align-items:center;gap:6px}
+.tunebtn{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;font-size:13px;font-weight:600;background:var(--surface);border:1px solid var(--line-2);color:var(--text-2)}
+.tunebtn svg{width:15px;height:15px}
+.tunebtn.on{color:var(--text);border-color:var(--accent)}
+
+/* What you probably did not like */
+.dislike{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12.5px;color:var(--text-2);margin:6px 0 0}
+.dislike .spin{margin-right:4px}
+.dislike.compact{margin:0 2px;padding-top:8px;border-top:1px solid var(--line)}
+.post.gone{display:flex;flex-direction:column;align-items:center;gap:6px}
+.post.gone .dislike{justify-content:center}
+.dchip{display:inline-flex;align-items:center;gap:3px;height:24px;padding:0 3px 0 9px;border-radius:999px;background:rgba(224,112,112,.12);border:1px solid rgba(224,112,112,.35);color:var(--text);font-weight:600;font-size:12px}
+.dchip button{all:unset;cursor:pointer;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;color:var(--text-3)}
+.dchip button:hover{color:var(--text);background:rgba(255,255,255,.08)}
+.dchip button svg{width:11px;height:11px}
+.dnote{flex-basis:100%;font-family:var(--display);font-size:15px;color:var(--text-2)}
+
+/* The phone tab bar: a floating frosted bar like iOS */
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:90;display:flex;justify-content:center;padding:0 14px calc(env(safe-area-inset-bottom,0px) + 10px);pointer-events:none}
+.tabbar-in{pointer-events:auto;display:flex;gap:2px;padding:6px;border-radius:999px;width:min(460px,100%);
+  background:linear-gradient(180deg,rgba(52,40,50,.62),rgba(30,22,30,.72));
+  -webkit-backdrop-filter:blur(26px) saturate(180%);backdrop-filter:blur(26px) saturate(180%);
+  border:1px solid rgba(255,255,255,.12);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),inset 0 -1px 0 rgba(0,0,0,.25),0 12px 34px rgba(0,0,0,.5)}
+.tab{all:unset;cursor:pointer;flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;height:52px;border-radius:999px;color:rgba(239,230,234,.62);-webkit-tap-highlight-color:transparent;transition:background .25s cubic-bezier(.2,.8,.2,1),color .2s,transform .15s}
+.tab:active{transform:scale(.94)}
+.tab-ic{position:relative;display:grid;place-items:center}
+.tab-ic svg{width:22px;height:22px}
+.tab-l{font-size:10.5px;font-weight:600;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.tab.on{color:#F6D5C9;background:rgba(255,255,255,.12);box-shadow:inset 0 1px 0 rgba(255,255,255,.12)}
+.tab.on .tab-ic svg{color:var(--flame-2,#E39A83)}
+.tab-dot{position:absolute;top:-2px;right:-5px;width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px rgba(30,22,30,.9)}
+@supports not ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){.tabbar-in{background:rgba(30,22,30,.97)}}
+
+/* Phones and narrow windows */
+html.narrow{--tabh:calc(78px + env(safe-area-inset-bottom,0px))}
+html.narrow body{padding-bottom:var(--tabh);padding-inline:max(10px,env(safe-area-inset-left,0px))}
+html.narrow .shell{padding-block:0 24px}
+html.narrow .top{grid-template-columns:minmax(0,1fr) auto;gap:8px;padding-top:calc(env(safe-area-inset-top,0px) + 8px);padding-bottom:8px;margin-top:0}
+html.narrow .brand,html.narrow .nav,html.narrow .phonebtn{display:none}
+html.narrow .topright{gap:6px}
+html.narrow .uppill{padding:7px 10px;font-size:11px}
+html.narrow .sbar{height:40px;border-radius:12px}
+html.narrow .statusdot{height:40px;width:18px}
+html.narrow .ask .btn-accent,html.narrow .ask .btn-clear{height:40px;border-radius:12px;padding:0 12px}
+html.narrow .sbar .deepbtn{display:none}
+html.narrow .sb-steps{top:44px}
+html.narrow .hello h2{font-size:28px}
+html.narrow .hello-sum{font-size:16px}
+html.narrow .post{border-radius:16px;padding:10px 10px 8px;gap:10px}
+html.narrow .toast{bottom:calc(var(--tabh) + 8px)}
+html.narrow .statuspop{width:calc(100vw - 24px)}
+
+/* On a phone the picture or video is as big as it can be while the whole post fits on the screen */
+html.narrow .post .media.land{width:min(100%,calc(var(--fit,60vh) * 16 / 9))}
+html.narrow .post .media.vert{width:min(100%,calc(var(--fit,60vh) * 9 / 16))}
+html.narrow .post .media.single{width:min(100%,calc(var(--fit,60vh) * 4 / 5))}
+html.narrow .post .media.sqr{width:min(100%,var(--fit,60vh))}
+html.narrow .post .media.gifm,html.narrow .post .media.real{width:min(100%,calc(var(--fit,60vh) * 4 / 3))}
+html.narrow .post .media.natural,html.narrow .post .media.natural.tall{width:min(100%,calc(var(--fit,60vh) * var(--ar)))}
+html.narrow .post .imgbtn img{max-height:var(--fit,70vh)}
+html.narrow .post .media{margin-inline:auto}
+
+/* Snapping from post to post */
+html.snap{scroll-snap-type:y mandatory;scroll-padding-top:calc(var(--toph,60px) + 6px);scroll-padding-bottom:var(--tabh,0px)}
+html.snap .hello,html.snap .tuner,html.snap .feedhead,html.snap .feed>*,html.snap .sentinel{scroll-snap-align:start}
+html.snap .feed>.post,html.snap .feed>.win{scroll-snap-stop:always}
+
+/* Opened from the iPhone's home screen */
+html.standalone body{overscroll-behavior-y:none}
+html.standalone .top{padding-top:calc(env(safe-area-inset-top,0px) + 6px)}
+html.narrow .post .gallery{margin-inline:auto;max-height:var(--fit,70vh)}
+html.narrow .post .gallery.g1{grid-template-columns:minmax(0,calc(var(--fit,60vh) * 4 / 5))}
+html.narrow .post .gallery.g2,html.narrow .post .gallery.g3{width:min(100%,calc(var(--fit,60vh) * 3 / 2))}
+html.narrow .post .gallery.g4{width:min(100%,calc(var(--fit,60vh) * 4 / 3))}
+html.narrow .feed>article.post{content-visibility:visible;contain-intrinsic-size:none}
+html.snap article.post,html.snap .win,html.snap .feedhead{scroll-margin-top:0}
+.qrpick .chip{all:unset;cursor:pointer;font-family:var(--mono);font-size:12px;padding:5px 11px;border-radius:999px;border:1px solid var(--line-2);color:var(--text-2)}
+.qrpick .chip.on{border-color:var(--accent);color:var(--text);background:color-mix(in srgb,var(--accent) 16%,transparent)}
+html.narrow .tline{flex-direction:column;align-items:stretch;gap:8px}

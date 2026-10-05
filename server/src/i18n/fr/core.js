@@ -23,5 +23,11 @@ export default {
   'Lemmy profiles': 'Profils Lemmy',
   'Performer list': 'Liste d’interprètes',
   'Scraper server test': 'Test du serveur de scraping',
-  'Web search': 'Recherche web'
+  'Web search': 'Recherche web',
+  'The local AI is not running, so only the tags you do not already like count against it.': 'L’IA locale ne tourne pas\u00A0: seuls les tags que vous n’aimez pas déjà comptent contre elle.',
+  'Could not look at it more closely, so only the tags you do not already like count against it.': 'Impossible de la regarder de plus près\u00A0: seuls les tags que vous n’aimez pas déjà comptent contre elle.',
+  'Only posts from {list}': 'Seulement les publications de {list}',
+  'Showing only posts from {list} for now. Remove it above to see all your sources again.': 'Seulement les publications de {list} pour l’instant. Retirez-le en haut pour revoir toutes vos sources.',
+  '{list} is switched off in Settings: you see what was already fetched from it.': '{list} est désactivé dans les Réglages\u00A0: vous voyez ce qui en avait déjà été récupéré.',
+  'Only the Mac itself can do this.': 'Seul le Mac lui-même peut faire ça.'
 };

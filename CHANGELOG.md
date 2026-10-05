@@ -3,6 +3,32 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.18.0 · 5 October 2026
+
+### On your iPhone
+- A phone button at the top shows a QR code: scan it with the iPhone camera to open Undercurrent from the Mac on your phone (same Wi-Fi). It uses the Mac's feed, taste and local AI.
+- The code is a key: only devices that scanned it get in, nobody else on the same Wi-Fi. "Forget all paired phones" makes a new code.
+- Add it to the Home Screen and it opens full screen like an app, with its own icon (web app support for iOS).
+- On a phone the views are a floating, frosted tab bar at the bottom, like iOS: Feed, Saved, Your map, Memory, Settings.
+- The feed snaps from post to post, one at a time. Every post fits on the screen, with the picture or video as big as it can be. Long stories start shorter and open with "Continue reading".
+- A window comes between every 3 to 5 posts.
+- The top bar is one slim line, and the feed controls fold away behind "Tune the feed".
+
+### Search
+- Name sources in the search bar to see only them for a while: "only bluesky", "bluesky, reddit", "hairy feet on reddit". They show as a chip you can remove.
+- Searching, clicking a tag or changing a filter scrolls straight to where the feed starts, with a line saying what is shown and how many posts match.
+- Filters and search tags are in one row with one look, so a clicked tag no longer jumps around next to the search tags.
+
+### Learning
+- Taking a like, a save or heat back undoes exactly what it taught your feed. Heat taken back below two flames also takes back the upvote it gave.
+- Hiding or disliking a post: tags you already like are left alone, and the bigger local model looks at the post (frames from the video when it can) to find what you probably did not like. What it finds shows under the post, and you can take back any reason with ×.
+
+### Mac app
+- The window moves by dragging the top bar, and a double-click zooms it, like a normal title bar.
+- The window buttons no longer cover the Undercurrent name; the "Local browser" line under it is gone.
+- The local AI status is a small dot left of the search bar: click or hover it for the details.
+- Ollama starts hidden in the background and stays out of the way.
+
 ## 0.17.1 · 5 October 2026
 
 ### Fixes

@@ -1,7 +1,7 @@
 {
   "name": "undercurrent-server",
   "private": true,
-  "version": "0.17.1",
+  "version": "0.18.0",
   "type": "module",
   "main": "src/index.js",
   "scripts": {

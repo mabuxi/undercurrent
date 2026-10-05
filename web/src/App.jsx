@@ -13,6 +13,8 @@ import { refreshWindows } from './components/SideColumn.jsx';
 import { begin, end } from './activity.js';
 import Onboarding from './components/Onboarding.jsx';
 import { useUpdates, UpdateModal, WhatsNew } from './components/Updates.jsx';
+import TabBar from './components/TabBar.jsx';
+import { useNarrow } from './components/FeedView.jsx';
 import { t, tn } from './i18n.js';
 
 export default function App() {
@@ -33,6 +35,7 @@ export default function App() {
   const [settings, setSettings] = useState(null);
   const [onboarding, setOnboarding] = useState(false);
   const updates = useUpdates();
+  const narrow = useNarrow();
   const [updateOpen, setUpdateOpen] = useState(false);
   // The Mac app's menu (Settings…, Check for Updates…) reaches in here.
   useEffect(() => {
@@ -42,6 +45,13 @@ export default function App() {
     };
     return () => { delete window.ucOpen; };
   }, [updates.info]);
+  // On a phone the feed snaps from post to post.
+  useEffect(() => {
+    const el = document.documentElement;
+    el.classList.toggle('narrow', narrow);
+    el.classList.toggle('snap', narrow && mode === 'feed');
+    el.classList.toggle('standalone', !!window.navigator.standalone || window.matchMedia?.('(display-mode: standalone)').matches);
+  }, [narrow, mode]);
   const toastTimer = useRef(null);
   const centerRef = useRef(null);
 
@@ -68,12 +78,13 @@ export default function App() {
     return () => clearInterval(timer);
   }, [refreshMeta]);
 
-  const scrollToCenter = useCallback(() => {
-    const el = centerRef.current?.querySelector('.tuner .showing') || centerRef.current;
+  // After a search, a click on a tag or any other change of what the feed shows: straight to where the feed starts,
+  // with the line that says what is shown.
+  const scrollToFeed = useCallback(() => {
+    const el = document.getElementById('feedStart');
     if (!el) return;
-    const top = el.getBoundingClientRect().top;
     const head = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--toph'), 10) || 92;
-    if (top < head || top > window.innerHeight * 0.6) window.scrollTo({ top: Math.max(0, top + window.scrollY - head - 12), behavior: 'smooth' });
+    window.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + window.scrollY - head - 8), behavior: 'smooth' });
   }, []);
 
   const setFilters = useCallback((f, o = {}) => {
@@ -83,8 +94,9 @@ export default function App() {
     else if (!o.keepMix) setMix(15);
     setMode('feed');
     setFeedKey((k) => k + 1);
-    setTimeout(() => (o.top ? window.scrollTo({ top: 0, behavior: 'smooth' }) : scrollToCenter()), 30);
-  }, [scrollToCenter]);
+    if (!o.keepAnswer) setAskOut(null);
+    if (!o.noScroll) setTimeout(scrollToFeed, 60);
+  }, [scrollToFeed]);
 
   const patchFilters = useCallback((patch) => {
     setFiltersState((cur) => {
@@ -94,7 +106,9 @@ export default function App() {
     });
     setOpts((o) => ({ ...o, preset: null, mood: null, activeWin: null, focus: null }));
     setFeedKey((k) => k + 1);
-  }, []);
+    setAskOut(null);
+    setTimeout(scrollToFeed, 60);
+  }, [scrollToFeed]);
 
   const applyMood = useCallback((id) => {
     const m = MOODS.find((x) => x.id === id);
@@ -137,7 +151,7 @@ export default function App() {
       const seen = seenRef.current;
       if (seen.id !== id) return;
       setSearch(v);
-      if (v.filter && !seen.filter) { seen.filter = true; setFilters(v.filter, { keepMix: true, top: true }); }
+      if (v.filter && !seen.filter) { seen.filter = true; setFilters(v.filter, { keepMix: true }); }
       if (v.client?.length > seen.client) {
         const fresh = v.client.slice(seen.client);
         seen.client = v.client.length;
@@ -174,9 +188,10 @@ export default function App() {
     try {
       const v = await api(`/search/${search.id}/chip`, { method: 'POST', body: { kind: chip.kind, value: chip.value, remove: true } });
       setSearch(v);
-      setFeedKey((k) => k + 1);
+      if (chip.kind === 'source') patchFilters({ sources: v.filter?.sources?.length ? v.filter.sources : null, sourcesLabel: v.filter?.sources?.length ? v.filter.sourcesLabel : null });
+      else setFeedKey((k) => k + 1);
     } catch (e) { toast(e.message); }
-  }, [search, toast]);
+  }, [search, toast, patchFilters]);
 
   const clearSearch = useCallback(() => {
     clearTimeout(pollRef.current);
@@ -191,6 +206,7 @@ export default function App() {
     if (key === 'search') { clearSearch(); return; }
     if (key === 'mood') { setFilters({}); return; }
     if (key === 'profile') { patchFilters({ profile: null, profileLabel: null }); return; }
+    if (key === 'sources') { patchFilters({ sources: null, sourcesLabel: null }); return; }
     if (key.startsWith('tag:')) { patchFilters({ tags: (filters.tags || []).filter((tag) => `tag:${tag}` !== key) }); return; }
     patchFilters({ [key]: null });
   }, [clearSearch, setFilters, patchFilters, filters]);
@@ -231,6 +247,7 @@ export default function App() {
           <SideColumn side={1} />
         </div>
       </div>
+      {narrow ? <TabBar /> : null}
       {toastMsg ? <div className="toast" role="status">{toastMsg}</div> : null}
       {onboarding ? <Onboarding onDone={() => { setOnboarding(false); refreshMeta(); setFeedKey((k) => k + 1); toast(t('Welcome. Your feed is filling up.')); }} /> : null}
       {!onboarding && updates.news ? <WhatsNew info={updates.news} onClose={updates.closeNews} /> : null}

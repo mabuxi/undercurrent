@@ -20,6 +20,12 @@ The first time, the welcome steps walk you through the local AI, who you want to
 
 Quitting the app (⌘Q, or closing its window) stops the server, unloads the models and quits Ollama.
 
+## On your iPhone
+
+Click the phone button at the top of the Mac app and scan the QR code with the iPhone camera (same Wi-Fi). Undercurrent opens in Safari, running on the Mac: same feed, same taste, same local AI. Tap Share, Add to Home Screen to keep it as a full-screen app. The code is a pairing key, so only devices that scanned it get in; "Forget all paired phones" makes a new one. On a phone the views are a tab bar at the bottom and the feed snaps from post to post.
+
+Over plain http on a home network iOS does not allow offline caching (service workers need https), so the phone app needs the Mac and Undercurrent to be on.
+
 ## Languages
 
 Undercurrent speaks English and French: Settings, Language, or the switch on the first welcome step (the first start follows your Mac's language). Kink names, the assistant and every message follow the language; tags stay in English so what you like counts the same in both. Searching in French also searches the English words the sources use. Posts in another language get a Translate button (and a small one next to the title), done by the local AI and kept for next time.

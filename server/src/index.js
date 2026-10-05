@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import os from 'node:os';
-import { isPrivateAddress } from './lan.js';
+import { isPrivateAddress, pairGate, pairToken, isPaired } from './lan.js';
 import { ensureOllama, stopWithServer } from './ai/lifecycle.js';
 import path from 'node:path';
 import express from 'express';
@@ -125,7 +125,17 @@ app.use((req, res, next) => {
   log('warn', `Refused a request from ${req.socket.remoteAddress}: only this Mac and your local network may open Undercurrent`);
   res.status(403).send('Undercurrent only answers devices on your local network.');
 });
+// Other devices on the network need the pairing code from the QR code on the Mac.
+app.use(pairGate(config.dataDir, () => { try { return getSetting('language', 'en') || 'en'; } catch { return 'en'; } }));
 app.use(express.json({ limit: '2mb' }));
+// The home screen app on an iPhone keeps its own cookies, so its start address carries the pairing code.
+app.get('/manifest.webmanifest', (req, res, next) => {
+  const file = path.join(config.webDist, 'manifest.webmanifest');
+  let m;
+  try { m = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return next(); }
+  if (!/^(127\.|::1|::ffff:127\.)/.test(String(req.socket.remoteAddress)) && isPaired(req, config.dataDir)) m.start_url = `/?pair=${encodeURIComponent(pairToken(config.dataDir))}`;
+  res.type('application/manifest+json').send(JSON.stringify(m));
+});
 app.use('/api/mock/video', express.static(path.join(config.root, 'server', 'mock-media')));
 
 app.post('/api/client-log', (req, res) => {

@@ -44,7 +44,7 @@ export function signalFor(type, value, item = null) {
   return points(type, value, item) * POINT_SCALE;
 }
 
-export const SCORE_VERSION = 5;
+export const SCORE_VERSION = 6;
 
 // Positive engagement per item, same weights as the profile. Used by the brain, history and widgets.
 export function engagement(since = 0, { limit = 2500, minPoints = 0.5 } = {}) {
@@ -103,6 +103,8 @@ export function applyEvent(ev, t = now(), record = true) {
   if (!itemId) return 0;
   const item = getItem(itemId);
   if (!item) return 0;
+  // What this post had before, so taking a like, save or heat back takes back exactly what it added.
+  const prev = (['up', 'down', 'unvote', 'save', 'unsave', 'rate'].includes(type) && db.prepare('SELECT vote, saved, rating FROM item_state WHERE item_id = ?').get(itemId)) || {};
   if (type === 'skip') setState(itemId, { seen: 1, seen_ts: t });
   if (type === 'impression') {
     setState(itemId, { seen: 1, seen_ts: t });
@@ -122,17 +124,61 @@ export function applyEvent(ev, t = now(), record = true) {
     const strong = (type === 'rate' && Number(ev.value) > 0) || type === 'save' || type === 'reason' || type === 'complete' || type === 'rewatch' || type === 'up' || (type === 'progress' && Number(ev.value) >= 0.5) || (type === 'dwell' && (st?.dwell_ms || 0) >= 60000);
     if (strong) db.prepare('UPDATE items SET ai_deep = 4 WHERE id = ? AND COALESCE(ai_deep, 0) IN (0, 1, 2, 3)').run(itemId);
   }
-  const s = signalFor(type, ev.value, item);
-  if (!s) return 0;
+  const parts = changeParts(type, ev.value, item, prev).filter((p) => p.s);
+  if (!parts.length) return 0;
   const tags = itemTags(itemId);
   const total = tags.reduce((a, b) => a + b.weight, 0) || 1;
   const scale = Math.min(1, 3 / total);
-  // A skip or dislike is about this content, not about a whole format or site, so those broad keys only learn from positive signals.
-  for (const [key, w] of keysForItem(item, tags)) {
-    if (s < 0 && (key.startsWith('f:') || key.startsWith('s:'))) continue;
-    bump(key, s * w * (key.startsWith('t:') ? scale : key.startsWith('c:') && s < 0 ? 0.5 : 1), t);
+  const keys = keysForItem(item, tags);
+  let sum = 0;
+  for (const { s, undo } of parts) {
+    // A dislike is about what you did not like in this post, not about what you already like in it: tags you clearly
+    // like are left alone and the rest takes the blame. A skip or dislike never teaches anything about a whole format
+    // or site. Taking something back undoes it on everything it touched.
+    const liked = s < 0 && !undo ? likedKeys(tags, t) : null;
+    for (const [key, w] of keys) {
+      if (s < 0 && !undo && (key.startsWith('f:') || key.startsWith('s:'))) continue;
+      if (liked?.has(key)) continue;
+      bump(key, s * w * (key.startsWith('t:') ? scale : key.startsWith('c:') && s < 0 && !undo ? 0.5 : 1), t, !undo);
+    }
+    sum += s;
   }
-  return s;
+  return sum;
+}
+
+// Taking something back: the change is the difference between what the post has now and what it had, so removing
+// a like, a save or heat takes back exactly what it added.
+const votePoints = (v) => (v > 0 ? POINTS.up : v < 0 ? POINTS.down : 0);
+const rateOf = (v) => Math.max(0, Math.min(5, Math.round((Number(v) || 0) * 2) / 2));
+const ratePoints = (r) => (r > 0 ? points('rate', r) : 0);
+export function changeParts(type, value, item, prev = {}) {
+  const S = POINT_SCALE;
+  const before = prev.vote || 0;
+  if (type === 'up' || type === 'down' || type === 'unvote') {
+    const now = type === 'up' ? 1 : type === 'down' ? -1 : 0;
+    if (now === before) return [];
+    return [{ s: -votePoints(before) * S, undo: true }, { s: votePoints(now) * S, undo: false }];
+  }
+  if (type === 'save') return prev.saved ? [] : [{ s: signalFor('save', value, item), undo: false }];
+  if (type === 'unsave') return prev.saved ? [{ s: -POINTS.save * S, undo: true }] : [];
+  if (type === 'rate') {
+    const a = rateOf(prev.rating);
+    const b = rateOf(value);
+    return [{ s: (ratePoints(b) - ratePoints(a)) * S, undo: b < a }];
+  }
+  return [{ s: signalFor(type, value, item), undo: false }];
+}
+
+// Tags you clearly like (by your long-term taste), which a dislike leaves alone.
+export const LIKED_AT = 0.25;
+function likedKeys(tags, t) {
+  const out = new Set();
+  const q = getDb().prepare('SELECT * FROM affinity WHERE key = ?');
+  for (const tg of tags) {
+    const key = `t:${tg.id}`;
+    if (decayed(q.get(key), t).long >= LIKED_AT) out.add(key);
+  }
+  return out;
 }
 
 export function boostTags(names, delta, t = now()) {

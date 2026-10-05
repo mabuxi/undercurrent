@@ -470,7 +470,10 @@ export function TextBody({ item, onPerson }) {
   const trTitle = useTranslate(item, 'title');
   const trBody = useTranslate(item, 'body');
   const body = trBody.text || item.body || '';
-  const short = body.length > 900 ? `${body.slice(0, 900).replace(/\s+\S*$/, '')}…` : body;
+  // On a phone a story starts shorter, so the whole post fits on the screen; "Continue reading" opens the rest.
+  const phone = window.innerWidth <= 900;
+  const cut = phone ? 380 : 900;
+  const short = body.length > cut ? `${body.slice(0, cut).replace(/\s+\S*$/, '')}…` : body;
   const c = item.kinks?.[0]?.color || '#E39A83';
   const story = item.format === 'story';
   return (
@@ -478,11 +481,11 @@ export function TextBody({ item, onPerson }) {
       {story ? <span className="kicker">{t('Story · {n} min read', { n: readMinutes(item) })}{item.flair ? ` · ${item.flair}` : ''}</span> : <span className="kicker thread-k">{t('Thread')}{item.community ? ` · ${item.community}` : ''}</span>}
       <h3><Linkify text={trTitle.text || item.title} source={item.source} onPerson={onPerson} /><TranslateButton tr={trTitle} small /><TranslatedNote tr={trTitle} /></h3>
       {body ? <div className="ptext prose"><Paragraphs text={open ? body : short} source={item.source} onPerson={onPerson} /></div> : null}
-      {!story ? <TopReplies item={item} /> : null}
+      {!story ? <TopReplies item={item} compact={phone && !open} /> : null}
       <div className="rowline">
         <TranslateButton tr={trBody} />
         <TranslatedNote tr={trBody} />
-        {body.length > 900 ? <button type="button" className="ghost-btn small" onClick={() => { setOpen((o) => !o); if (!open) track(item.id, 'open'); }}>{open ? t('Show less') : t('Continue reading')}</button> : null}
+        {body.length > cut || (phone && !story && !open && item.comments > 2) ? <button type="button" className="ghost-btn small" onClick={() => { setOpen((o) => !o); if (!open) track(item.id, 'open'); }}>{open ? t('Show less') : t('Continue reading')}</button> : null}
         <span className="read">{story ? t('about {n} min to read', { n: readMinutes(item) }) : tn(item.comments, '{n} reply', '{n} replies')}</span>
       </div>
     </div>

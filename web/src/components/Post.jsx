@@ -18,6 +18,66 @@ function PerfAvatar({ p }) {
 const HAS_COMMENTS = new Set(['reddit', 'lemmy']);
 const AUTO_UP_HEAT = 2;
 
+// What the bigger model thinks you did not like in a post you hid or disliked. Each reason can be taken back.
+export function DislikeNote({ id, compact = false }) {
+  const [d, setD] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    let n = 0;
+    let tm = null;
+    const poll = async () => {
+      n++;
+      try {
+        const r = await api(`/items/${id}/dislike`);
+        if (!alive) return;
+        setD(r);
+        if ((r.status === 'waiting' || r.status === 'running') && n < 60) tm = setTimeout(poll, n < 5 ? 1500 : 3000);
+      } catch { if (alive && n < 3) tm = setTimeout(poll, 3000); }
+    };
+    tm = setTimeout(poll, 600);
+    return () => { alive = false; clearTimeout(tm); };
+  }, [id]);
+  async function drop(r) {
+    try { setD(await api(`/items/${id}/dislike/${encodeURIComponent(r)}`, { method: 'DELETE' })); } catch {}
+  }
+  if (!d || d.status === 'none') return null;
+  if (d.status === 'waiting' || d.status === 'running') return <p className={`dislike${compact ? ' compact' : ''}`}><span className="spin" />{t('Looking at what you did not like, leaving out what you already like…')}</p>;
+  return (
+    <div className={`dislike${compact ? ' compact' : ''}`}>
+      {d.reasons?.length ? (
+        <>
+          <span>{t('Less of:')}</span>
+          {d.reasons.map((r) => <span key={r} className="dchip">{r}<button type="button" onClick={() => drop(r)} title={t('That was not it')} aria-label={t('That was not it: {tag}', { tag: r })}><Icon name="x" /></button></span>)}
+        </>
+      ) : <span>{t('Nothing clear stood out, so only the tags you do not already like count against it.')}</span>}
+      {d.note ? <em className="dnote">{d.note}</em> : null}
+    </div>
+  );
+}
+
+// On a phone the whole post fits on the screen, with the picture or video as big as it can be.
+function useFit(ref, mediaRef, on) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!on || !el) return undefined;
+    const fit = () => {
+      const m = mediaRef.current;
+      if (!m) return;
+      const cs = getComputedStyle(document.documentElement);
+      const head = parseInt(cs.getPropertyValue('--toph'), 10) || 60;
+      const tab = document.querySelector('.tabbar')?.offsetHeight || 0;
+      const vh = window.visualViewport?.height || window.innerHeight;
+      const chrome = el.offsetHeight - m.offsetHeight;
+      el.style.setProperty('--fit', `${Math.max(200, Math.round(vh - head - tab - chrome - 16))}px`);
+    };
+    fit();
+    const ro = new ResizeObserver(() => requestAnimationFrame(fit));
+    ro.observe(el);
+    window.addEventListener('resize', fit);
+    return () => { ro.disconnect(); window.removeEventListener('resize', fit); };
+  }, [on]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
 function useNear(ref) {
   const [near, setNear] = useState(true);
   useEffect(() => {
@@ -106,16 +166,20 @@ export default function Post({ item: initial, focus = false, onStrong }) {
   const near = useNear(ref);
   const mediaRef = useRef(null);
   const lastH = useRef(null);
+  const narrowNow = typeof window !== 'undefined' && window.innerWidth <= 900;
+  useFit(ref, mediaRef, narrowNow && item.media?.kind !== 'text');
   if (near && mediaRef.current) lastH.current = mediaRef.current.offsetHeight || lastH.current;
   const c = item.kinks?.[0]?.color || '#E39A83';
 
   async function vote(dir) {
     const next = item.vote === dir ? 0 : dir;
-    setItem({ ...item, vote: next, score: item.score - item.vote + next, upvotes: item.upvotes != null ? item.upvotes - (item.vote > 0 ? 1 : 0) + (next > 0 ? 1 : 0) : null });
+    setItem({ ...item, vote: next, autoUp: false, score: item.score - item.vote + next, upvotes: item.upvotes != null ? item.upvotes - (item.vote > 0 ? 1 : 0) + (next > 0 ? 1 : 0) : null });
     if (next > 0) strong('up');
+    setDownNote(next < 0);
     try {
       const r = await api(`/items/${item.id}/vote`, { method: 'POST', body: { dir: next } });
       if (r.synced && next) toast(next > 0 ? t('Upvoted on Reddit too.') : t('Downvoted on Reddit too.'));
+      else if (!next && item.vote) toast(item.vote > 0 ? t('Like taken back. What it taught your feed is undone.') : t('Dislike taken back. What it taught your feed is undone.'));
     } catch (e) { toast(e.message); }
   }
 
@@ -125,7 +189,7 @@ export default function Post({ item: initial, focus = false, onStrong }) {
     if (on) strong('save');
     try {
       const r = await api(`/items/${item.id}/save`, { method: 'POST', body: { on } });
-      toast(on ? (r.synced ? t('Saved here and on Reddit.') : t('Saved.')) : t('Removed from saved.'));
+      toast(on ? (r.synced ? t('Saved here and on Reddit.') : t('Saved.')) : t('Removed from saved. What saving it taught your feed is undone.'));
     } catch (e) { toast(e.message); }
   }
 
@@ -133,18 +197,22 @@ export default function Post({ item: initial, focus = false, onStrong }) {
     setGone(true);
     try {
       await api(`/items/${item.id}/less`, { method: 'POST', body: {} });
-      toast(t('Less like this. {tags} count against it now.', { tags: item.tags?.slice(0, 2).join(` ${t('and')} `) || t('These tags') }));
+      toast(t('Hidden. The bigger model is looking at what you did not like in it.'));
     } catch (e) { toast(e.message); }
   }
 
   // Finding something hot is liking it: a heat of 2 flames or more upvotes it too (also on Reddit when that is on).
   async function rate(n) {
     const autoUp = n >= AUTO_UP_HEAT && item.vote <= 0;
-    setItem((cur) => ({ ...cur, rating: n, ...(autoUp ? { vote: 1, upvotes: cur.upvotes != null ? cur.upvotes + 1 - (cur.vote > 0 ? 1 : 0) : null } : {}) }));
+    // Heat taken back below two flames also takes back the upvote it gave.
+    const autoDown = n < AUTO_UP_HEAT && item.vote > 0 && item.autoUp;
+    setItem((cur) => ({ ...cur, rating: n, ...(autoUp ? { vote: 1, autoUp: true, upvotes: cur.upvotes != null ? cur.upvotes + 1 - (cur.vote > 0 ? 1 : 0) : null } : autoDown ? { vote: 0, autoUp: false, upvotes: cur.upvotes != null ? cur.upvotes - 1 : null } : {}) }));
     if (n > 0) strong('rate');
     try {
       await api(`/items/${item.id}/rate`, { method: 'POST', body: { value: n } });
       if (autoUp) await api(`/items/${item.id}/vote`, { method: 'POST', body: { dir: 1 } });
+      if (autoDown) await api(`/items/${item.id}/vote`, { method: 'POST', body: { dir: 0 } });
+      if (!n) { toast(autoDown ? t('Heat and upvote taken back. What they taught your feed is undone.') : t('Heat taken back. What it taught your feed is undone.')); return; }
       if (n) toast(n >= 4 ? (autoUp ? t('On fire and upvoted. Your feed goes deeper into this.') : t('On fire. Your feed goes deeper into this.')) : (autoUp ? t('Noted how hot this was, and upvoted it. It counts more than an upvote.') : t('Noted how hot this was. It counts more than an upvote.')));
     } catch (e) { toast(e.message); }
   }
@@ -177,7 +245,8 @@ export default function Post({ item: initial, focus = false, onStrong }) {
   const openPerson = (p) => setPanel(`person:${p.platform || 'any'}|${p.handle}`);
   const trTitle = useTranslate(item, 'title');
   const trBody = useTranslate(item, 'body');
-  if (gone) return <div className="post gone">{t('Hidden. The feed will show less like this.')}</div>;
+  const [downNote, setDownNote] = useState(false);
+  if (gone) return <div className="post gone"><span>{t('Hidden. The feed will show less like this.')}</span><DislikeNote id={item.id} /></div>;
   const id = identity(item);
   const isText = item.media?.kind === 'text';
   const liked = item.media?.rating;
@@ -262,6 +331,7 @@ export default function Post({ item: initial, focus = false, onStrong }) {
           {item.url ? <a className="pb icon" href={item.url} target="_blank" rel="noreferrer noopener" aria-label={t('Open on source')} title={t('Open on the original site')} onClick={() => track(item.id, 'open')}><Icon name="open" /></a> : null}
         </div>
       </div>
+      {downNote ? <DislikeNote id={item.id} compact /> : null}
       {panel ? (
         <div className="panel-in" ref={panelRef}>
           {panel === 'why' ? <WhyPanel item={item} /> : null}

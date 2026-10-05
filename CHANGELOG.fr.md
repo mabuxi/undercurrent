@@ -2,6 +2,32 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.18.0 · 5 octobre 2026
+
+### Sur votre iPhone
+- Un bouton téléphone en haut affiche un code QR : scannez-le avec l’appareil photo de l’iPhone pour ouvrir Undercurrent depuis le Mac sur votre téléphone (même Wi-Fi). Il utilise le fil, les goûts et l’IA locale du Mac.
+- Le code est une clé : seuls les appareils qui l’ont scanné peuvent entrer, personne d’autre sur le même Wi-Fi. « Oublier tous les téléphones associés » crée un nouveau code.
+- Ajoutez-le à l’écran d’accueil et il s’ouvre en plein écran comme une app, avec sa propre icône (prise en charge des web apps sur iOS).
+- Sur un téléphone, les vues sont une barre d’onglets flottante et givrée en bas, comme sur iOS : Fil, Enregistrés, Votre carte, Mémoire, Réglages.
+- Le fil s’aimante de publication en publication, une à la fois. Chaque publication tient dans l’écran, avec l’image ou la vidéo aussi grande que possible. Les longs récits commencent plus courts et s’ouvrent avec « Continuer la lecture ».
+- Une fenêtre apparaît toutes les 3 à 5 publications.
+- La barre du haut tient sur une seule ligne fine, et les réglages du fil se replient derrière « Régler le fil ».
+
+### Recherche
+- Nommez des sources dans la barre de recherche pour ne voir qu’elles pendant un moment : « only bluesky », « bluesky, reddit », « seulement reddit ». Elles apparaissent comme une puce que vous pouvez retirer.
+- Une recherche, un clic sur un tag ou un changement de filtre fait défiler jusqu’au début du fil, avec une ligne qui dit ce qui est affiché et combien de publications correspondent.
+- Les filtres et les tags de recherche sont sur une seule ligne avec le même style : un tag cliqué ne saute plus à côté des tags de recherche.
+
+### Apprentissage
+- Retirer un j’aime, un enregistrement ou de la chaleur annule exactement ce que cela avait appris à votre fil. Une chaleur ramenée sous deux flammes retire aussi le vote positif qu’elle avait donné.
+- Masquer ou ne pas aimer une publication : les tags que vous aimez déjà ne sont pas touchés, et le plus grand modèle local regarde la publication (des images de la vidéo quand il peut) pour trouver ce qui ne vous a probablement pas plu. Ce qu’il trouve s’affiche sous la publication, et vous pouvez retirer chaque raison avec ×.
+
+### App Mac
+- La fenêtre se déplace en faisant glisser la barre du haut, et un double-clic l’agrandit, comme une vraie barre de titre.
+- Les boutons de la fenêtre ne cachent plus le nom Undercurrent ; la ligne « Navigateur local » en dessous a disparu.
+- L’état de l’IA locale est un petit point à gauche de la barre de recherche : cliquez ou survolez-le pour les détails.
+- Ollama démarre caché en arrière-plan et ne vous gêne plus.
+
 ## 0.17.1 · 5 octobre 2026
 
 ### Corrections

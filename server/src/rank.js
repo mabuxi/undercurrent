@@ -65,6 +65,7 @@ function passes(item, tags, f, kinkSets) {
   if (f.community && (item.community || '').toLowerCase() !== f.community.toLowerCase()) return false;
   if (f.author && String(item.author || '').toLowerCase() !== f.author.toLowerCase()) return false;
   if (f.source && item.source !== f.source) return false;
+  if (Array.isArray(f.sources) && f.sources.length && !f.sources.includes(item.source)) return false;
   const ids = new Set(tags.map((t) => t.id));
   const names = new Set(tags.map((t) => t.name));
   if (f.tags?.length) {
@@ -165,7 +166,10 @@ export function buildFeed(filters = {}, { exclude = [], limit = 12, mix = 15 } =
   const only = sq && f.profile ? getProfileItems(f.search, f.profile) || new Set() : null;
   const explicit = !!(f.q || f.author || f.community || f.saved || sq?.gender || sq?.people?.length || only);
   const where = ['i.blocked = 0', 'COALESCE(s.hidden, 0) = 0', "NOT (i.format = 'discussion' AND COALESCE(i.thread_ok, 1) = 0)"];
-  if (!config.mock && !f.saved) {
+  // Only some sources, for a while ("only bluesky and reddit"): those, also when one of them is switched off.
+  const onlySources = Array.isArray(f.sources) ? f.sources.filter((x) => /^[a-z0-9]+$/.test(x)) : [];
+  if (onlySources.length) where.push(`i.source IN (${onlySources.map((x) => `'${x}'`).join(',')})`);
+  else if (!config.mock && !f.saved) {
     const st = providerState();
     const on = Object.keys(st).filter((k) => st[k].enabled);
     where.push(`i.source IN (${on.map((x) => `'${x}'`).join(',') || "''"})`);

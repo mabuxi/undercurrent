@@ -46,6 +46,7 @@ import { listProfiles, createProfile, renameProfile, setProfileColor, switchProf
 import { updateStatus, applyUpdate, job as updateJob, whatsNew, markSeen, changelog } from './update.js';
 import { lang, languageSet, setLanguage, LANGS, tr, trn, replyIn } from './i18n.js';
 import { kinkLabel, translateItem } from './translate.js';
+import { queueDislike, dislikeOf, dropReason } from './dislike.js';
 import { conceptLabel } from './vocab.js';
 import { conceptName as cName, knownVariants, familyOf } from './concepts.js';
 import { boostTags } from './profile.js';
@@ -259,6 +260,7 @@ api.post('/items/:id/vote', wrap(async (req, res) => {
   const dir = Number(req.body?.dir) || 0;
   applyEvent({ itemId: it.id, type: dir > 0 ? 'up' : dir < 0 ? 'down' : 'unvote', sessionId: req.body?.sessionId });
   if (dir > 0) { fetchForInsight([it.id]); deepNow(it.id); try { strengthen([it.id], 1); } catch {} }
+  if (dir < 0) queueDislike(it.id, 'down');
   let synced = false;
   if (it.source === 'reddit' && !config.mock && getSetting('syncVotes', true) && reddit.redditConfigured()) {
     await reddit.vote(`t3_${it.extId}`, dir);
@@ -306,8 +308,12 @@ api.post('/items/:id/kinks', wrap((req, res) => {
 
 api.post('/items/:id/less', wrap((req, res) => {
   applyEvent({ itemId: Number(req.params.id), type: 'less', sessionId: req.body?.sessionId });
+  queueDislike(Number(req.params.id), 'less');
   res.json({ ok: true });
 }));
+// What the bigger model thinks you did not like in a post you hid or disliked, and taking one reason back.
+api.get('/items/:id/dislike', wrap((req, res) => res.json(dislikeOf(Number(req.params.id)))));
+api.delete('/items/:id/dislike/:reason', wrap((req, res) => res.json(dropReason(Number(req.params.id), String(req.params.reason)))));
 
 api.post('/items/:id/retag', wrap(async (req, res) => {
   res.json(await tagItem(Number(req.params.id)));
@@ -412,6 +418,23 @@ function purposeLabel(p) {
   if (m) return tr('Scraper server: {site}', { site: m[1] });
   return tr(v);
 }
+
+// Opening Undercurrent on a phone: the addresses on this network, or why it is not possible.
+api.get('/lan', wrap(async (req, res) => {
+  const os = await import('node:os');
+  const { lanUrls } = await import('./lan.js');
+  const local = /^(127\.|::1$|localhost$)/.test(config.host);
+  const { pairToken } = await import('./lan.js');
+  const code = encodeURIComponent(pairToken(config.dataDir));
+  res.json({ urls: local ? [] : lanUrls(config.port, os.networkInterfaces()).map((u) => ({ ...u, url: `${u.url}/?pair=${code}`, plain: u.url })), port: config.port, localOnly: local });
+}));
+// Forgetting every paired phone: a new code, the old QR code stops working.
+api.post('/lan/reset', wrap(async (req, res) => {
+  const { resetPairToken, isLoopback } = await import('./lan.js');
+  if (!isLoopback(req.socket.remoteAddress)) return res.status(403).json({ error: tr('Only the Mac itself can do this.') });
+  resetPairToken(config.dataDir);
+  res.json({ ok: true });
+}));
 
 api.get('/settings/language', wrap((req, res) => res.json({ language: languageSet() ? lang() : null, languages: LANGS })));
 api.put('/settings/language', wrap((req, res) => {

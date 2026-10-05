@@ -15,7 +15,7 @@ export async function ensureOllama() {
   let h = await health();
   if (h.ok) return { ok: true, started: false };
   try {
-    if (os.platform() === 'darwin') spawn('open', ['-g', '-a', 'Ollama'], { stdio: 'ignore', detached: true }).unref();
+    if (os.platform() === 'darwin') spawn('open', ['-g', '-j', '-a', 'Ollama'], { stdio: 'ignore', detached: true }).unref();
     else spawn('ollama', ['serve'], { stdio: 'ignore', detached: true }).unref();
   } catch (err) {
     return { ok: false, error: `Could not start Ollama: ${err.message}` };

@@ -4,6 +4,7 @@ import { useApp, crumbList, MOODS } from '../context.jsx';
 import { Icon } from '../icons.jsx';
 import { useActivity } from '../activity.js';
 import { t, tn, getLang } from '../i18n.js';
+import { PhoneModal } from './Phone.jsx';
 
 const LOADED = Date.now();
 
@@ -21,7 +22,7 @@ function Step({ s }) {
   );
 }
 
-const CHIP_ICON = { gender: null, person: 'person', format: 'grid', tag: null, syn: null };
+const CHIP_ICON = { gender: null, person: 'person', format: 'grid', tag: null, syn: null, source: 'globe' };
 
 function Chip({ c, onRemove }) {
   const g = c.kind === 'gender' ? (c.value === 'both' ? 'both' : String(c.value).startsWith('women') ? 'f' : 'm') : null;
@@ -42,6 +43,8 @@ export default function TopBar() {
   const [deep, setDeep] = useState(readDeep);
   const [status, setStatus] = useState(null);
   const [open, setOpen] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const [phone, setPhone] = useState(false);
   const [stepsOpen, setStepsOpen] = useState(false);
   const hideTimer = useRef(null);
   const stepTimer = useRef(null);
@@ -108,7 +111,14 @@ export default function TopBar() {
   const u = status?.usage?.session;
   const tps = u && u.ms ? (u.completionTokens / (u.ms / 1000)).toFixed(1) : null;
   const show = () => { clearTimeout(hideTimer.current); setOpen(true); };
-  const hide = () => { hideTimer.current = setTimeout(() => setOpen(false), 200); };
+  const hide = () => { if (!pinned) hideTimer.current = setTimeout(() => setOpen(false), 200); };
+  useEffect(() => {
+    if (!pinned) return undefined;
+    const away = (e) => { if (!e.target.closest?.('.statusdot-wrap')) { setPinned(false); setOpen(false); } };
+    document.addEventListener('pointerdown', away);
+    return () => document.removeEventListener('pointerdown', away);
+  }, [pinned]);
+  const ok = !!status?.ollama?.ok;
 
   const steps = search?.steps || [];
   const busy = [...steps].reverse().find((s) => s.state === 'run') || acts.find((a) => a.state === 'run');
@@ -122,10 +132,32 @@ export default function TopBar() {
   return (
     <header className="top" ref={headRef}>
       <button type="button" className="brand" onClick={() => setFilters({})} aria-label={t('Back to the mixed feed')}>
-        <h1>Undercurrent</h1><span>{t('Local browser')}</span>
+        <h1>Undercurrent</h1>
       </button>
       <div className="askwrap">
         <form className="ask" onSubmit={submit} role="search">
+          <div className="statusdot-wrap" onMouseEnter={show} onMouseLeave={hide}>
+            <button type="button" className={`statusdot${status ? (ok ? ' ok' : ' off') : ''}${status?.mock ? ' mock' : ''}`} onClick={() => { if (pinned) { setPinned(false); setOpen(false); } else { setPinned(true); setOpen(true); } }} aria-expanded={open} aria-controls="statusPop" title={ok ? (status?.mock ? t('Local model (test)') : t('Local model ready')) : t('Local model offline')} aria-label={t('What runs on this Mac')}>
+              <i />
+            </button>
+            {open && status ? (
+              <div className="statuspop" id="statusPop" role="dialog" aria-label={t('What runs on this Mac')}>
+                <div className="sp-head"><span className={`live${ok ? '' : ' off'}`}><i className={ok ? '' : 'off'} />{ok ? (status.mock ? t('Local model (test)') : t('Local model ready')) : t('Local model offline')}</span><span className="bytes">{tn(nReq, '0 B profile data sent · {n} content request', '0 B profile data sent · {n} content requests')}</span></div>
+                <div className="sp-row"><b>{t('Model')}</b><span>{status.model}</span></div>
+                <div className="sp-row"><b>Ollama</b><span>{status.ollama.ok ? t('running {v}', { v: status.ollama.version }) : status.ollama.error}</span></div>
+                {status.running?.map((m) => <div className="sp-row" key={m.name}><b>{t('Loaded')}</b><span>{m.name} · {t('{size} in GPU memory', { size: fmtBytes(m.vram) })}</span></div>)}
+                <div className="sp-row"><b>{t('This session')}</b><span>{tn(u?.requests || 0, '{n} AI call', '{n} AI calls')} · {t('{n} tokens', { n: fmtNum((u?.promptTokens || 0) + (u?.completionTokens || 0)) })}{tps ? ` · ${t('{n} tokens/s', { n: getLang() === 'fr' ? tps.replace('.', ',') : tps })}` : ''}</span></div>
+                <div className="sp-row"><b>{t('Tagging')}</b><span>{t('{n} waiting', { n: status.tagger.pending })} · {t('{n} tagged', { n: status.tagger.tagged })}{status.tagger.lastError ? ` · ${status.tagger.lastError}` : ''}</span></div>
+                <div className="sp-row"><b>{t('Machine')}</b><span>{t('{gb} GB memory · {n} cores', { gb: status.system.memoryGb, n: status.system.cores })}</span></div>
+                <div className="sp-sep" />
+                <p className="sp-note">{status.webSearch ? t('Your profile, memory and history never leave this computer. The AI runs locally. The only outgoing traffic is fetching posts and media, plus web searches for names when you look someone up:') : t('Your profile, memory and history never leave this computer. The AI runs locally. The only outgoing traffic is fetching posts and media:')}</p>
+                {reqs.length ? reqs.slice(0, 8).map((r) => (
+                  <div className="sp-row" key={r.host + r.purpose}><b>{r.host}</b><span>{r.n}× {r.purpose} · {t('{out} out · {in} in', { out: fmtBytes(r.bytesOut), in: fmtBytes(r.bytesIn) })}</span></div>
+                )) : <div className="sp-row full"><span>{t('No outgoing requests since you opened the app.')}</span></div>}
+                {status.ingest?.log?.[0] ? <p className="sp-note">{t('Last fetch: {msg}', { msg: status.ingest.log[0].msg })}</p> : null}
+              </div>
+            ) : null}
+          </div>
           <div className={`sbar${busy ? ' working' : ''}`}>
             <Icon name="search" />
             <input id="askIn" type="text" autoComplete="off" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('Search or ask: hairy muscle daddy · woman with big tits · content from a creator · remove a kink and show me more…')} aria-label={t('Search or tell the assistant what to do')} />
@@ -155,28 +187,24 @@ export default function TopBar() {
           </ul>
         ) : null}
         {(() => {
-          // What the feed is showing, when it is not the plain mixed feed. The search itself is in the field above.
-          const list = crumbList(filters, { kinks, fantasies }).filter(([k]) => !(k === 'search' && activeNow));
+          // What the feed is showing (filters) and what the search looks for, in one row with one look.
+          const list = crumbList(filters, { kinks, fantasies }).filter(([k]) => !(k === 'search' && activeNow) && !(k === 'sources' && chips.some((c) => c.kind === 'source')));
           const mood = opts?.mood ? MOODS.find((m) => m.id === opts.mood) : null;
           if (mood) for (const k of Object.keys(mood.filters || {})) { const i = list.findIndex(([x]) => x === k); if (i >= 0) list.splice(i, 1); }
-          if (!list.length && !mood) return null;
+          if (!list.length && !mood && !chips.length) return null;
           return (
-            <div className="sb-crumbs" aria-label={t('What the feed is showing')}>
-              <span className="tlabel">{t('Showing')}</span>
-              {mood ? <span className="crumb top">{t('Mood: {mood}', { mood: mood.label })}<button type="button" onClick={() => clearFilter('mood')} aria-label={t('Remove the {mood} mood', { mood: mood.label })}><Icon name="x" /></button></span> : null}
-              {list.map(([k, label]) => <span key={k} className="crumb top">{label}<button type="button" onClick={() => clearFilter(k)} aria-label={t('Remove {name}', { name: label })}><Icon name="x" /></button></span>)}
+            <div className="sb-chips" aria-label={t('What the feed is showing')}>
+              {mood ? <span className="schip schip-filter"><span>{t('Mood: {mood}', { mood: mood.label })}</span><button type="button" onClick={() => clearFilter('mood')} aria-label={t('Remove the {mood} mood', { mood: mood.label })}><Icon name="x" /></button></span> : null}
+              {list.map(([k, label]) => <span key={k} className={`schip schip-filter${k.startsWith('tag:') ? ' schip-tag' : ''}`}><span>{label}</span><button type="button" onClick={() => clearFilter(k)} aria-label={t('Remove {name}', { name: label })}><Icon name="x" /></button></span>)}
+              {chips.map((c) => <Chip key={`${c.kind}:${c.value}`} c={c} onRemove={editChip} />)}
             </div>
           );
         })()}
-        {chips.length ? (
-          <div className="sb-chips" aria-label={t('What this search looks for')}>
-            {chips.map((c) => <Chip key={`${c.kind}:${c.value}`} c={c} onRemove={editChip} />)}
-          </div>
-        ) : null}
         {mode !== 'feed' && askOut ? <div id="askOut" aria-live="polite">{askOut}</div> : null}
       </div>
       <div className="topright">
         {update?.available ? <button type="button" className="uppill" onClick={openUpdate} title={t('Version {v} is available', { v: update.latest })}><Icon name="spark" />{t('Update to {v}', { v: update.latest })}</button> : null}
+        {!window.navigator.standalone && !/iPhone|iPad|Android/i.test(navigator.userAgent) ? <button type="button" className="phonebtn" onClick={() => setPhone(true)} title={t('Open on your iPhone')} aria-label={t('Open on your iPhone')}><Icon name="phone" /></button> : null}
         <nav className="nav" aria-label={t('Views')}>
           <button type="button" className={mode === 'feed' && !filters.saved ? 'on' : ''} onClick={() => { if (filters.saved) setFilters({}); openMode('feed'); }} title={t('Feed')} aria-label={t('Feed')}><Icon name="home" /></button>
           <button type="button" className={mode === 'feed' && filters.saved ? 'on' : ''} onClick={() => { openMode('feed'); setFilters({ saved: true }); }} title={t('Saved posts')} aria-label={t('Saved posts')}><Icon name="save" /></button>
@@ -184,27 +212,8 @@ export default function TopBar() {
           <button type="button" className={mode === 'memory' ? 'on' : ''} onClick={() => openMode('memory')} title={t('Memory, kinks and fantasies')} aria-label={t('Memory')}><Icon name="brain" /></button>
           <button type="button" className={mode === 'settings' ? 'on' : ''} onClick={() => openMode('settings')} title={t('Settings')} aria-label={t('Settings')}><Icon name="gear" /></button>
         </nav>
-        <div className="status" onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide} tabIndex={0} aria-describedby="statusPop">
-          <span className="live"><i className={status?.ollama?.ok ? '' : 'off'} />{status?.ollama?.ok ? (status?.mock ? t('Local model (test)') : t('Local model ready')) : t('Local model offline')}</span>
-          <span className="bytes">{tn(nReq, '0 B profile data sent · {n} content request', '0 B profile data sent · {n} content requests')}</span>
-          {open && status ? (
-            <div className="statuspop" id="statusPop" role="tooltip">
-              <div className="sp-row"><b>{t('Model')}</b><span>{status.model}</span></div>
-              <div className="sp-row"><b>Ollama</b><span>{status.ollama.ok ? t('running {v}', { v: status.ollama.version }) : status.ollama.error}</span></div>
-              {status.running?.map((m) => <div className="sp-row" key={m.name}><b>{t('Loaded')}</b><span>{m.name} · {t('{size} in GPU memory', { size: fmtBytes(m.vram) })}</span></div>)}
-              <div className="sp-row"><b>{t('This session')}</b><span>{tn(u?.requests || 0, '{n} AI call', '{n} AI calls')} · {t('{n} tokens', { n: fmtNum((u?.promptTokens || 0) + (u?.completionTokens || 0)) })}{tps ? ` · ${t('{n} tokens/s', { n: getLang() === 'fr' ? tps.replace('.', ',') : tps })}` : ''}</span></div>
-              <div className="sp-row"><b>{t('Tagging')}</b><span>{t('{n} waiting', { n: status.tagger.pending })} · {t('{n} tagged', { n: status.tagger.tagged })}{status.tagger.lastError ? ` · ${status.tagger.lastError}` : ''}</span></div>
-              <div className="sp-row"><b>{t('Machine')}</b><span>{t('{gb} GB memory · {n} cores', { gb: status.system.memoryGb, n: status.system.cores })}</span></div>
-              <div className="sp-sep" />
-              <p className="sp-note">{status.webSearch ? t('Your profile, memory and history never leave this computer. The AI runs locally. The only outgoing traffic is fetching posts and media, plus web searches for names when you look someone up:') : t('Your profile, memory and history never leave this computer. The AI runs locally. The only outgoing traffic is fetching posts and media:')}</p>
-              {reqs.length ? reqs.slice(0, 8).map((r) => (
-                <div className="sp-row" key={r.host + r.purpose}><b>{r.host}</b><span>{r.n}× {r.purpose} · {t('{out} out · {in} in', { out: fmtBytes(r.bytesOut), in: fmtBytes(r.bytesIn) })}</span></div>
-              )) : <div className="sp-row full"><span>{t('No outgoing requests since you opened the app.')}</span></div>}
-              {status.ingest?.log?.[0] ? <p className="sp-note">{t('Last fetch: {msg}', { msg: status.ingest.log[0].msg })}</p> : null}
-            </div>
-          ) : null}
-        </div>
       </div>
+      {phone ? <PhoneModal onClose={() => setPhone(false)} /> : null}
     </header>
   );
 }

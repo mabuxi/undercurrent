@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, FORMATS, flushNow, imgSrc } from '../api.js';
-import { useApp, MOODS } from '../context.jsx';
+import { useApp, MOODS, crumbList } from '../context.jsx';
 import { Icon } from '../icons.jsx';
 import Post from './Post.jsx';
 import { Window } from './Windows.jsx';
@@ -32,6 +32,9 @@ const NOW_KIND = {
   fantasy: { label: t('fantasy'), icon: 'spark', color: '#F6C35B' },
   new: { label: t('new'), icon: 'spark', color: '#7FD0C2' }
 };
+
+// Where windows go between posts on a phone: after 4, then every 3 to 5 posts.
+const WIN_AFTER = (() => { const out = []; let at = 0; const gaps = [4, 3, 5, 4, 5, 3]; for (let i = 0; i < 200; i++) { at += gaps[i % gaps.length]; out.push(at); } return out; })();
 
 function greeting() {
   const h = new Date().getHours();
@@ -201,9 +204,33 @@ function SearchCard() {
 const dec = (s) => (getLang() === 'fr' ? s.replace('.', ',') : s);
 const fmtCount = (n) => { n = Number(n) || 0; return n >= 1e6 ? `${dec((n / 1e6).toFixed(1).replace(/\.0$/, ''))}M` : n >= 1000 ? `${dec((n / 1000).toFixed(1).replace(/\.0$/, ''))}k` : String(n); };
 
-function Controls({ total }) {
+// Right where the feed starts: what it is showing now and how much matched, or the assistant's answer. A search,
+// a tag or any other change scrolls here.
+function FeedHead({ total, loading }) {
+  const { filters, opts, kinks, fantasies, askOut } = useApp();
+  const mood = opts?.mood ? MOODS.find((m) => m.id === opts.mood) : null;
+  // The search itself is in the answer and the search bar; this line says what else narrows the feed.
+  const what = crumbList(filters, { kinks, fantasies }).filter(([k]) => k !== 'search').map(([, l]) => l);
+  if (mood) what.unshift(t('Mood: {mood}', { mood: mood.label }));
+  const filtered = what.length > 0 || !!filters.search;
+  const count = filtered && total != null && !loading ? tn(total, '{n} post matches', '{n} posts match') : null;
+  return (
+    <div className="feedhead" id="feedStart">
+      {askOut || filtered ? (
+        <div className="fh-line" aria-live="polite">
+          {askOut ? <p className="fh-answer">{askOut}</p> : null}
+          {filtered ? <p className="fh-what">{what.length ? <span>{t('Showing: {what}', { what: what.join(' · ') })}</span> : null}{count ? <em>{count}</em> : loading ? <em className="fh-wait"><span className="spin" />{t('Loading…')}</em> : null}</p> : null}
+        </div>
+      ) : null}
+      <SearchCard />
+    </div>
+  );
+}
+
+function Controls({ total, narrow }) {
   const { filters, opts, mix, setMix, setFilters, patchFilters, applyMood, presets, kinks, fantasies, askOut, clearSearch } = useApp();
   const [summary, setSummary] = useState(null);
+  const [tuneOpen, setTuneOpen] = useState(false);
   useEffect(() => { api('/home/summary').then((r) => setSummary(r.text)).catch(() => {}); }, []);
   const toggleFormat = (f) => {
     const cur = filters.formats || [];
@@ -213,10 +240,10 @@ function Controls({ total }) {
     <>
       <div className="hello">
         <h2>{greeting()}</h2>
-        <p className={`hello-sum${askOut ? ' answer' : ''}`} aria-live="polite">{askOut || summary || ''}</p>
+        <p className="hello-sum">{summary || ''}</p>
+        {narrow ? <button type="button" className={`tunebtn${tuneOpen ? ' on' : ''}`} onClick={() => setTuneOpen((o) => !o)} aria-expanded={tuneOpen}><Icon name="sliders" />{tuneOpen ? t('Hide the controls') : t('Tune the feed')}</button> : null}
       </div>
-      <SearchCard />
-      <section className="tuner" aria-label={t('Tune the feed')}>
+      {narrow && !tuneOpen ? null : <section className="tuner" aria-label={t('Tune the feed')}>
         <FeedWindow />
         <div className="tline tline-top">
           <span className="tlabel">{t('Mood')}</span>
@@ -256,7 +283,7 @@ function Controls({ total }) {
             <span className="count">{filters.onlyNew ? t('only things you haven’t opened') : mix ? t('about 1 in {n} is new to you', { n: Math.max(2, Math.round(100 / mix)) }) : t('nothing new mixed in')}</span>
           </div>
         </div>
-      </section>
+      </section>}
     </>
   );
 }
@@ -339,7 +366,7 @@ export default function FeedView() {
       setWider(relaxed.current);
       setError(null);
       if (narrow && next.length) {
-        const n = Math.ceil(next.length / 5);
+        const n = Math.ceil(next.length / 3);
         const w = await api(`/windows?cursor=${winCursor.current}&count=${n}&side=2`);
         winCursor.current += n;
         setWins((cur) => [...cur, ...w.windows]);
@@ -441,16 +468,19 @@ export default function FeedView() {
       list.push(<div key={`d${it.id}`} className="deeper"><span className="deeper-why">{d.why}</span></div>);
       d.items.forEach((x) => list.push(<ErrorBoundary key={x.id} name="Post"><Post item={{ ...x, label: 'deeper' }} onStrong={onStrong} /></ErrorBoundary>));
     }
-    if (narrow && (i + 1) % 5 === 0 && wins[Math.floor(i / 5)]) {
-      const w = wins[Math.floor(i / 5)];
+    // On a phone a window comes after every 3 to 5 posts.
+    const slot = WIN_AFTER.indexOf(i + 1);
+    if (narrow && slot >= 0 && wins[slot]) {
+      const w = wins[slot];
       list.push(<ErrorBoundary key={w.uid} name="Window" quiet><Window w={w} /></ErrorBoundary>);
     }
   });
 
   return (
     <section className="center" style={{ paddingTop: 0 }}>
-      <Controls total={total} />
-      <div className="feed">{list}</div>
+      <Controls total={total} narrow={narrow} />
+      <FeedHead total={total} loading={loading && !items.length} />
+      <div className="feed" style={items.length < 2 ? { minHeight: '100vh' } : undefined}>{list}</div>
       {error ? <div className="empty">{error}</div> : null}
       {wider && items.length ? <div className="deeper"><span className="deeper-why">{t('Few exact matches left, now also showing close matches')}</span></div> : null}
       {fresh ? <button type="button" className="freshbar" onClick={() => { reset(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>{t('New results from your sources are in · Show them')}</button> : null}

@@ -67,7 +67,7 @@ func L(_ s: String) -> String {
 let PORT = 4317
 let BASE = "http://127.0.0.1:\(PORT)"
 
-final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
     var window: NSWindow!
     var web: WKWebView!
     var server: Process?
@@ -112,6 +112,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         config.preferences.javaScriptCanOpenWindowsAutomatically = false
         if #available(macOS 12.3, *) { config.preferences.isElementFullscreenEnabled = true }
         config.websiteDataStore = WKWebsiteDataStore.default()
+        // The page knows it is inside the Mac app (room for the window buttons), and its top bar moves the window:
+        // drag it anywhere that is not a button or a field, double-click it to zoom, like a normal title bar.
+        let bridge = """
+        (function () {
+          window.ucMac = true;
+          var mark = function () { if (document.documentElement) document.documentElement.classList.add('mac-app'); };
+          mark(); document.addEventListener('DOMContentLoaded', mark);
+          var NO = 'button, a, input, textarea, select, label, summary, video, iframe, [role=button], [role=radio], [contenteditable], .no-drag, .sb-steps, .statuspop, .sb-chips';
+          var can = function (e) { return e.button === 0 && e.target && e.target.closest && e.target.closest('.top') && !e.target.closest(NO); };
+          document.addEventListener('mousedown', function (e) { if (can(e) && e.detail === 1) window.webkit.messageHandlers.uc.postMessage('drag'); }, true);
+          document.addEventListener('dblclick', function (e) { if (can(e)) window.webkit.messageHandlers.uc.postMessage('zoom'); }, true);
+        })();
+        """
+        config.userContentController.addUserScript(WKUserScript(source: bridge, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        config.userContentController.add(self, name: "uc")
         web = WKWebView(frame: .zero, configuration: config)
         web.navigationDelegate = self
         web.uiDelegate = self
@@ -135,6 +150,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         NSApp.activate(ignoringOtherApps: true)
 
         showSplash(L("Starting Undercurrent…"))
+        keepOllamaHidden()
         DispatchQueue.global(qos: .userInitiated).async {
             self.moveOldData()
             if self.serverUp() {
@@ -142,6 +158,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             } else {
                 DispatchQueue.main.async { self.startServer() }
             }
+        }
+    }
+
+    // ---------- Moving the window from the page's top bar ----------
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard let what = message.body as? String else { return }
+        if what == "zoom" { window.performZoom(nil); return }
+        if what == "drag" { dragWindow() }
+    }
+
+    func dragWindow() {
+        if let e = NSApp.currentEvent, e.type == .leftMouseDown || e.type == .leftMouseDragged {
+            window.performDrag(with: e)
+            return
+        }
+        // The click already went by: follow the mouse until it is released.
+        guard NSEvent.pressedMouseButtons & 1 == 1 else { return }
+        let start = NSEvent.mouseLocation
+        let origin = window.frame.origin
+        while true {
+            guard let e = window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp], until: .distantFuture, inMode: .eventTracking, dequeue: true) else { break }
+            if e.type == .leftMouseUp { break }
+            let p = NSEvent.mouseLocation
+            window.setFrameOrigin(NSPoint(x: origin.x + p.x - start.x, y: origin.y + p.y - start.y))
+        }
+    }
+
+    // ---------- Ollama stays in the background ----------
+
+    // Ollama is started for the models only: when its app opens a window while Undercurrent starts, it is hidden again
+    // and Undercurrent stays in front.
+    let startedAt = Date()
+    func isOllama(_ app: NSRunningApplication) -> Bool {
+        return (app.bundleIdentifier ?? "").lowercased().contains("ollama") || app.localizedName == "Ollama"
+    }
+
+    func keepOllamaHidden() {
+        let center = NSWorkspace.shared.notificationCenter
+        for app in NSWorkspace.shared.runningApplications where isOllama(app) && app.isActive { app.hide() }
+        center.addObserver(forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main) { [weak self] n in
+            guard let self = self, let app = n.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication, self.isOllama(app) else { return }
+            app.hide()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { app.hide() }
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        center.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] n in
+            guard let self = self, Date().timeIntervalSince(self.startedAt) < 120,
+                  let app = n.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication, self.isOllama(app) else { return }
+            app.hide()
+            NSApp.activate(ignoringOtherApps: true)
         }
     }
 

@@ -57,6 +57,7 @@ export async function mockChat({ kind, user, schema }) {
     return { tags, summary: `Mock description of "${title.slice(0, 60)}".`, minor_risk: false };
   }
   if (kind === 'translate') return `[FR] ${user}`;
+  if (kind === 'dislike') return { reasons: ['soft lighting', 'fake moaning'], note: 'Probably the lighting and the fake moaning.' };
   if (kind === 'ask-parse') return null;
   if (kind === 'search-parse' && schema?.properties?.concepts) {
     const found = (user.match(/quick split found: ([^(.\n]*)/) || [])[1] || '';

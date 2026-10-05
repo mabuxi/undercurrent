@@ -244,6 +244,7 @@ function chipsFor(spec) {
     for (const s of c.syn.slice(0, 6)) chips.push({ kind: 'syn', text: s, value: s, of: c.name });
   }
   for (const p of spec.people) chips.push({ kind: 'person', text: p, value: p });
+  for (const id of spec.sources || []) chips.push({ kind: 'source', text: PROVIDERS[id]?.label || id, value: id });
   for (const f of spec.formats || []) chips.push({ kind: 'format', text: { long: tr('Long form'), short: tr('Short form'), gif: tr('GIFs'), image: tr('Images'), set: tr('Image sets'), story: tr('Stories'), discussion: tr('Threads') }[f] || f, value: f });
   return chips;
 }
@@ -303,8 +304,9 @@ async function withTimeout(p, ms) {
 
 async function searchProviders(job, terms, { page = 1 } = {}) {
   const st = providerState();
-  const on = (id) => (config.mock ? id === 'redgifs' || id === 'pornhub' : !!st[id]?.enabled);
   const spec = job.spec;
+  const named = spec.sources?.length ? new Set(spec.sources) : null;
+  const on = (id) => (named ? named.has(id) : true) && (config.mock ? id === 'redgifs' || id === 'pornhub' || !!named : !!st[id]?.enabled);
   const found = { communities: new Map(), users: new Map(), performers: new Map() };
   const tasks = [];
   const run = (key, label, fn) => tasks.push((async () => {
@@ -1032,6 +1034,34 @@ function looksLikePerson(text) {
   return n.split(' ').length === 1 && n.length >= 4 && !lexicon().has(n) && !WOMEN.has(n) && !MEN.has(n) && !GAY.has(n) && !LES.has(n) && !BOTH.has(n) && !TRANS.has(n) && !NOISE.has(n);
 }
 
+// ---------- Only some sources ----------
+
+// "only bluesky", "show me content from bluesky and reddit", "bluesky, reddit", "seulement reddit".
+const SOURCE_ALIASES = {
+  redgifs: ['redgifs', 'red gifs', 'redgif'], pornhub: ['pornhub', 'porn hub'], redtube: ['redtube', 'red tube'], eporner: ['eporner'],
+  lemmy: ['lemmy'], bluesky: ['bluesky', 'blue sky', 'bsky'], rule34: ['rule34', 'rule 34', 'r34'], gelbooru: ['gelbooru'],
+  xvideos: ['xvideos', 'x videos'], xnxx: ['xnxx'], xhamster: ['xhamster', 'x hamster'], youporn: ['youporn', 'you porn'], txxx: ['txxx'],
+  reddit: ['reddit', 'subreddits']
+};
+const SOURCE_FILLER = new Set(['show', 'me', 'only', 'just', 'content', 'contents', 'posts', 'post', 'stuff', 'from', 'on', 'of', 'the', 'give', 'i', 'want', 'to', 'see', 'display', 'everything', 'all', 'and', 'or', 'plus', 'with', 'in', 'feed', 'my', 'source', 'sources', 'site', 'sites', 'please',
+  'montre', 'montre-moi', 'moi', 'seulement', 'uniquement', 'que', 'du', 'de', 'des', 'd', 'le', 'la', 'les', 'contenu', 'publications', 'publication', 'sur', 'en', 'provenance', 'venant', 'juste', 'et', 'ou', 'tout', 'affiche', 'mon', 'fil', 'je', 'veux', 'voir', 'sites']);
+
+export function sourcesIn(text) {
+  let s = ` ${String(text || '').toLowerCase().replace(/[,;/&+|]/g, ' , ')} `;
+  const ids = [];
+  for (const [id, names] of Object.entries(SOURCE_ALIASES)) {
+    for (const n of names.sort((a, b) => b.length - a.length)) {
+      const re = new RegExp(`(^|[\\s,])${n.replace(/ /g, '\\s+')}(?=[\\s,]|$)`, 'g');
+      if (re.test(s)) { if (!ids.includes(id)) ids.push(id); s = s.replace(re, '$1 '); }
+    }
+  }
+  if (!ids.length) return null;
+  const rest = s.split(/[\s,]+/).filter(Boolean).filter((w) => !SOURCE_FILLER.has(w.replace(/[’']/g, '')) && !/^[.!?:]+$/.test(w)).join(' ').trim();
+  return { ids, rest };
+}
+
+const sourceLabels = (ids) => ids.map((id) => PROVIDERS[id]?.label || id);
+
 export function startSearch({ q, deep = false, sessionId = null }) {
   pruneJobs();
   const text = String(q || '').trim().slice(0, 400);
@@ -1041,8 +1071,24 @@ export function startSearch({ q, deep = false, sessionId = null }) {
     spec: { concepts: [], gender: null, trans: null, formats: [], people: [], fetched: new Set(), weak: new Set() }
   };
   JOBS.set(job.id, job);
+  // A search can name the sources it is about; the rest of what was typed is searched only there.
+  const src = sourcesIn(text);
+  const query = src ? src.rest : text;
+  if (src) job.spec.sources = src.ids;
   (async () => {
     try {
+      if (src && !query) {
+        job.mode = 'sources';
+        const list = sourceLabels(src.ids).join(', ');
+        step(job, 'sources', tr('Only posts from {list}', { list }), 'done');
+        job.filter = { sources: src.ids, sourcesLabel: list };
+        job.chips = chipsFor(job.spec);
+        job.answer = tr('Showing only posts from {list} for now. Remove it above to see all your sources again.', { list });
+        const off = src.ids.filter((id) => !providerState()[id]?.enabled);
+        if (off.length) job.notes.push(tr('{list} is switched off in Settings: you see what was already fetched from it.', { list: sourceLabels(off).join(', ') }));
+        return;
+      }
+      const text = query;
       const who = personIn(text) || (looksLikePerson(text) ? text.trim() : null);
       if (who) { job.mode = 'person'; job.filter = { search: job.id, searchLabel: who }; job.chips = [{ kind: 'person', text: who, value: who }]; await personSearch(job, who); job.chips = chipsFor(job.spec); }
       else if (isNatural(text) || deep) { job.mode = 'assistant'; await agentSearch(job, text, deep); }
@@ -1082,7 +1128,7 @@ export function jobView(id) {
   if (!j) return null;
   return {
     id: j.id, q: j.q, mode: j.mode, rev: j.rev, done: j.done, error: j.error, answer: j.answer, notes: j.notes, chips: j.chips, person: j.person,
-    filter: j.filter, client: j.client, sources: j.sources, profiles: j.profiles, found: j.found, added: j.added, steps: j.steps.map((s) => ({ key: s.key, label: s.label, state: s.state, detail: s.detail }))
+    filter: j.filter ? { ...j.filter, ...(j.spec.sources?.length ? { sources: j.spec.sources, sourcesLabel: sourceLabels(j.spec.sources).join(', ') } : {}) } : null, client: j.client, sources: j.sources, profiles: j.profiles, found: j.found, added: j.added, steps: j.steps.map((s) => ({ key: s.key, label: s.label, state: s.state, detail: s.detail }))
   };
 }
 
@@ -1096,6 +1142,7 @@ export function editChip(id, { kind, value, remove = true }) {
   if (kind === 'syn' && remove) for (const c of s.concepts) c.syn = c.syn.filter((x) => x !== value);
   if (kind === 'person' && remove) s.people = s.people.filter((p) => p !== value);
   if (kind === 'format' && remove) s.formats = (s.formats || []).filter((f) => f !== value);
+  if (kind === 'source' && remove) { s.sources = (s.sources || []).filter((x) => x !== value); if (j.filter?.sources) j.filter = { ...j.filter, sources: s.sources }; }
   j.chips = chipsFor(s);
   j.rev++;
   return jobView(id);

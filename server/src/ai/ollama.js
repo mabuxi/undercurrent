@@ -152,8 +152,8 @@ function record(kind, model, data, ms) {
   } catch {}
 }
 
-const BACKGROUND = new Set(['tag', 'name-kinks', 'reflect', 'threads', 'suggest', 'discover-ai', 'combos', 'judge', 'look']);
-const LIMITS = { tag: 1200, 'ask-parse': 350, 'ask-item': 300, summary: 200, 'name-kinks': 500, reflect: 500, test: 60, threads: 900, suggest: 1200, 'discover-ai': 700, combos: 900, 'memory-sort': 300, judge: 500, look: 700 };
+const BACKGROUND = new Set(['dislike', 'tag', 'name-kinks', 'reflect', 'threads', 'suggest', 'discover-ai', 'combos', 'judge', 'look']);
+const LIMITS = { dislike: 300, translate: 1200, tag: 1200, 'ask-parse': 350, 'ask-item': 300, summary: 200, 'name-kinks': 500, reflect: 500, test: 60, threads: 900, suggest: 1200, 'discover-ai': 700, combos: 900, 'memory-sort': 300, judge: 500, look: 700 };
 const lane = { interactive: 0, background: new Set(), hold: 0, looks: 0 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

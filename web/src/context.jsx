@@ -17,6 +17,7 @@ export function crumbList(filters, { kinks = [], fantasies = [] } = {}) {
   const c = [];
   const kname = (id) => kinks.find((k) => k.id === Number(id))?.name || t('Kink {id}', { id });
   if (filters.search) c.push(['search', t('Search: {q}', { q: filters.searchLabel || t('your search') })]);
+  if (filters.sources?.length) c.push(['sources', t('Only {list}', { list: filters.sourcesLabel || filters.sources.join(', ') })]);
   if (filters.profile) c.push(['profile', t('Only {name}', { name: filters.profileLabel || t('this profile') })]);
   else if (filters.q) c.push(['q', t('Search: {q}', { q: filters.q })]);
   if (filters.window) { const [m, p] = String(filters.window).split(':'); const when = { day: t('today'), week: t('this week'), month: t('this month'), year: t('this year') }[p] || ''; c.push(['window', m === 'new' ? t('New {when}', { when }) : t('Popular {when}', { when })]); }

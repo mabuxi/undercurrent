@@ -46,6 +46,8 @@ function strongItems(t = now()) {
     if (e.type === 'unvote') { x.kinds.delete('up'); continue; }
     if (e.type === 'unsave') { x.kinds.delete('save'); continue; }
     const w = e.type === 'rate' ? (Number(e.value) > 0 ? 0.6 + 0.2 * Math.min(5, Number(e.value)) : 0) : STRONG[e.type];
+    // Heat taken back to nothing no longer counts as liking it.
+    if (e.type === 'rate' && !w) { x.kinds.delete('rate'); continue; }
     if (!w) continue;
     x.neg = false;
     x.kinds.set(e.type, Math.max(x.kinds.get(e.type) || 0, w));
