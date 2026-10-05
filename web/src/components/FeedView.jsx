@@ -8,6 +8,7 @@ import ErrorBoundary from './ErrorBoundary.jsx';
 import { refreshWindows } from './SideColumn.jsx';
 import { begin, end } from '../activity.js';
 import { Avatar } from './Panels.jsx';
+import { t, tn, getLang } from '../i18n.js';
 
 export function useNarrow() {
   const [narrow, setNarrow] = useState(() => window.innerWidth <= 900);
@@ -23,18 +24,18 @@ const FORMAT_ICON = { long: 'video', short: 'loop', gif: 'spark', image: 'image'
 const FORMAT_COLOR = { long: '#E39A83', short: '#7FD0C2', gif: '#B79BF0', image: '#93B4DF', set: '#7FA7D9', story: '#E8C66B', discussion: '#B6A8B0' };
 
 const NOW_KIND = {
-  kink: { label: 'kink', icon: 'flame', color: '#E39A83' },
-  tag: { label: 'tag', icon: 'pulse', color: '#E8C66B' },
-  person: { label: 'person', icon: 'person', color: '#D6A0CF' },
-  creator: { label: 'creator', icon: 'person', color: '#8EA6C9' },
-  pair: { label: 'pair', icon: 'route', color: '#B79BF0' },
-  fantasy: { label: 'fantasy', icon: 'spark', color: '#F6C35B' },
-  new: { label: 'new', icon: 'spark', color: '#7FD0C2' }
+  kink: { label: t('kink'), icon: 'flame', color: '#E39A83' },
+  tag: { label: t('tag'), icon: 'pulse', color: '#E8C66B' },
+  person: { label: t('person'), icon: 'person', color: '#D6A0CF' },
+  creator: { label: t('creator'), icon: 'person', color: '#8EA6C9' },
+  pair: { label: t('pair'), icon: 'route', color: '#B79BF0' },
+  fantasy: { label: t('fantasy'), icon: 'spark', color: '#F6C35B' },
+  new: { label: t('new'), icon: 'spark', color: '#7FD0C2' }
 };
 
 function greeting() {
   const h = new Date().getHours();
-  return h < 5 ? 'Good night' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  return h < 5 ? t('Good night') : h < 12 ? t('Good morning') : h < 18 ? t('Good afternoon') : t('Good evening');
 }
 
 function TChip({ on, icon, color, label, sub, onClick, title }) {
@@ -68,16 +69,16 @@ function Balance() {
   const male = g.auto ? g.autoValue : g.male;
   return (
     <div className="tline">
-      <span className="tlabel">Gender</span>
+      <span className="tlabel">{t('Gender')}</span>
       <div className="uslider-row">
-        <span className="gsym f" title="Women"><Icon name="female" /></span>
-        <input className="uslider gender" type="range" min="0" max="100" step="5" value={male} disabled={g.auto || g.everyone} aria-label="Balance between women and men" onChange={(e) => save({ male: Number(e.target.value) })} />
-        <span className="gsym m" title="Men"><Icon name="male" /></span>
-        <output>{g.everyone ? 'everyone' : male >= 90 ? 'men only' : male <= 10 ? 'women only' : male >= 45 && male <= 65 ? 'hetero only' : `${100 - male}% women · ${male}% men`}</output>
+        <span className="gsym f" title={t('Women')}><Icon name="female" /></span>
+        <input className="uslider gender" type="range" min="0" max="100" step="5" value={male} disabled={g.auto || g.everyone} aria-label={t('Balance between women and men')} onChange={(e) => save({ male: Number(e.target.value) })} />
+        <span className="gsym m" title={t('Men')}><Icon name="male" /></span>
+        <output>{g.everyone ? t('everyone') : male >= 90 ? t('men only') : male <= 10 ? t('women only') : male >= 45 && male <= 65 ? t('hetero only') : t('{w}% women · {m}% men', { w: 100 - male, m: male })}</output>
       </div>
-      <TChip on={g.auto} icon="auto" color="#B6A8B0" label="Auto" sub={g.auto ? 'from what you like' : null} onClick={() => save({ auto: !g.auto }, !g.auto ? 'The balance now follows what you like, heat and save.' : 'Balance set by hand again.')} title="Let the balance follow what you interact with" />
-      <TChip on={g.everyone} icon="grid" color="#E8C66B" label="Everyone" sub={g.everyone ? 'all of it' : null} onClick={() => save({ everyone: !g.everyone }, !g.everyone ? 'Showing everyone: men, women and both together.' : 'The balance decides again.')} title="Show posts with anyone, whatever the balance says" />
-      <TChip on={g.trans} icon="trans" color="#C9A7E8" label="Trans" sub={g.trans ? 'allowed' : 'hidden'} onClick={() => save({ trans: !g.trans })} title="Allow trans content" />
+      <TChip on={g.auto} icon="auto" color="#B6A8B0" label={t('Auto')} sub={g.auto ? t('from what you like') : null} onClick={() => save({ auto: !g.auto }, !g.auto ? t('The balance now follows what you like, heat and save.') : t('Balance set by hand again.'))} title={t('Let the balance follow what you interact with')} />
+      <TChip on={g.everyone} icon="grid" color="#E8C66B" label={t('Everyone')} sub={g.everyone ? t('all of it') : null} onClick={() => save({ everyone: !g.everyone }, !g.everyone ? t('Showing everyone: men, women and both together.') : t('The balance decides again.'))} title={t('Show posts with anyone, whatever the balance says')} />
+      <TChip on={g.trans} icon="trans" color="#C9A7E8" label={t('Trans')} sub={g.trans ? t('allowed') : t('hidden')} onClick={() => save({ trans: !g.trans })} title={t('Allow trans content')} />
     </div>
   );
 }
@@ -90,26 +91,26 @@ function FeedWindow() {
   const set = (m, p) => patchFilters({ window: m === 'mixed' ? null : `${m}:${p || period || 'week'}` });
   return (
     <div className="tline feedwin">
-      <span className="tlabel">Feed</span>
+      <span className="tlabel">{t('Feed')}</span>
       <div className="fw">
         <label className="fsel"><Icon name={mode === 'new' ? 'spark' : mode === 'popular' ? 'flame' : 'grid'} />
-          <select value={filters.window ? mode : 'mixed'} onChange={(e) => set(e.target.value)} aria-label="Feed">
-            <option value="mixed">Mixed</option>
-            <option value="new">Only new posts</option>
-            <option value="popular">Only popular</option>
+          <select value={filters.window ? mode : 'mixed'} onChange={(e) => set(e.target.value)} aria-label={t('Feed')}>
+            <option value="mixed">{t('Mixed')}</option>
+            <option value="new">{t('Only new posts')}</option>
+            <option value="popular">{t('Only popular')}</option>
           </select>
         </label>
         {filters.window ? (
           <label className="fsel"><Icon name="clock" />
-            <select value={period} onChange={(e) => set(mode, e.target.value)} aria-label="Period">
-              <option value="day">Today</option>
-              <option value="week">This week</option>
-              <option value="month">This month</option>
-              <option value="year">This year</option>
+            <select value={period} onChange={(e) => set(mode, e.target.value)} aria-label={t('Period')}>
+              <option value="day">{t('Today')}</option>
+              <option value="week">{t('This week')}</option>
+              <option value="month">{t('This month')}</option>
+              <option value="year">{t('This year')}</option>
             </select>
           </label>
         ) : null}
-        <span className="count">{!filters.window ? 'everything, ordered by how well it fits you' : mode === 'new' ? 'only posts from this period' : 'only the most upvoted and viewed posts of this period'}</span>
+        <span className="count">{!filters.window ? t('everything, ordered by how well it fits you') : mode === 'new' ? t('only posts from this period') : t('only the most upvoted and viewed posts of this period')}</span>
       </div>
     </div>
   );
@@ -120,23 +121,23 @@ const PLATFORM = { bluesky: 'Bluesky', reddit: 'Reddit', redgifs: 'RedGIFs', lem
 function ProfileCard({ p, active, followed, onOpen, onFollow }) {
   const [bad, setBad] = useState(false);
   const stats = [
-    p.followers != null ? `${fmtCount(p.followers)} ${p.kind === 'community' ? 'members' : 'followers'}` : null,
-    p.posts != null ? `${fmtCount(p.posts)} ${p.kind === 'name' || ['pornhub', 'redtube', 'eporner', 'xvideos', 'xnxx', 'xhamster', 'youporn', 'txxx'].includes(p.platform) ? 'videos' : 'posts'}` : null,
-    p.views ? `${fmtCount(p.views)} views` : null
+    p.followers != null ? (p.kind === 'community' ? tn(p.followers, '{n} member', '{n} members', { n: fmtCount(p.followers) }) : tn(p.followers, '{n} follower', '{n} followers', { n: fmtCount(p.followers) })) : null,
+    p.posts != null ? (p.kind === 'name' || ['pornhub', 'redtube', 'eporner', 'xvideos', 'xnxx', 'xhamster', 'youporn', 'txxx'].includes(p.platform) ? tn(p.posts, '{n} video', '{n} videos', { n: fmtCount(p.posts) }) : tn(p.posts, '{n} post', '{n} posts', { n: fmtCount(p.posts) })) : null,
+    p.views ? tn(p.views, '{n} view', '{n} views', { n: fmtCount(p.views) }) : null
   ].filter(Boolean).join(' · ');
   return (
     <div className={`pcard${active ? ' on' : ''}`}>
-      <button type="button" className="pcard-main" onClick={() => onOpen(p)} title={`Show only posts from ${p.name}`}>
+      <button type="button" className="pcard-main" onClick={() => onOpen(p)} title={t('Show only posts from {name}', { name: p.name })}>
         {p.avatar && !bad ? <img src={imgSrc(p.avatar)} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBad(true)} /> : <Avatar name={p.name} size="m" />}
         <span className="pcard-txt">
           <strong>{p.name}</strong>
-          <span className="pcard-sub"><em className={`plat plat-${p.platform}`}>{PLATFORM[p.platform] || p.platform}{p.kind === 'community' ? ' community' : p.kind === 'performer' ? ' performer' : ''}</em>{p.handle && p.handle !== p.name ? ` ${p.handle}` : ''}</span>
-          {stats ? <span className="pcard-stats">{stats}</span> : <span className="pcard-stats dim">no follower count from this source</span>}
+          <span className="pcard-sub"><em className={`plat plat-${p.platform}`}>{p.kind === 'community' ? t('{platform} community', { platform: PLATFORM[p.platform] || p.platform }) : p.kind === 'performer' ? t('{platform} performer', { platform: PLATFORM[p.platform] || p.platform }) : PLATFORM[p.platform] || p.platform}</em>{p.handle && p.handle !== p.name ? ` ${p.handle}` : ''}</span>
+          {stats ? <span className="pcard-stats">{stats}</span> : <span className="pcard-stats dim">{t('no follower count from this source')}</span>}
         </span>
       </button>
       <div className="pcard-acts">
-        {p.url ? <a href={p.url} target="_blank" rel="noreferrer noopener" aria-label={`Open ${p.name} on ${PLATFORM[p.platform] || p.platform}`} title="Open on the site"><Icon name="open" /></a> : null}
-        {p.kind !== 'name' ? <button type="button" onClick={() => onFollow(p)} disabled={followed} aria-label={followed ? 'Added to your sources' : `Add ${p.name} to your sources`} title={followed ? 'Added to your sources' : 'Add to your sources'}><Icon name={followed ? 'check' : 'plus'} /></button> : null}
+        {p.url ? <a href={p.url} target="_blank" rel="noreferrer noopener" aria-label={t('Open {name} on {platform}', { name: p.name, platform: PLATFORM[p.platform] || p.platform })} title={t('Open on the site')}><Icon name="open" /></a> : null}
+        {p.kind !== 'name' ? <button type="button" onClick={() => onFollow(p)} disabled={followed} aria-label={followed ? t('Added to your sources') : t('Add {name} to your sources', { name: p.name })} title={followed ? t('Added to your sources') : t('Add to your sources')}><Icon name={followed ? 'check' : 'plus'} /></button> : null}
       </div>
     </div>
   );
@@ -155,7 +156,7 @@ function SearchCard() {
   if (!p && !profiles.length && !srcs.length) return null;
   async function add(s) {
     const body = { provider: s.provider, mode: s.mode, value: s.value, label: s.label || `${PLATFORM[s.provider] || s.provider}: ${s.name || s.value}` };
-    try { await api(`/search/${search.id}/follow`, { method: 'POST', body }); setFollowed((f) => ({ ...f, [`${s.provider}|${s.value}`]: true })); toast(`Added ${body.label} to your sources.`); } catch (e) { toast(e.message); }
+    try { await api(`/search/${search.id}/follow`, { method: 'POST', body }); setFollowed((f) => ({ ...f, [`${s.provider}|${s.value}`]: true })); toast(t('Added {label} to your sources.', { label: body.label })); } catch (e) { toast(e.message); }
   }
   return (
     <div className="searchcard">
@@ -164,7 +165,7 @@ function SearchCard() {
           {p.avatar ? <img className="pc-img" src={imgSrc(p.avatar)} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.display = 'none'; }} /> : <Avatar name={p.display} size="l" />}
           <div className="pc-main">
             <strong>{p.display}</strong>
-            <span>{[p.videos ? `${fmtCount(p.videos)} videos on Pornhub` : null, p.views ? `${fmtCount(p.views)} views on the videos found` : null, p.profiles.length ? `profiles on ${[...new Set(p.profiles.map((x) => PLATFORM[x.platform] || x.platform))].join(', ')}` : null].filter(Boolean).join(' · ') || 'searching every source'}</span>
+            <span>{[p.videos ? tn(p.videos, '{n} video on Pornhub', '{n} videos on Pornhub', { n: fmtCount(p.videos) }) : null, p.views ? tn(p.views, '{n} view on the videos found', '{n} views on the videos found', { n: fmtCount(p.views) }) : null, p.profiles.length ? t('profiles on {sites}', { sites: [...new Set(p.profiles.map((x) => PLATFORM[x.platform] || x.platform))].join(', ') }) : null].filter(Boolean).join(' · ') || t('searching every source')}</span>
             {p.links.length ? <div className="pc-links">{p.links.map((l) => <a key={l.url} className="pc-ext" href={l.url} target="_blank" rel="noreferrer noopener"><Icon name="globe" />{l.platform}: {l.handle}</a>)}</div> : null}
           </div>
         </div>
@@ -172,21 +173,21 @@ function SearchCard() {
       {profiles.length ? (
         <div className="profiles">
           <div className="profiles-head">
-            <span className="tlabel">Profiles and communities</span>
-            {filters.profile ? <button type="button" className="linkbtn" onClick={() => patchFilters({ profile: null, profileLabel: null })}>Show all results again</button> : <span className="count">click one to see only their posts</span>}
+            <span className="tlabel">{t('Profiles and communities')}</span>
+            {filters.profile ? <button type="button" className="linkbtn" onClick={() => patchFilters({ profile: null, profileLabel: null })}>{t('Show all results again')}</button> : <span className="count">{t('click one to see only their posts')}</span>}
           </div>
           <div className="pgrid">
             {profiles.slice(0, shown).map((x) => <ProfileCard key={x.key} p={x} active={filters.profile === x.key} followed={!!followed[`${x.provider}|${x.value}`]} onOpen={openProfile} onFollow={add} />)}
           </div>
-          {profiles.length > shown ? <button type="button" className="linkbtn more" onClick={() => setShown((n) => n + 8)}>Show {Math.min(8, profiles.length - shown)} more of {profiles.length}</button> : null}
+          {profiles.length > shown ? <button type="button" className="linkbtn more" onClick={() => setShown((n) => n + 8)}>{t('Show {n} more of {total}', { n: Math.min(8, profiles.length - shown), total: profiles.length })}</button> : null}
         </div>
       ) : null}
       {srcs.length ? (
         <div className="foundsrc">
-          <span className="tlabel">Found in the results</span>
+          <span className="tlabel">{t('Found in the results')}</span>
           <div className="tchips">
             {srcs.map((s) => (
-              <button type="button" key={`${s.provider}|${s.value}`} className={`tchip${followed[`${s.provider}|${s.value}`] ? ' on' : ''}`} style={{ '--tc': '#93B4DF' }} onClick={() => add(s)} disabled={followed[`${s.provider}|${s.value}`]} title="Add as a source">
+              <button type="button" key={`${s.provider}|${s.value}`} className={`tchip${followed[`${s.provider}|${s.value}`] ? ' on' : ''}`} style={{ '--tc': '#93B4DF' }} onClick={() => add(s)} disabled={followed[`${s.provider}|${s.value}`]} title={t('Add as a source')}>
                 <Icon name={followed[`${s.provider}|${s.value}`] ? 'check' : 'plus'} /><span>{s.label}</span>
               </button>
             ))}
@@ -197,7 +198,8 @@ function SearchCard() {
   );
 }
 
-const fmtCount = (n) => { n = Number(n) || 0; return n >= 1e6 ? `${(n / 1e6).toFixed(1).replace(/\.0$/, '')}M` : n >= 1000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k` : String(n); };
+const dec = (s) => (getLang() === 'fr' ? s.replace('.', ',') : s);
+const fmtCount = (n) => { n = Number(n) || 0; return n >= 1e6 ? `${dec((n / 1e6).toFixed(1).replace(/\.0$/, ''))}M` : n >= 1000 ? `${dec((n / 1000).toFixed(1).replace(/\.0$/, ''))}k` : String(n); };
 
 function Controls({ total }) {
   const { filters, opts, mix, setMix, setFilters, patchFilters, applyMood, presets, kinks, fantasies, askOut, clearSearch } = useApp();
@@ -214,10 +216,10 @@ function Controls({ total }) {
         <p className={`hello-sum${askOut ? ' answer' : ''}`} aria-live="polite">{askOut || summary || ''}</p>
       </div>
       <SearchCard />
-      <section className="tuner" aria-label="Tune the feed">
+      <section className="tuner" aria-label={t('Tune the feed')}>
         <FeedWindow />
         <div className="tline tline-top">
-          <span className="tlabel">Mood</span>
+          <span className="tlabel">{t('Mood')}</span>
           <div className="moodcards">
             {MOODS.map((m) => (
               <button key={m.id} type="button" className={`moodcard${opts.mood === m.id ? ' on' : ''}`} style={{ '--tc': m.color }} onClick={() => applyMood(m.id)}>
@@ -230,7 +232,7 @@ function Controls({ total }) {
         </div>
         {presets.length ? (
           <div className="tline">
-            <span className="tlabel">Right now</span>
+            <span className="tlabel">{t('Right now')}</span>
             <div className="tchips">{presets.map((p, i) => {
               const k = NOW_KIND[p.kind] || NOW_KIND.tag;
               return (
@@ -242,16 +244,16 @@ function Controls({ total }) {
           </div>
         ) : null}
         <div className="tline">
-          <span className="tlabel">Formats</span>
+          <span className="tlabel">{t('Formats')}</span>
           <div className="tchips">{Object.entries(FORMATS).map(([f, label]) => <TChip key={f} on={(filters.formats || []).includes(f)} icon={FORMAT_ICON[f]} color={FORMAT_COLOR[f]} label={label} onClick={() => toggleFormat(f)} />)}</div>
         </div>
         <Balance />
         <div className="tline">
-          <span className="tlabel">New to you</span>
+          <span className="tlabel">{t('New to you')}</span>
           <div className="uslider-row">
-            <input className="uslider" type="range" id="mix" min="0" max="40" step="5" value={mix} onChange={(e) => setMix(Number(e.target.value))} aria-label="How much new to you" />
+            <input className="uslider" type="range" id="mix" min="0" max="40" step="5" value={mix} onChange={(e) => setMix(Number(e.target.value))} aria-label={t('How much new to you')} />
             <output htmlFor="mix">{mix}%</output>
-            <span className="count">{filters.onlyNew ? 'only things you haven’t opened' : mix ? `about 1 in ${Math.max(2, Math.round(100 / mix))} is new to you` : 'nothing new mixed in'}</span>
+            <span className="count">{filters.onlyNew ? t('only things you haven’t opened') : mix ? t('about 1 in {n} is new to you', { n: Math.max(2, Math.round(100 / mix)) }) : t('nothing new mixed in')}</span>
           </div>
         </div>
       </section>
@@ -292,7 +294,7 @@ export default function FeedView() {
     busy.current = true;
     const my = gen.current;
     setLoading(true);
-    begin('feed', searching ? 'Loading search results' : 'Loading the feed', { quiet: !reset || !searching });
+    begin('feed', searching ? t('Loading search results') : t('Loading the feed'), { quiet: !reset || !searching });
     try {
       flushNow();
       const first = [];
@@ -306,7 +308,7 @@ export default function FeedView() {
       // A search fetches from the sources itself; the feed only asks the sources for more when there is no search.
       if (!searching && r.items.length < 8 && dry.current < 3) {
         setFinding(true);
-        begin('more', 'Fetching more from your sources', { quiet: true });
+        begin('more', t('Fetching more from your sources'), { quiet: true });
         let got = 0;
         try {
           const more = await api('/feed/more', { method: 'POST', body: { filters: f() } });
@@ -315,7 +317,7 @@ export default function FeedView() {
           dry.current = more.added ? 0 : dry.current + 1;
           if (!more.added && hasFilter && dry.current >= 2 && !relaxed.current) { relaxed.current = true; dry.current = 0; }
           r = await api('/feed', { method: 'POST', body: { filters: f(), exclude: [...shown.current, ...first.map((x) => x.id)], limit: 8, mix } });
-        } catch { dry.current++; } finally { end('more', 'done', got ? `${got} new posts` : 'nothing new'); if (my === gen.current) setFinding(false); }
+        } catch { dry.current++; } finally { end('more', 'done', got ? tn(got, '{n} new post', '{n} new posts') : t('nothing new')); if (my === gen.current) setFinding(false); }
         if (my !== gen.current) return;
       }
       if (!searching && r.total < 30 && !prefetching.current && dry.current < 3) {
@@ -395,18 +397,18 @@ export default function FeedView() {
     return () => { window.removeEventListener('uc-search-done', on); window.removeEventListener('uc-search-progress', on); };
   }, [filters.search, reset, done]);
 
-  const WHY = { dwell: 'You stayed on this', play: 'You played this', up: 'You liked this', save: 'You saved this', rate: 'You rated this high', comments: 'You opened the comments', performer: 'You looked at who is in this' };
+  const WHY = { dwell: t('You stayed on this'), play: t('You played this'), up: t('You liked this'), save: t('You saved this'), rate: t('You rated this high'), comments: t('You opened the comments'), performer: t('You looked at who is in this') };
   const onStrong = useCallback(async (item, why) => {
     if (deeperCount.current > 40) return;
     deeperCount.current++;
-    begin(`sim${item.id}`, 'Finding similar posts');
+    begin(`sim${item.id}`, t('Finding similar posts'));
     try {
       const r = await api(`/items/${item.id}/similar?limit=${why === 'dwell' ? 2 : 3}&exclude=${[...shown.current].slice(-300).join(',')}`);
       const fresh = (r.items || []).filter((x) => !shown.current.has(x.id));
       if (!fresh.length) return;
       fresh.forEach((x) => shown.current.add(x.id));
-      const label = r.performers?.length && fresh[0].performers?.some((p) => r.performers.includes(String(p).toLowerCase())) ? `more with ${r.performers[0]}` : `going deeper into ${(r.tags || []).slice(0, 2).join(' and ')}`;
-      setDeeper((cur) => ({ ...cur, [item.id]: { why: `${WHY[why] || 'You were into this'}, ${label}`, items: fresh } }));
+      const label = r.performers?.length && fresh[0].performers?.some((p) => r.performers.includes(String(p).toLowerCase())) ? t('more with {name}', { name: r.performers[0] }) : t('going deeper into {tags}', { tags: (r.tags || []).slice(0, 2).join(t(' and ')) });
+      setDeeper((cur) => ({ ...cur, [item.id]: { why: `${WHY[why] || t('You were into this')}, ${label}`, items: fresh } }));
     } catch {} finally { end(`sim${item.id}`); }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -419,10 +421,10 @@ export default function FeedView() {
   }, [loadMore, done]);
 
   async function fetchNew() {
-    toast('Fetching new posts from your sources…');
+    toast(t('Fetching new posts from your sources…'));
     try {
       const r = await api('/ingest', { method: 'POST', body: { force: true } });
-      toast(r.skipped ? 'Already fetching, try again in a moment.' : `${r.added} new posts.`);
+      toast(r.skipped ? t('Already fetching, try again in a moment.') : tn(r.added, '{n} new post.', '{n} new posts.'));
       refreshMeta();
       dry.current = 0;
       busy.current = false;
@@ -450,18 +452,18 @@ export default function FeedView() {
       <Controls total={total} />
       <div className="feed">{list}</div>
       {error ? <div className="empty">{error}</div> : null}
-      {wider && items.length ? <div className="deeper"><span className="deeper-why">Few exact matches left, now also showing close matches</span></div> : null}
-      {fresh ? <button type="button" className="freshbar" onClick={() => { reset(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>New results from your sources are in · Show them</button> : null}
+      {wider && items.length ? <div className="deeper"><span className="deeper-why">{t('Few exact matches left, now also showing close matches')}</span></div> : null}
+      {fresh ? <button type="button" className="freshbar" onClick={() => { reset(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>{t('New results from your sources are in · Show them')}</button> : null}
       <div className="sentinel" ref={sentinel}>
         {finding || loading || waiting ? (
-          <span className="finding"><span className="spin" />{finding ? 'Finding more like this on your sources…' : waiting ? 'Nothing left that matches. Checking your sources once more shortly…' : 'Loading more…'}</span>
+          <span className="finding"><span className="spin" />{finding ? t('Finding more like this on your sources…') : waiting ? t('Nothing left that matches. Checking your sources once more shortly…') : t('Loading more…')}</span>
         ) : searching && search?.id === filters.search && !search.done ? (
-          <span className="finding"><span className="spin" />Still searching your sources…</span>
+          <span className="finding"><span className="spin" />{t('Still searching your sources…')}</span>
         ) : searching && done ? (
-          <span className="endnote">That is everything found for this search so far. <button type="button" className="linkbtn" onClick={searchMore}>Search further on your sources</button></span>
+          <span className="endnote">{t('That is everything found for this search so far.')} <button type="button" className="linkbtn" onClick={searchMore}>{t('Search further on your sources')}</button></span>
         ) : done ? (
-          <span className="endnote">Nothing more matches right now. <button type="button" className="linkbtn" onClick={fetchNew}>Fetch new posts now</button></span>
-        ) : <button type="button" className="linkbtn" onClick={fetchNew}>Fetch new posts now</button>}
+          <span className="endnote">{t('Nothing more matches right now.')} <button type="button" className="linkbtn" onClick={fetchNew}>{t('Fetch new posts now')}</button></span>
+        ) : <button type="button" className="linkbtn" onClick={fetchNew}>{t('Fetch new posts now')}</button>}
       </div>
     </section>
   );

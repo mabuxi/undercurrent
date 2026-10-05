@@ -1,3 +1,5 @@
+import { t, tn, getLang } from './i18n.js';
+
 export const sessionId = (() => {
   try {
     const k = 'uc-session';
@@ -23,7 +25,7 @@ export async function api(path, { method = 'GET', body } = {}) {
   const text = await res.text();
   let data = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = { error: text }; }
-  if (!res.ok) throw new Error(data?.error || `Request failed (${res.status})`);
+  if (!res.ok) throw new Error(data?.error || t('Request failed ({status})', { status: res.status }));
   return data;
 }
 
@@ -67,25 +69,35 @@ export function fmtDur(s) {
   return `${h ? `${h}:${String(m).padStart(2, '0')}` : m}:${String(r).padStart(2, '0')}`;
 }
 
+const dec = (s) => (getLang() === 'fr' ? s.replace('.', ',') : s);
+
 export function fmtNum(n) {
   n = Number(n) || 0;
   if (n >= 10000000) return `${Math.round(n / 1000000)}M`;
-  if (n >= 1000000) return `${(n / 1000000).toFixed(1).replace(/\.0$/, '')}M`;
+  if (n >= 1000000) return `${dec((n / 1000000).toFixed(1).replace(/\.0$/, ''))}M`;
   if (n >= 10000) return `${Math.round(n / 1000)}k`;
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  if (n >= 1000) return `${dec((n / 1000).toFixed(1))}k`;
   return String(n);
 }
 
 export function fmtBytes(b) {
   b = Number(b) || 0;
-  if (b >= 1048576) return `${(b / 1048576).toFixed(1)} MB`;
-  if (b >= 1024) return `${Math.round(b / 1024)} kB`;
-  return `${b} B`;
+  const fr = getLang() === 'fr';
+  if (b >= 1048576) return `${dec((b / 1048576).toFixed(1))} ${fr ? 'Mo' : 'MB'}`;
+  if (b >= 1024) return `${Math.round(b / 1024)} ${fr ? 'ko' : 'kB'}`;
+  return `${b} ${fr ? 'o' : 'B'}`;
 }
 
 export function ago(unix) {
   if (!unix) return '';
   const s = Date.now() / 1000 - unix;
+  if (getLang() === 'fr') {
+    if (s < 3600) return `${Math.max(1, Math.round(s / 60))}\u00a0min`;
+    if (s < 86400) return `${Math.round(s / 3600)}\u00a0h`;
+    if (s < 604800) return `${Math.round(s / 86400)}\u00a0j`;
+    if (s < 2592000) return `${Math.round(s / 604800)}\u00a0sem.`;
+    return `${Math.round(s / 2592000)}\u00a0mois`;
+  }
   if (s < 3600) return `${Math.max(1, Math.round(s / 60))}m`;
   if (s < 86400) return `${Math.round(s / 3600)}h`;
   if (s < 604800) return `${Math.round(s / 86400)}d`;
@@ -107,16 +119,16 @@ export function proxied(url) {
   return url && /^https:/.test(url) ? `/api/proxy?url=${encodeURIComponent(url)}` : url;
 }
 
-export const FORMATS = { long: 'Long form', short: 'Short form', gif: 'GIFs', image: 'Images', set: 'Image sets', story: 'Stories', discussion: 'Discussions' };
-export const LEN_HINT = { any: 'everything', quick: 'video under 2 min · reads under 5 min · GIFs and images', medium: 'video 2 to 15 min · reads 5 to 15 min · threads', long: 'video over 15 min · reads over 15 min' };
-export const LABELS = { following: 'Following', foryou: 'For you', discovery: 'New to you', deeper: 'Deeper', popular: 'Popular' };
+export const FORMATS = { long: t('Long form'), short: t('Short form'), gif: t('GIFs'), image: t('Images'), set: t('Image sets'), story: t('Stories'), discussion: t('Discussions') };
+export const LEN_HINT = { any: t('everything'), quick: t('video under 2 min · reads under 5 min · GIFs and images'), medium: t('video 2 to 15 min · reads 5 to 15 min · threads'), long: t('video over 15 min · reads over 15 min') };
+export const LABELS = { following: t('Following'), foryou: t('For you'), discovery: t('New to you'), deeper: t('Deeper'), popular: t('Popular') };
 
 export function formatMeta(it) {
-  if (it.format === 'long') return `Long form${it.duration ? ` · ${fmtDur(it.duration)}` : ''}`;
-  if (it.format === 'short') return `Short form${it.duration ? ` · ${fmtDur(it.duration)}` : ''}`;
-  if (it.format === 'gif') return 'GIF · loops';
-  if (it.format === 'image') return 'Image';
-  if (it.format === 'set') return `${it.media?.items?.length || ''} images`.trim();
-  if (it.format === 'story') return `Story · ${it.media?.readMin || 1} min read`;
-  return `Thread · ${fmtNum(it.comments)} replies`;
+  if (it.format === 'long') return `${t('Long form')}${it.duration ? ` · ${fmtDur(it.duration)}` : ''}`;
+  if (it.format === 'short') return `${t('Short form')}${it.duration ? ` · ${fmtDur(it.duration)}` : ''}`;
+  if (it.format === 'gif') return t('GIF · loops');
+  if (it.format === 'image') return t('Image');
+  if (it.format === 'set') return t('{n} images', { n: it.media?.items?.length || '' }).trim();
+  if (it.format === 'story') return t('Story · {n} min read', { n: it.media?.readMin || 1 });
+  return tn(Number(it.comments) || 0, 'Thread · {n} reply', 'Thread · {n} replies', { n: fmtNum(it.comments) });
 }

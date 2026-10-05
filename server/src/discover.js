@@ -12,6 +12,7 @@ import { chat, fastModel } from './ai/ollama.js';
 import { userLimits, isBlocked } from './safety.js';
 import { log } from './log.js';
 import { genderPrefs, genderMode, genderTerm } from './gender.js';
+import { tr } from './i18n.js';
 
 // Automatic sources. Everything added here is marked "auto": it is refreshed often, follows what you are into
 // right now, and is removed again when its posts get few views or interactions. Sources you follow yourself are
@@ -114,14 +115,14 @@ export async function sourcesForTopic(name, tags, { origin = 'auto', st = provid
   const t = norm(name);
   const topic = [...new Set([t, ...(tags || []).map(norm)])].filter(Boolean).slice(0, 6).join(', ');
   const added = [];
-  const why = origin === 'ask' ? 'you asked for it' : `for ${name}`;
+  const why = origin === 'ask' ? tr('you asked for it') : tr('for {name}', { name });
   const terms = [...new Set([...(tags || []).map(norm), t])].filter((x) => x && x.length > 2).slice(0, 3);
   if (st.reddit?.enabled) for (const [sub] of subsFor(terms).slice(0, 2)) if (addAuto('community', `reddit|${sub}`, `r/${sub} · ${why}`, topic)) added.push(`r/${sub}`);
   if (withNiche && st.redgifs?.enabled) {
     try {
       const list = await redgifs.searchNiches(terms[0] || t, 6);
       const n = list.filter((x) => x.gifs >= 200 && !isBlocked({ title: x.name, tags: x.tags }).blocked).sort((a, b) => b.subscribers - a.subscribers)[0];
-      if (n && addAuto('community', `redgifs|${n.name}`, `RedGIFs niche: ${n.name} · ${why}`, topic)) added.push(`RedGIFs niche ${n.name}`);
+      if (n && addAuto('community', `redgifs|${n.name}`, `${tr('RedGIFs niche: {name}', { name: n.name })} · ${why}`, topic)) added.push(tr('RedGIFs niche {name}', { name: n.name }));
     } catch {}
   }
   // Searches go to every site that can search, taking turns, so Pornhub, RedTube and Eporner get sources too.
@@ -130,7 +131,7 @@ export async function sourcesForTopic(name, tags, { origin = 'auto', st = provid
   for (const ch of t) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   const providers = all.map((_, i) => all[(i + h) % all.length]);
   const term = genderTerm(terms[0] || t);
-  for (const p of providers.slice(0, origin === 'ask' ? Math.min(4, providers.length) : searches)) if (addAuto('search', `${p}|${term}`, `Search "${term}" on ${p} · ${why}`, topic)) added.push(`search "${term}" on ${p}`);
+  for (const p of providers.slice(0, origin === 'ask' ? Math.min(4, providers.length) : searches)) if (addAuto('search', `${p}|${term}`, `${tr('Search "{term}" on {source}', { term, source: p })} · ${why}`, topic)) added.push(tr('search "{term}" on {source}', { term, source: p }));
   if (origin === 'ask') getDb().prepare("UPDATE follows SET active = 1, dormant_since = NULL WHERE synced_from = 'auto' AND topic LIKE ?").run(`%${t}%`);
   return added;
 }
@@ -155,7 +156,7 @@ async function discoverTopics(st) {
     if (isCovered && searchesNow >= 2) continue;
     const a = await sourcesForTopic(tp.name, tp.tags, { st, searches: 2, withNiche: !isCovered && added.length < 12 });
     for (const x of a) { added.push(x); covered.add(norm(tp.name)); }
-    room -= a.filter((x) => x.startsWith('search')).length;
+    room = LIMITS.searches - db.prepare("SELECT COUNT(*) c FROM follows WHERE synced_from = 'auto' AND kind = 'search'").get().c;
   }
   return added;
 }
@@ -170,10 +171,10 @@ export function reviveAndRest() {
     const ti = topicInterest(f.topic);
     if (!ti) continue;
     if (!f.active && f.dormant_since && ti.lately >= 0.35 && now() - f.dormant_since > 2 * 86400000) {
-      db.prepare("UPDATE follows SET active = 1, dormant_since = NULL, why = 'woke up: you are into it again' WHERE id = ?").run(f.id);
+      db.prepare('UPDATE follows SET active = 1, dormant_since = NULL, why = ? WHERE id = ?').run(tr('woke up: you are into it again'), f.id);
       woke.push(f.label || f.value);
     } else if (f.active && ti.lately < 0.03 && ti.long < 0.25 && now() - f.created > 10 * 86400000) {
-      db.prepare("UPDATE follows SET active = 0, dormant_since = ?, why = 'resting: you moved on from it' WHERE id = ?").run(now(), f.id);
+      db.prepare('UPDATE follows SET active = 0, dormant_since = ?, why = ? WHERE id = ?').run(now(), tr('resting: you moved on from it'), f.id);
       rested.push(f.label || f.value);
     }
   }
@@ -206,7 +207,7 @@ function discoverReddit(terms) {
   }
   for (const [sub, why] of wanted) {
     if (room <= 0) break;
-    if (addAuto('community', `reddit|${sub}`, `r/${sub} · ${why === 'threads' ? 'sexual discussion threads' : why === 'stories' ? 'stories' : `matches ${why}`}`, ['popular', 'stories', 'threads'].includes(why) ? null : why)) { added.push(sub); room--; }
+    if (addAuto('community', `reddit|${sub}`, `r/${sub} · ${why === 'threads' ? tr('sexual discussion threads') : why === 'stories' ? tr('stories') : tr('matches {what}', { what: { 'men only': tr('men only'), 'women only': tr('women only'), popular: tr('popular') }[why] || why })}`, ['popular', 'stories', 'threads'].includes(why) ? null : why)) { added.push(sub); room--; }
   }
   return added;
 }
@@ -257,7 +258,7 @@ async function validateSubs(picks, room) {
   for (const s of picks.slice(0, Math.min(room, rssBudget()))) {
     queueRedditCheck(s.name, (list) => {
       if ((list?.length || 0) >= 5) {
-        const label = s.kind === 'discussion' ? `r/${s.name} · AI pick for sexual threads` : `r/${s.name} · AI pick for ${s.for}`;
+        const label = s.kind === 'discussion' ? `r/${s.name} · ${tr('AI pick for sexual threads')}` : `r/${s.name} · ${tr('AI pick for {what}', { what: s.for })}`;
         if (addAuto('community', `reddit|${s.name}`, label, s.kind === 'discussion' ? null : s.for)) log('info', `Auto-follow (AI pick, checked): r/${s.name}`);
       } else {
         noteRemoved({ synced_from: 'auto', kind: 'community', value: `reddit|${s.name}` });
@@ -291,7 +292,7 @@ function discoverRedditUsers() {
   const added = [];
   for (const [author, x] of [...per.entries()].filter(([, v]) => v.n >= 2 && v.p >= 6).sort((a, b) => b[1].p - a[1].p)) {
     if (room <= 0) break;
-    if (addAuto('creator', `reddit|${author}`, `u/${author} · you liked ${x.n} of their posts`)) { added.push(author); room--; }
+    if (addAuto('creator', `reddit|${author}`, `u/${author} · ${tr('you liked {n} of their posts', { n: x.n })}`)) { added.push(author); room--; }
   }
   return added;
 }
@@ -308,7 +309,7 @@ async function discoverNiches(terms) {
       .sort((a, b) => b.fit - a.fit || b.subscribers - a.subscribers).slice(0, 2);
     for (const n of good) {
       if (room <= 0) break;
-      if (addAuto('community', `redgifs|${n.name}`, `RedGIFs niche: ${n.name} · matches ${t}`, t)) { added.push(n.name); room--; }
+      if (addAuto('community', `redgifs|${n.name}`, `${tr('RedGIFs niche: {name}', { name: n.name })} · ${tr('matches {what}', { what: t })}`, t)) { added.push(n.name); room--; }
     }
   }
   return added;
@@ -334,7 +335,7 @@ async function discoverLemmy(terms) {
       if (room <= 0) break;
       const host = (() => { try { return new URL(c.community.actor_id).host; } catch { return lemmyInstance(); } })();
       const name = `${c.community.name}@${host}`;
-      if (addAuto('community', `lemmy|${name}`, `${name} · matches ${t}`, ['stories', 'confessions', 'sex'].includes(t) ? null : t)) { added.push(name); room--; }
+      if (addAuto('community', `lemmy|${name}`, `${name} · ${tr('matches {what}', { what: t })}`, ['stories', 'confessions', 'sex'].includes(t) ? null : t)) { added.push(name); room--; }
     }
   }
   return added;
@@ -377,7 +378,7 @@ async function discoverBluesky(terms) {
       else if (st.total && st.reposts > st.total * 0.7 && st.adultReposts < 3) continue;
     } catch { continue; }
     const followers = c.followers >= 1000 ? `${Math.round(c.followers / 100) / 10}k` : c.followers;
-    if (addAuto('creator', `bluesky|${c.handle}`, `@${c.handle} · ${kind === 'reposter' ? 'reposts' : 'posts'} ${c.term.replace(/ ?nsfw ?/, '') || 'adult content'} · ${followers} followers`, /nsfw/.test(c.term) ? null : c.term)) { added.push(c.handle); room--; }
+    if (addAuto('creator', `bluesky|${c.handle}`, `@${c.handle} · ${kind === 'reposter' ? tr('reposts {what}', { what: c.term.replace(/ ?nsfw ?/, '') || tr('adult content') }) : tr('posts {what}', { what: c.term.replace(/ ?nsfw ?/, '') || tr('adult content') })} · ${tr('{n} followers', { n: followers })}`, /nsfw/.test(c.term) ? null : c.term)) { added.push(c.handle); room--; }
   }
   return added;
 }
@@ -397,9 +398,9 @@ export function pruneAutoSources() {
     const seen = st.seen || 0;
     const weak = (seen >= 10 && pts < 2 + seen * 0.05) || (fetched >= 40 && seen <= 2 && now() - f.created > 7 * 86400000);
     if (weak && f.active) {
-      db.prepare("UPDATE follows SET active = 0, dormant_since = ?, why = ? WHERE id = ?").run(now(), `resting: ${seen} seen, ${Math.round(pts)} pts`, f.id);
+      db.prepare("UPDATE follows SET active = 0, dormant_since = ?, why = ? WHERE id = ?").run(now(), tr('resting: {seen} seen, {pts} pts', { seen, pts: Math.round(pts) }), f.id);
       pruned.push(`${f.label || f.value} (${seen} seen, ${Math.round(pts)} pts)`);
-    } else db.prepare('UPDATE follows SET label = ? WHERE id = ?').run(`${String(f.label || f.value).replace(/ · \d+ seen · \d+ pts$/, '')}${seen ? ` · ${seen} seen · ${Math.round(pts)} pts` : ''}`, f.id);
+    } else db.prepare('UPDATE follows SET label = ? WHERE id = ?').run(`${String(f.label || f.value).replace(/ · \d+ \S+ · \d+ pts$/, '')}${seen ? ` · ${tr('{seen} seen · {pts} pts', { seen, pts: Math.round(pts) })}` : ''}`, f.id);
   }
   if (pruned.length) log('info', `Resting weak auto sources (kept for later): ${pruned.join(', ')}`);
   return pruned;

@@ -3,6 +3,8 @@ import { api, fmtDur, proxied, rgba, track } from '../api.js';
 import { Icon } from '../icons.jsx';
 import { soundOn, setSound, onSound, soundBlocked } from '../sound.js';
 import Linkify from './Linkify.jsx';
+import { t, tn } from '../i18n.js';
+import { useTranslate, TranslateButton, TranslatedNote } from './Translate.jsx';
 
 let HlsLib = null;
 async function loadHls() {
@@ -11,8 +13,8 @@ async function loadHls() {
 }
 
 function Badge({ format }) {
-  if (format === 'long') return <span className="badge b-long"><Icon name="clock" />Long form</span>;
-  if (format === 'short') return <span className="badge b-short"><Icon name="loop" />Short form</span>;
+  if (format === 'long') return <span className="badge b-long"><Icon name="clock" />{t('Long form')}</span>;
+  if (format === 'short') return <span className="badge b-short"><Icon name="loop" />{t('Short form')}</span>;
   if (format === 'gif') return <span className="badge b-gif">GIF</span>;
   return null;
 }
@@ -92,7 +94,7 @@ export function VideoPlayer({ item, active, onPlay, onReady }) {
           hlsRef.current = null;
           if (!hlsUrl.startsWith('/api/hls')) setHlsUrl(`/api/hls?url=${encodeURIComponent(item.media.hls)}`);
           else if (src && src !== item.media.hls) { setHlsUrl(null); }
-          else { setError('This video could not be loaded. It may have been removed at the source.'); setLoading(false); }
+          else { setError(t('This video could not be loaded. It may have been removed at the source.')); setLoading(false); }
         });
       });
       return () => { cancelled = true; hlsRef.current?.destroy(); hlsRef.current = null; };
@@ -128,7 +130,7 @@ export function VideoPlayer({ item, active, onPlay, onReady }) {
       return;
     }
     setLoading(false);
-    setError('This video could not be loaded. It may have been removed at the source.');
+    setError(t('This video could not be loaded. It may have been removed at the source.'));
   }
 
   // Watch tracking for every video format: quartiles watched, watched to the end, and rewatches.
@@ -218,9 +220,9 @@ export function VideoPlayer({ item, active, onPlay, onReady }) {
         ) : poster ? <img src={poster} alt="" loading="lazy" referrerPolicy="no-referrer" /> : null}
         <Badge format={item.format} />
         {item.duration ? <span className="dur">{fmtDur(item.duration)}</span> : null}
-        {loading && !error ? <span className="spinner" aria-label="Loading video" /> : null}
+        {loading && !error ? <span className="spinner" aria-label={t('Loading video')} /> : null}
         {item.media.hasAudio !== false && (src || hlsUrl) && armed ? (
-          <button type="button" className={`mutebtn${muted ? '' : ' on'}`} onClick={(e) => { e.stopPropagation(); if (muted) unmute(); else { setSound(false); } }} aria-label={muted ? 'Turn sound on' : 'Turn sound off'} title={muted ? 'Sound on for every video' : 'Sound off for every video'}>
+          <button type="button" className={`mutebtn${muted ? '' : ' on'}`} onClick={(e) => { e.stopPropagation(); if (muted) unmute(); else { setSound(false); } }} aria-label={muted ? t('Turn sound on') : t('Turn sound off')} title={muted ? t('Sound on for every video') : t('Sound off for every video')}>
             <Icon name={muted ? 'mute' : 'volume'} />
           </button>
         ) : null}
@@ -293,7 +295,7 @@ export function EmbedPlayer({ item, active, onPlay, onReady }) {
       img.src = thumbSrc(u, proxyAll);
     };
     for (let k = 0; k < Math.min(4, thumbs.length); k++) load(k);
-    const t = setInterval(() => {
+    const tm = setInterval(() => {
       setI((cur) => {
         for (let step = 1; step <= thumbs.length; step++) {
           const nx = (cur + step) % thumbs.length;
@@ -304,7 +306,7 @@ export function EmbedPlayer({ item, active, onPlay, onReady }) {
         return cur;
       });
     }, short ? 550 : 750);
-    return () => { alive = false; clearInterval(t); };
+    return () => { alive = false; clearInterval(tm); };
   }, [previewing, thumbs.join('|'), proxyAll, short]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function onPosterError() {
@@ -324,7 +326,7 @@ export function EmbedPlayer({ item, active, onPlay, onReady }) {
   const shown = ready.current.has(thumbs[i]) || i === 0 ? thumbs[i] : m.poster;
   const embedUrl = m.embed && short && !/autoplay/.test(m.embed) ? `${m.embed}${m.embed.includes('?') ? '&' : '?'}autoplay=1` : m.embed;
   if (dead && !playing) {
-    return <div className="media land embed-dead" style={{ '--c': rgba(c, 0.4), '--c2': rgba(c, 0.18) }}><span>This video is no longer available on {m.provider}.</span></div>;
+    return <div className="media land embed-dead" style={{ '--c': rgba(c, 0.4), '--c2': rgba(c, 0.18) }}><span>{t('This video is no longer available on {provider}.', { provider: m.provider })}</span></div>;
   }
   return (
     <div ref={embedRef} className={`vidwrap${short ? ' tube-short' : ''}`} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
@@ -337,7 +339,7 @@ export function EmbedPlayer({ item, active, onPlay, onReady }) {
             <Badge format={item.format} />
             {item.duration ? <span className="dur">{fmtDur(item.duration)}</span> : null}
             <span className="provider">{m.provider}</span>
-            <button type="button" className="play" onClick={play} aria-label={`Play in the ${m.provider} player`}><Icon name="play" filled /></button>
+            <button type="button" className="play" onClick={play} aria-label={t('Play in the {provider} player', { provider: m.provider })}><Icon name="play" filled /></button>
           </>
         )}
       </div>
@@ -345,8 +347,8 @@ export function EmbedPlayer({ item, active, onPlay, onReady }) {
       {playing ? (
         <div className="embednote">
           {sandboxed
-            ? <>Pop-ups from the player are blocked. <button type="button" className="linkbtn" onClick={() => setSandboxed(false)}>Player stays black? Load it without the blocker</button></>
-            : <>Loaded without the pop-up blocker. <button type="button" className="linkbtn" onClick={() => setSandboxed(true)}>Turn the blocker back on</button></>}
+            ? <>{t('Pop-ups from the player are blocked.')} <button type="button" className="linkbtn" onClick={() => setSandboxed(false)}>{t('Player stays black? Load it without the blocker')}</button></>
+            : <>{t('Loaded without the pop-up blocker.')} <button type="button" className="linkbtn" onClick={() => setSandboxed(true)}>{t('Turn the blocker back on')}</button></>}
         </div>
       ) : null}
     </div>
@@ -362,7 +364,7 @@ export function ImageMedia({ item, src, mid, single = true, onReady }) {
     if (!failed && /^https:/.test(url)) { setFailed(true); setUrl(proxied(url)); }
   }
   return (
-    <button type="button" className={`imgbtn ${single ? 'single' : ''} ${big ? 'big' : ''}`} onClick={() => { setBig((b) => !b); if (!big) track(item.id, 'open'); }} aria-label={big ? 'Show smaller' : 'Show larger'}>
+    <button type="button" className={`imgbtn ${single ? 'single' : ''} ${big ? 'big' : ''}`} onClick={() => { setBig((b) => !b); if (!big) track(item.id, 'open'); }} aria-label={big ? t('Show smaller') : t('Show larger')}>
       <img src={url} alt={item.title} loading="lazy" referrerPolicy="no-referrer" onError={onError} onLoad={() => onReady?.()} />
     </button>
   );
@@ -385,10 +387,10 @@ export function Gallery({ item, onReady }) {
           ? <video src={g.src} autoPlay muted loop playsInline controls />
           : <img src={srcOf(g, true)} alt="" referrerPolicy="no-referrer" onError={() => setFailed((f) => ({ ...f, [g.src || g.mid]: true }))} />}
         <div className="viewer-bar">
-          <button type="button" className="icon-btn" onClick={() => setOpen((open - 1 + items.length) % items.length)} aria-label="Previous image"><Icon name="chevL" /></button>
+          <button type="button" className="icon-btn" onClick={() => setOpen((open - 1 + items.length) % items.length)} aria-label={t('Previous image')}><Icon name="chevL" /></button>
           <span className="count">{open + 1} / {items.length}</span>
-          <button type="button" className="icon-btn" onClick={() => { const n = (open + 1) % items.length; setOpen(n); if (items[n].itemId && items[n].itemId !== g.itemId) track(items[n].itemId, 'open'); }} aria-label="Next image"><Icon name="chevR" /></button>
-          <button type="button" className="ghost-btn small" onClick={() => setOpen(null)}>Close</button>
+          <button type="button" className="icon-btn" onClick={() => { const n = (open + 1) % items.length; setOpen(n); if (items[n].itemId && items[n].itemId !== g.itemId) track(items[n].itemId, 'open'); }} aria-label={t('Next image')}><Icon name="chevR" /></button>
+          <button type="button" className="ghost-btn small" onClick={() => setOpen(null)}>{t('Close')}</button>
         </div>
       </div>
     );
@@ -398,10 +400,10 @@ export function Gallery({ item, onReady }) {
   const coll = item.collection;
   return (
     <div className="galwrap">
-      {coll ? <div className="collnote"><Icon name="grid" />{coll.why}{coll.sources.length > 1 ? ` · from ${coll.sources.join(' and ')}` : ''}</div> : null}
+      {coll ? <div className="collnote"><Icon name="grid" />{coll.why}{coll.sources.length > 1 ? ` · ${t('from {list}', { list: coll.sources.join(` ${t('and')} `) })}` : ''}</div> : null}
       <div className={`gallery g${show.length}`}>
         {show.map((g, i) => (
-          <button type="button" key={i} className={`gtile${i === 0 ? ' big' : ''}`} onClick={() => { setOpen(i); track(g.itemId || item.id, 'open'); }} aria-label={`Open image ${i + 1} of ${items.length}`}>
+          <button type="button" key={i} className={`gtile${i === 0 ? ' big' : ''}`} onClick={() => { setOpen(i); track(g.itemId || item.id, 'open'); }} aria-label={t('Open image {i} of {n}', { i: i + 1, n: items.length })}>
             {g.type === 'video' ? <video src={g.src} muted loop autoPlay playsInline onPlaying={() => onReady?.()} /> : <img src={srcOf(g, false)} alt="" loading="lazy" referrerPolicy="no-referrer" onLoad={() => onReady?.()} onError={() => setFailed((f) => ({ ...f, [g.mid || g.src]: true }))} />}
             {i === show.length - 1 && items.length > show.length ? <span className="more-n">+{items.length - show.length}</span> : null}
           </button>
@@ -441,22 +443,22 @@ export function TopReplies({ item, compact = false }) {
       track(item.id, 'comments');
     } catch { /* keep what is shown */ } finally { setLoading(false); }
   }
-  if (!top?.length) return pending && !compact ? <p className="replies-wait">Top replies are on their way…</p> : null;
+  if (!top?.length) return pending && !compact ? <p className="replies-wait">{t('Top replies are on their way…')}</p> : null;
   const shown = top.slice(0, compact ? 2 : Math.max(2, n));
   const canMore = !compact && (item.comments || 0) > shown.length && n < 40;
   return (
     <div className={`topreplies${compact ? ' compact' : ''}`}>
       {shown.map((c, i) => (
         <div key={i} className="topreply">
-          <span className="ra">{c.author || 'someone'}{c.score != null ? <em>▲ {c.score >= 1000 ? `${(c.score / 1000).toFixed(1)}k` : c.score}</em> : null}</span>
+          <span className="ra">{c.author || t('someone')}{c.score != null ? <em>▲ {c.score >= 1000 ? `${(c.score / 1000).toFixed(1)}k` : c.score}</em> : null}</span>
           <p>{compact && c.body.length > 220 ? `${c.body.slice(0, 220).replace(/\s+\S*$/, '')}…` : c.body}</p>
-          {!compact && c.replies?.length ? <div className="subreplies">{c.replies.map((r, j) => <div key={j} className="topreply sub"><span className="ra">{r.author || 'someone'}{r.score != null ? <em>▲ {r.score}</em> : null}</span><p>{r.body}</p></div>)}</div> : null}
+          {!compact && c.replies?.length ? <div className="subreplies">{c.replies.map((r, j) => <div key={j} className="topreply sub"><span className="ra">{r.author || t('someone')}{r.score != null ? <em>▲ {r.score}</em> : null}</span><p>{r.body}</p></div>)}</div> : null}
         </div>
       ))}
       {canMore ? (
         <div className="morereplies">
-          <button type="button" className="ghost-btn small" disabled={loading} onClick={() => more(n < 10 ? 10 : 40)}>{loading ? 'Loading replies…' : n < 10 ? 'More replies' : 'All replies'}</button>
-          {n < 10 ? <button type="button" className="linkbtn" disabled={loading} onClick={() => more(40)}>Load all</button> : null}
+          <button type="button" className="ghost-btn small" disabled={loading} onClick={() => more(n < 10 ? 10 : 40)}>{loading ? t('Loading replies…') : n < 10 ? t('More replies') : t('All replies')}</button>
+          {n < 10 ? <button type="button" className="linkbtn" disabled={loading} onClick={() => more(40)}>{t('Load all')}</button> : null}
         </div>
       ) : null}
     </div>
@@ -465,19 +467,23 @@ export function TopReplies({ item, compact = false }) {
 
 export function TextBody({ item, onPerson }) {
   const [open, setOpen] = useState(false);
-  const body = item.body || '';
+  const trTitle = useTranslate(item, 'title');
+  const trBody = useTranslate(item, 'body');
+  const body = trBody.text || item.body || '';
   const short = body.length > 900 ? `${body.slice(0, 900).replace(/\s+\S*$/, '')}…` : body;
   const c = item.kinks?.[0]?.color || '#E39A83';
   const story = item.format === 'story';
   return (
     <div className={story ? 'story' : 'thread'} style={{ '--c': c }}>
-      {story ? <span className="kicker">Story · {readMinutes(item)} min read{item.flair ? ` · ${item.flair}` : ''}</span> : <span className="kicker thread-k">Thread{item.community ? ` · ${item.community}` : ''}</span>}
-      <h3><Linkify text={item.title} source={item.source} onPerson={onPerson} /></h3>
+      {story ? <span className="kicker">{t('Story · {n} min read', { n: readMinutes(item) })}{item.flair ? ` · ${item.flair}` : ''}</span> : <span className="kicker thread-k">{t('Thread')}{item.community ? ` · ${item.community}` : ''}</span>}
+      <h3><Linkify text={trTitle.text || item.title} source={item.source} onPerson={onPerson} /><TranslateButton tr={trTitle} small /><TranslatedNote tr={trTitle} /></h3>
       {body ? <div className="ptext prose"><Paragraphs text={open ? body : short} source={item.source} onPerson={onPerson} /></div> : null}
       {!story ? <TopReplies item={item} /> : null}
       <div className="rowline">
-        {body.length > 900 ? <button type="button" className="ghost-btn small" onClick={() => { setOpen((o) => !o); if (!open) track(item.id, 'open'); }}>{open ? 'Show less' : 'Continue reading'}</button> : null}
-        <span className="read">{story ? `about ${readMinutes(item)} min to read` : `${item.comments} replies`}</span>
+        <TranslateButton tr={trBody} />
+        <TranslatedNote tr={trBody} />
+        {body.length > 900 ? <button type="button" className="ghost-btn small" onClick={() => { setOpen((o) => !o); if (!open) track(item.id, 'open'); }}>{open ? t('Show less') : t('Continue reading')}</button> : null}
+        <span className="read">{story ? t('about {n} min to read', { n: readMinutes(item) }) : tn(item.comments, '{n} reply', '{n} replies')}</span>
       </div>
     </div>
   );

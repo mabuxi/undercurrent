@@ -1,5 +1,6 @@
 import { getSetting } from '../db.js';
 import { logNet } from '../db.js';
+import { tr } from '../i18n.js';
 
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15';
 const state = { lastAt: 0, backoffUntil: 0, chain: Promise.resolve(), waiting: 0, lastError: null, requests: 0 };
@@ -23,7 +24,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function schedule(fn, { maxWaitMs = Infinity } = {}) {
   const wait = Math.max(0, Math.max(state.lastAt + gapMs(), state.backoffUntil) - Date.now()) + state.waiting * gapMs();
   if (wait > maxWaitMs) {
-    const err = new Error(`Reddit only allows one feed request per minute without a feed key; next slot in ${Math.round(wait / 1000)} s.`);
+    const err = new Error(tr('Reddit only allows one feed request per minute without a feed key; next slot in {s} s.', { s: Math.round(wait / 1000) }));
     err.busy = true;
     return Promise.reject(err);
   }
@@ -50,10 +51,10 @@ async function getFeed(path, params = {}, opts = {}) {
     logNet('www.reddit.com', 'Reddit RSS', path.length + 40, text.length, res.status);
     if (res.status === 403 || res.status === 429) {
       state.backoffUntil = Date.now() + 3 * 60000;
-      state.lastError = `Reddit said ${res.status}, waiting 3 minutes`;
-      throw new Error(`Reddit is rate limiting feeds right now (${res.status}). Trying again in a few minutes.`);
+      state.lastError = tr('Reddit said {status}, waiting 3 minutes', { status: res.status });
+      throw Object.assign(new Error(tr('Reddit is rate limiting feeds right now ({status}). Trying again in a few minutes.', { status: res.status })), { rateLimited: true });
     }
-    if (!res.ok) { state.lastError = `Reddit said ${res.status}`; throw new Error(`Reddit answered ${res.status}`); }
+    if (!res.ok) { state.lastError = tr('Reddit said {status}', { status: res.status }); throw new Error(tr('Reddit answered {status}', { status: res.status })); }
     state.lastError = null;
     return parseAtom(text);
   }, opts);

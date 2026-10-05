@@ -1,4 +1,5 @@
 import { getDb, now, tagId } from './db.js';
+import { postLangs } from './langdetect.js';
 import { isBlocked } from './safety.js';
 import { extractInto } from './ai/extract.js';
 import { guessGender } from './gender.js';
@@ -106,7 +107,8 @@ export function hydrate(row) {
     community: row.community, flair: row.flair, format: row.format, media, width: row.width, height: row.height,
     duration: row.duration, score: row.score, comments: row.comments, created: row.created_utc, nsfw: !!row.nsfw,
     aiStatus: row.ai_status, aiSummary: row.ai_summary, saved: !!row.saved, rating: row.rating || 0, vote: row.vote || 0,
-    oc: !!row.oc, via: row.via || null, threadOk: row.thread_ok ?? null, threadMatch: row.thread_match ?? null, aiFit: row.ai_fit ?? null, gMen: row.g_men ?? null, gWomen: row.g_women ?? null, gTrans: !!row.g_trans, gSrc: row.g_src || null
+    oc: !!row.oc, via: row.via || null, threadOk: row.thread_ok ?? null, threadMatch: row.thread_match ?? null, aiFit: row.ai_fit ?? null, gMen: row.g_men ?? null, gWomen: row.g_women ?? null, gTrans: !!row.g_trans, gSrc: row.g_src || null,
+    langs: postLangs({ title: row.title, body: row.body })
   };
 }
 

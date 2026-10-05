@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { api, fmtDur, fmtNum, formatMeta, rgba, proxied, imgSrc, sessionId, ago } from '../api.js';
 import { useApp, MOODS } from '../context.jsx';
 import { Icon } from '../icons.jsx';
-import { Avatar, HeatSlider } from './Panels.jsx';
+import { Avatar, HeatSlider, plain } from './Panels.jsx';
 import { TopReplies } from './Media.jsx';
 import { drawMap } from '../mapdraw.js';
+import { t, tn } from '../i18n.js';
 
 function thumbUrl(it) {
   const m = it.media || {};
@@ -34,7 +35,7 @@ function Mini({ it, onOpen, rank }) {
     <button type="button" className="mini" onClick={() => onOpen(it)}>
       {rank ? <span className="num">{rank}</span> : null}
       <span className="thumbbox"><Thumb it={it} shape={shapeOf(it)} /></span>
-      <span className="mini-text"><span className="mini-title">{it.title}</span><span className="mini-meta">{rank && it.upvotes ? `${fmtNum(it.upvotes)} up · ` : ''}{formatMeta(it)} · {it.match}%</span></span>
+      <span className="mini-text"><span className="mini-title">{it.title}</span><span className="mini-meta">{rank && it.upvotes ? `${t('{n} up', { n: fmtNum(it.upvotes) })} · ` : ''}{formatMeta(it)} · {it.match}%</span></span>
     </button>
   );
 }
@@ -46,7 +47,7 @@ function Tile({ it, onOpen, vert }) {
   return (
     <button type="button" className={`tile${it.format === 'gif' && !url ? ' gifm' : ''}`} style={{ '--c': rgba(c, 0.7), ...(vert ? { aspectRatio: '9/16' } : {}) }} onClick={() => onOpen(it)} aria-label={it.title} {...cyc.on}>
       <CycleImg cyc={cyc} />
-      <span className="tb">{it.format === 'gif' ? 'GIF' : it.format === 'short' || it.format === 'long' ? fmtDur(it.duration) || formatMeta(it) : it.format === 'set' ? `${it.media?.items?.length || ''} img` : formatMeta(it).split(' · ')[0]}</span>
+      <span className="tb">{it.format === 'gif' ? 'GIF' : it.format === 'short' || it.format === 'long' ? fmtDur(it.duration) || formatMeta(it) : it.format === 'set' ? t('{n} img', { n: it.media?.items?.length || '' }).trim() : formatMeta(it).split(' · ')[0]}</span>
     </button>
   );
 }
@@ -58,7 +59,7 @@ function Spot({ it, onOpen, note }) {
     <>
       <button type="button" className="mini spotbtn" onClick={() => onOpen(it)} {...cyc.on}>
         <span className="spot"><span className="sm" style={{ '--c': rgba(c, 0.55), '--c2': rgba(c, 0.3) }}><CycleImg cyc={cyc} /></span></span>
-        <span className="mini-text"><span className="mini-title wrap">{it.title}</span><span className="mini-meta">{it.author ? `${it.author} · ` : ''}{it.upvotes ? `${fmtNum(it.upvotes)} up · ` : ''}{it.match}%</span></span>
+        <span className="mini-text"><span className="mini-title wrap">{it.title}</span><span className="mini-meta">{it.author ? `${it.author} · ` : ''}{it.upvotes ? `${t('{n} up', { n: fmtNum(it.upvotes) })} · ` : ''}{it.match}%</span></span>
       </button>
       {note ? <p className="wnote">{note}</p> : null}
     </>
@@ -74,10 +75,10 @@ function Tonight({ w, setAskOut }) {
   }, []);
   return (
     <div className="win-body">
-      <div className="sess"><div><b>{s.minutes >= 90 ? `${Math.floor(s.minutes / 60)}h${String(s.minutes % 60).padStart(2, '0')}` : s.minutes}</b><span>{s.minutes >= 90 ? 'tonight' : 'minutes'}</span></div><div><b>{s.seen}</b><span>posts seen</span></div><div><b>{s.saved}</b><span>saved</span></div><div><b>{s.rated}</b><span>rated</span></div></div>
-      <div className="barrow" style={{ padding: '4px 2px' }}><div className="bt"><span>Long vs short</span><em>{s.longShare} / {100 - s.longShare}</em></div><div className="track2"><i style={{ width: `${s.longShare}%`, background: 'var(--accent)' }} /></div></div>
-      {s.topTagsNow?.length ? <p className="wnote">Right now: {s.topTagsNow.join(', ')}</p> : null}
-      <div className="wbtns"><button type="button" className="ghost-btn small" onClick={async () => { setAskOut('Summarizing tonight…'); window.scrollTo({ top: 0, behavior: 'smooth' }); try { const r = await api('/session/summary'); setAskOut(r.text); } catch (e) { setAskOut(e.message); } }}>Summarize tonight</button></div>
+      <div className="sess"><div><b>{s.minutes >= 90 ? `${Math.floor(s.minutes / 60)}h${String(s.minutes % 60).padStart(2, '0')}` : s.minutes}</b><span>{s.minutes >= 90 ? t('tonight') : t('minutes')}</span></div><div><b>{s.seen}</b><span>{t('posts seen')}</span></div><div><b>{s.saved}</b><span>{plain(t('saved [tonight count]'))}</span></div><div><b>{s.rated}</b><span>{t('rated')}</span></div></div>
+      <div className="barrow" style={{ padding: '4px 2px' }}><div className="bt"><span>{t('Long vs short')}</span><em>{s.longShare} / {100 - s.longShare}</em></div><div className="track2"><i style={{ width: `${s.longShare}%`, background: 'var(--accent)' }} /></div></div>
+      {s.topTagsNow?.length ? <p className="wnote">{t('Right now: {tags}', { tags: s.topTagsNow.join(', ') })}</p> : null}
+      <div className="wbtns"><button type="button" className="ghost-btn small" onClick={async () => { setAskOut(t('Summarizing tonight…')); window.scrollTo({ top: 0, behavior: 'smooth' }); try { const r = await api('/session/summary'); setAskOut(r.text); } catch (e) { setAskOut(e.message); } }}>{t('Summarize tonight')}</button></div>
     </div>
   );
 }
@@ -163,7 +164,7 @@ function Preview({ it, big = false }) {
   return (
     <span className={`pv${big ? ' big' : ''}`} style={{ '--c': rgba(c, 0.6) }} {...cyc.on}>
       {cyc.first ? <CycleImg cyc={cyc} /> : <span className="pv-fallback">{it.title}</span>}
-      {it.format === 'long' || it.format === 'short' ? <span className="tb">{fmtDur(it.duration) || (it.format === 'short' ? 'clip' : 'video')}</span> : it.format === 'gif' ? <span className="tb">GIF</span> : it.format === 'set' ? <span className="tb">set</span> : null}
+      {it.format === 'long' || it.format === 'short' ? <span className="tb">{fmtDur(it.duration) || (it.format === 'short' ? t('clip') : t('video'))}</span> : it.format === 'gif' ? <span className="tb">GIF</span> : it.format === 'set' ? <span className="tb">{t('set')}</span> : null}
       {cyc.list.length > 1 && cyc.hover ? <span className="pv-bar"><i style={{ width: `${((cyc.i + 1) / cyc.list.length) * 100}%` }} /></span> : null}
     </span>
   );
@@ -204,9 +205,9 @@ function Carousel({ items, onOpen }) {
       </div>
       {items.length > 1 ? (
         <div className="car-nav">
-          <button type="button" className="icon-btn" onClick={() => go(-1)} disabled={idx === 0} aria-label="Previous"><Icon name="chevL" /></button>
+          <button type="button" className="icon-btn" onClick={() => go(-1)} disabled={idx === 0} aria-label={t('Previous')}><Icon name="chevL" /></button>
           <span className="car-dots">{items.map((it, i) => <i key={it.id} className={i === idx ? 'on' : ''} />)}</span>
-          <button type="button" className="icon-btn" onClick={() => go(1)} disabled={idx >= items.length - 1} aria-label="Next"><Icon name="chevR" /></button>
+          <button type="button" className="icon-btn" onClick={() => go(1)} disabled={idx >= items.length - 1} aria-label={t('Next')}><Icon name="chevR" /></button>
         </div>
       ) : null}
     </div>
@@ -220,7 +221,7 @@ function Hero({ items, onOpen }) {
     <div className="hero">
       <button type="button" className="hero-main" onClick={() => onOpen(first)} title={first.title}>
         <Preview it={first} big />
-        <span className="hero-cap"><span className="mini-title wrap">{first.title}</span><span className="mini-meta">{first.match}% match · {formatMeta(first)}</span></span>
+        <span className="hero-cap"><span className="mini-title wrap">{first.title}</span><span className="mini-meta">{t('{n}% match', { n: first.match })} · {formatMeta(first)}</span></span>
       </button>
       {rest.length ? <div className="hero-row">{rest.slice(0, 3).map((it) => <button type="button" key={it.id} className="hero-sm" onClick={() => onOpen(it)} title={it.title}><Preview it={it} /></button>)}</div> : null}
     </div>
@@ -245,14 +246,14 @@ function Layout({ w, items, open }) {
 function MiniMap({ data }) {
   const ref = useRef(null);
   useEffect(() => { drawMap(ref.current, data, false); }, [data]);
-  return <div className="mmap-box"><canvas ref={ref} className="mmap" role="img" aria-label="Small map of your kinks and fantasies" /></div>;
+  return <div className="mmap-box"><canvas ref={ref} className="mmap" role="img" aria-label={t('Small map of your kinks and fantasies')} /></div>;
 }
 
-const FORMAT_NAME = { long: 'Long videos', short: 'Short clips', gif: 'GIFs', image: 'Images', set: 'Image sets', story: 'Stories', discussion: 'Threads' };
+const FORMAT_NAME = { long: t('Long videos'), short: t('Short clips'), gif: t('GIFs'), image: t('Images'), set: t('Image sets'), story: t('Stories'), discussion: t('Threads') };
 
 function MatchBar({ value }) {
   const v = Math.max(0, Math.min(100, Number(value) || 0));
-  return <div className="wmatch" title={`${v}% match`}><div className="track2"><i style={{ width: `${v}%` }} /></div><span>{v}% match</span></div>;
+  return <div className="wmatch" title={t('{n}% match', { n: v })}><div className="track2"><i style={{ width: `${v}%` }} /></div><span>{t('{n}% match', { n: v })}</span></div>;
 }
 
 function FantasySuggest({ w, open }) {
@@ -263,10 +264,10 @@ function FantasySuggest({ w, open }) {
     try {
       await api(`/suggestions/${sg.id}`, { method: 'POST', body: { action } });
       setState(action === 'save' ? 'saved' : 'dismissed');
-      if (action === 'save') { refreshMeta(); toast('Saved to your fantasies.'); } else toast('Got it. It will not come back.');
+      if (action === 'save') { refreshMeta(); toast(t('Saved to your fantasies.')); } else toast(t('Got it. It will not come back.'));
     } catch (e) { toast(e.message); }
   };
-  if (state === 'dismissed') return <div className="win-body"><p className="wnote">Dismissed.</p></div>;
+  if (state === 'dismissed') return <div className="win-body"><p className="wnote">{t('Dismissed.')}</p></div>;
   return (
     <div className="win-body"><div className="fant">
       <p className="scenario serif">{sg.scenario}</p>
@@ -278,8 +279,8 @@ function FantasySuggest({ w, open }) {
       {sg.why ? <p className="wnote">{sg.why}</p> : null}
       {w.items?.length ? <div className="wgrid three">{w.items.slice(0, 3).map((it) => <Tile key={it.id} it={it} onOpen={open} />)}</div> : null}
       <div className="wbtns">
-        <button type="button" className="ghost-btn small accent" onClick={() => act('save')} disabled={state === 'saved'}>{state === 'saved' ? 'Saved' : 'Save fantasy'}</button>
-        <button type="button" className="ghost-btn small" onClick={() => act('dismiss')}>Not for me</button>
+        <button type="button" className="ghost-btn small accent" onClick={() => act('save')} disabled={state === 'saved'}>{state === 'saved' ? plain(t('Saved [button state]')) : t('Save fantasy')}</button>
+        <button type="button" className="ghost-btn small" onClick={() => act('dismiss')}>{t('Not for me')}</button>
       </div>
     </div></div>
   );
@@ -289,7 +290,7 @@ function NewKink({ w, open }) {
   const { toast, refreshMeta } = useApp();
   const [state, setState] = useState(w.kink.status);
   const set = async (status) => {
-    try { await api(`/kinks/${w.kink.id}`, { method: 'PATCH', body: { status } }); setState(status); refreshMeta(); toast(status === 'active' ? `${w.kink.name} is one of your kinks now.` : 'Hidden. It will not be suggested again.'); } catch (e) { toast(e.message); }
+    try { await api(`/kinks/${w.kink.id}`, { method: 'PATCH', body: { status } }); setState(status); refreshMeta(); toast(status === 'active' ? t('{name} is one of your kinks now.', { name: w.kink.name }) : t('Hidden. It will not be suggested again.')); } catch (e) { toast(e.message); }
   };
   return (
     <div className="win-body">
@@ -298,10 +299,10 @@ function NewKink({ w, open }) {
       <Layout w={w} items={w.items || []} open={open} />
       {state !== 'hidden' ? (
         <div className="wbtns">
-          <button type="button" className="ghost-btn small accent" onClick={() => set('active')} disabled={state === 'active'}>{state === 'active' ? 'In your kinks' : 'Keep it'}</button>
-          <button type="button" className="ghost-btn small" onClick={() => set('hidden')}>Not for me</button>
+          <button type="button" className="ghost-btn small accent" onClick={() => set('active')} disabled={state === 'active'}>{state === 'active' ? t('In your kinks') : t('Keep it')}</button>
+          <button type="button" className="ghost-btn small" onClick={() => set('hidden')}>{t('Not for me')}</button>
         </div>
-      ) : <p className="wnote">Hidden.</p>}
+      ) : <p className="wnote">{t('Hidden.')}</p>}
     </div>
   );
 }
@@ -319,8 +320,8 @@ function Body({ w, open }) {
         <div className="win-body scroll">
           {items.map((it) => (
             <button type="button" key={it.id} className="mini storyrow" onClick={() => open(it)}>
-              <span className="readbadge"><b>{it.readMin || it.media?.readMin || 1}</b><span>min</span></span>
-              <span className="mini-text"><span className="mini-title wrap serif">{it.title}</span><span className="mini-meta">{it.community || it.author} · {it.match}% match</span></span>
+              <span className="readbadge"><b>{it.readMin || it.media?.readMin || 1}</b><span>{t('min')}</span></span>
+              <span className="mini-text"><span className="mini-title wrap serif">{it.title}</span><span className="mini-meta">{it.community || it.author} · {t('{n}% match', { n: it.match })}</span></span>
             </button>
           ))}
         </div>
@@ -328,7 +329,7 @@ function Body({ w, open }) {
     case 'kinkList':
       return (
         <div className="win-body">
-          {w.newest ? <p className="newestline">Newest post {ago(w.newest)}</p> : null}
+          {w.newest ? <p className="newestline">{t('Newest post {ago}', { ago: ago(w.newest) })}</p> : null}
           {w.performerThumb ? <div className="perfhead"><img src={imgSrc(w.performerThumb)} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.display = 'none'; }} /><span>{w.title}</span></div> : null}
           <Layout w={w} items={items} open={open} />
         </div>
@@ -338,7 +339,7 @@ function Body({ w, open }) {
         <div className="win-body">
           {w.subs?.length ? (
             <div className="chiprow subs">
-              {w.group ? <button type="button" className="chip btn" onClick={() => setFilters({ kink: w.group.id })}>All of {w.group.name}</button> : null}
+              {w.group ? <button type="button" className="chip btn" onClick={() => setFilters({ kink: w.group.id })}>{t('All of {name}', { name: w.group.name })}</button> : null}
               {w.subs.map((x) => (
                 <button type="button" key={x.id || x.tag} className={`chip btn${(x.id && x.id === w.activeSub) || (x.tag && x.tag === w.activeTag) ? ' on' : ''}`} onClick={() => setFilters(x.id ? { kink: x.id } : { kink: w.kink.id, tags: [x.tag] })}>{x.name}</button>
               ))}
@@ -350,14 +351,14 @@ function Body({ w, open }) {
     case 'kinkSpot':
       return <div className="win-body">{items[0] ? <Spot it={items[0]} onOpen={open} /> : null}</div>;
     case 'discovery':
-      if (w.big) return <div className="win-body">{items[0] ? <Spot it={items[0]} onOpen={open} note={`You haven't opened ${items[0].kinks?.[0]?.name || 'this kind of post'} before. It sits next to things you like.`} /> : null}</div>;
-      return <div className="win-body">{items.slice(0, 3).map((it) => <Mini key={it.id} it={it} onOpen={open} />)}<p className="wnote">Kinds of posts you haven&apos;t opened yet, next to things you like.</p></div>;
+      if (w.big) return <div className="win-body">{items[0] ? <Spot it={items[0]} onOpen={open} note={t("You haven't opened {name} before. It sits next to things you like.", { name: items[0].kinks?.[0]?.name || t('this kind of post') })} /> : null}</div>;
+      return <div className="win-body">{items.slice(0, 3).map((it) => <Mini key={it.id} it={it} onOpen={open} />)}<p className="wnote">{t("Kinds of posts you haven't opened yet, next to things you like.")}</p></div>;
     case 'pair':
       return (
         <div className="win-body">
           <div className="chiprow">{w.pair.map((k) => <span key={k.id} className="chip" style={{ '--c': k.color, '--c2': rgba(k.color, 0.16) }}>{k.name}</span>)}</div>
           <div className="wgrid">{items.map((it) => <Tile key={it.id} it={it} onOpen={open} />)}</div>
-          <p className="wnote">These two show up together in the things you rate highest.</p>
+          <p className="wnote">{t('These two show up together in the things you rate highest.')}</p>
         </div>
       );
     case 'gifs':
@@ -371,8 +372,8 @@ function Body({ w, open }) {
           {fant.description ? <p className="wtext">{fant.description}</p> : null}
           <div className="chiprow">{fant.kinks.map((k) => <span key={k.id} className="chip" style={{ '--c': k.color, '--c2': rgba(k.color, 0.16) }}>{k.name}</span>)}</div>
           <div className="wbtns">
-            <button type="button" className="ghost-btn small accent" onClick={() => openMode('journey', { fantasy: fant.id })}><Icon name="route" />Start a journey</button>
-            <button type="button" className="ghost-btn small" onClick={async () => { await api(`/fantasies/${fant.id}`, { method: 'PATCH', body: { saved: !fant.saved } }); setFant({ ...fant, saved: !fant.saved }); refreshMeta(); toast(fant.saved ? 'Removed from your fantasies.' : 'Saved to your fantasies.'); }}>{fant.saved ? 'Saved' : 'Save fantasy'}</button>
+            <button type="button" className="ghost-btn small accent" onClick={() => openMode('journey', { fantasy: fant.id })}><Icon name="route" />{t('Start a journey')}</button>
+            <button type="button" className="ghost-btn small" onClick={async () => { await api(`/fantasies/${fant.id}`, { method: 'PATCH', body: { saved: !fant.saved } }); setFant({ ...fant, saved: !fant.saved }); refreshMeta(); toast(fant.saved ? t('Removed from your fantasies.') : t('Saved to your fantasies.')); }}>{fant.saved ? plain(t('Saved [button state]')) : t('Save fantasy')}</button>
           </div>
         </div></div>
       );
@@ -384,19 +385,19 @@ function Body({ w, open }) {
               <span className="ring"><Avatar name={f.value} /></span><span>{f.kind === 'subreddit' || (f.kind === 'community' && f.provider === 'reddit') ? `r/${f.value}` : f.value}</span>
             </button>
           ))}</div>
-          {w.newest ? <p className="newestline">Newest post {ago(w.newest)}</p> : null}
+          {w.newest ? <p className="newestline">{t('Newest post {ago}', { ago: ago(w.newest) })}</p> : null}
           {items.map((it) => <Mini key={it.id} it={it} onOpen={open} />)}
         </div>
       );
     case 'followLatest':
       return (
         <div className="win-body scroll">
-          {w.newest ? <p className="newestline">Newest post {ago(w.newest)}</p> : null}
+          {w.newest ? <p className="newestline">{t('Newest post {ago}', { ago: ago(w.newest) })}</p> : null}
           {items.map((it) => (
             <button type="button" key={it.id} className="mini latest" onClick={() => open(it)}>
               <span className="thumbbox"><Thumb it={it} shape={shapeOf(it)} /></span>
               <span className="mini-text"><span className="mini-title">{it.title}</span><span className="mini-meta">{it.author || it.community} · {ago(it.created)}</span></span>
-              {(it.created || 0) * 1000 > Date.now() - 86400000 ? <span className="newdot">new</span> : null}
+              {(it.created || 0) * 1000 > Date.now() - 86400000 ? <span className="newdot">{t('new')}</span> : null}
             </button>
           ))}
         </div>
@@ -406,10 +407,10 @@ function Body({ w, open }) {
     case 'creator':
       return (
         <div className="win-body">
-          <div className="prof"><Avatar name={w.creator.name} size="l" /><div className="pn"><strong>{w.creator.name}</strong><span>{w.creator.source === 'reddit' ? `u/${w.creator.name}` : `@${w.creator.name}`} · {w.creator.posts} posts</span></div></div>
+          <div className="prof"><Avatar name={w.creator.name} size="l" /><div className="pn"><strong>{w.creator.name}</strong><span>{w.creator.source === 'reddit' ? `u/${w.creator.name}` : `@${w.creator.name}`} · {tn(w.creator.posts, '{n} post', '{n} posts')}</span></div></div>
           {w.creator.match ? <MatchBar value={w.creator.match} /> : null}
           <Layout w={w} items={items} open={open} />
-          <div className="wbtns"><button type="button" className="ghost-btn small accent" onClick={async () => { await api('/follow', { method: 'POST', body: { kind: 'creator', value: `${w.creator.source}|${w.creator.name}`, on: true, label: w.creator.name } }); toast(`Following ${w.creator.name}.`); }}>{w.creator.followed ? 'Following' : 'Follow'}</button></div>
+          <div className="wbtns"><button type="button" className="ghost-btn small accent" onClick={async () => { await api('/follow', { method: 'POST', body: { kind: 'creator', value: `${w.creator.source}|${w.creator.name}`, on: true, label: w.creator.name } }); toast(t('Following {name}.', { name: w.creator.name })); }}>{w.creator.followed ? plain(t('Following [button state]')) : t('Follow')}</button></div>
         </div>
       );
     case 'tonight': {
@@ -424,7 +425,7 @@ function Body({ w, open }) {
               <div className="duo"><div className="track2"><i style={{ width: `${k.allTime}%`, background: rgba(k.color, 0.45) }} /></div><div className="track2"><i style={{ width: `${k.lately}%`, background: k.color }} /></div></div>
             </div>
           ); })}
-        </div><p className="wnote">Left bar all time, right bar the last week.</p></div>
+        </div><p className="wnote">{t('Left bar all time, right bar the last week.')}</p></div>
       );
     case 'map':
       if (w.variant === 'groups') {
@@ -437,7 +438,7 @@ function Body({ w, open }) {
                 <div className="chiprow">{g.kinks.map((k) => <button type="button" key={k.id} className="chip btn" style={{ '--c': k.color, '--c2': rgba(k.color, 0.16) }} onClick={() => setFilters({ kink: k.id })}>{k.name}</button>)}</div>
               </div>
             ))}
-            <div className="wbtns"><button type="button" className="ghost-btn small" onClick={() => openMode('map')}><Icon name="map" />Expand your map</button></div>
+            <div className="wbtns"><button type="button" className="ghost-btn small" onClick={() => openMode('map')}><Icon name="map" />{t('Expand your map')}</button></div>
           </div>
         );
       }
@@ -451,20 +452,20 @@ function Body({ w, open }) {
                 <span className="chip" style={{ '--c': l.b.color, '--c2': rgba(l.b.color || '#999', 0.16) }}>{l.b.name}</span>
               </button>
             ))}
-            <div className="wbtns"><button type="button" className="ghost-btn small" onClick={() => openMode('map')}><Icon name="map" />Expand your map</button></div>
+            <div className="wbtns"><button type="button" className="ghost-btn small" onClick={() => openMode('map')}><Icon name="map" />{t('Expand your map')}</button></div>
           </div>
         );
       }
-      return <div className="win-body"><MiniMap data={w} /><div className="wbtns"><button type="button" className="ghost-btn small" onClick={() => openMode('map')}><Icon name="map" />Expand your map</button></div></div>;
+      return <div className="win-body"><MiniMap data={w} /><div className="wbtns"><button type="button" className="ghost-btn small" onClick={() => openMode('map')}><Icon name="map" />{t('Expand your map')}</button></div></div>;
     case 'rising':
       return (
         <div className="win-body">
           {w.rising.map((k) => (
             <button type="button" key={k.id} className="riserow" onClick={() => setFilters({ kink: k.id })}>
-              <span className="rise up">▲ {k.delta}</span><span className="rname" style={{ color: k.color }}>{k.name}</span><em>{k.lately}% this week</em>
+              <span className="rise up">▲ {k.delta}</span><span className="rname" style={{ color: k.color }}>{k.name}</span><em>{t('{n}% this week', { n: k.lately })}</em>
             </button>
           ))}
-          {w.falling?.length ? <p className="wnote">Cooling off: {w.falling.map((k) => `${k.name} (${k.delta})`).join(', ')}</p> : null}
+          {w.falling?.length ? <p className="wnote">{t('Cooling off: {list}', { list: w.falling.map((k) => `${k.name} (${k.delta})`).join(', ') })}</p> : null}
         </div>
       );
     case 'topWatched':
@@ -478,7 +479,7 @@ function Body({ w, open }) {
               <span className="pts">+{it.points}</span>
             </button>
           ))}
-          <p className="wnote">Points: saves, heat and likes count most, then rewatches and watching to the end.</p>
+          <p className="wnote">{t('Points: saves, heat and likes count most, then rewatches and watching to the end.')}</p>
         </div>
       );
     case 'scoreboard':
@@ -486,7 +487,7 @@ function Body({ w, open }) {
         <div className="win-body">
           <div className="scoreboard">
             {w.rows.map((r) => (
-              <div key={r.key}><b>{r.now}</b><span>{r.label}</span>{r.before !== r.now ? <em className={r.now >= r.before ? 'up' : 'down'}>{r.now >= r.before ? '▲' : '▼'} {Math.abs(r.now - r.before)}</em> : <em>same</em>}</div>
+              <div key={r.key}><b>{r.now}</b><span>{r.label}</span>{r.before !== r.now ? <em className={r.now >= r.before ? 'up' : 'down'}>{r.now >= r.before ? '▲' : '▼'} {Math.abs(r.now - r.before)}</em> : <em>{t('same')}</em>}</div>
             ))}
           </div>
         </div>
@@ -508,7 +509,7 @@ function Body({ w, open }) {
           <p className="wtext">{w.blurb}</p>
           {items.length ? <div className="wgrid three">{items.slice(0, 3).map((it) => <Tile key={it.id} it={it} onOpen={open} />)}</div> : null}
           <div className="wbtns">
-            <button type="button" className="ghost-btn small accent" onClick={() => openMode('journey', w.subject.kind === 'fantasy' ? { fantasy: w.subject.id, mode: w.mode } : { kink: w.subject.id, mode: w.mode })}><Icon name="route" />Start the journey</button>
+            <button type="button" className="ghost-btn small accent" onClick={() => openMode('journey', w.subject.kind === 'fantasy' ? { fantasy: w.subject.id, mode: w.mode } : { kink: w.subject.id, mode: w.mode })}><Icon name="route" />{t('Start the journey')}</button>
           </div>
         </div>
       );
@@ -532,12 +533,12 @@ function Body({ w, open }) {
     case 'limits':
       return (
         <div className="win-body">
-          <div className="limits">{limits.map((l) => <span className="limit" key={l}>{l}<button type="button" aria-label={`Remove ${l}`} onClick={async () => { await api(`/limits/${encodeURIComponent(l)}`, { method: 'DELETE' }); setLimits(limits.filter((x) => x !== l)); }}><Icon name="close" /></button></span>)}</div>
-          <form className="limitform" onSubmit={async (e) => { e.preventDefault(); const t = limIn.trim(); if (!t) { toast('Type a tag to block first.'); return; } const r = await api('/limits', { method: 'POST', body: { tag: t } }); setLimits([...limits, t.toLowerCase()]); setLimIn(''); toast(`Blocked. ${r.hidden} posts hidden.`); }}>
-            <input id={`lim-${w.uid}`} value={limIn} onChange={(e) => setLimIn(e.target.value)} placeholder="Add a tag to block" aria-label="Tag to block" />
-            <button type="submit" className="ghost-btn small">Block</button>
+          <div className="limits">{limits.map((l) => <span className="limit" key={l}>{l}<button type="button" aria-label={t('Remove {tag}', { tag: l })} onClick={async () => { await api(`/limits/${encodeURIComponent(l)}`, { method: 'DELETE' }); setLimits(limits.filter((x) => x !== l)); }}><Icon name="close" /></button></span>)}</div>
+          <form className="limitform" onSubmit={async (e) => { e.preventDefault(); const tag = limIn.trim(); if (!tag) { toast(t('Type a tag to block first.')); return; } const r = await api('/limits', { method: 'POST', body: { tag } }); setLimits([...limits, tag.toLowerCase()]); setLimIn(''); toast(tn(r.hidden, 'Blocked. {n} post hidden.', 'Blocked. {n} posts hidden.')); }}>
+            <input id={`lim-${w.uid}`} value={limIn} onChange={(e) => setLimIn(e.target.value)} placeholder={t('Add a tag to block')} aria-label={t('Tag to block')} />
+            <button type="submit" className="ghost-btn small">{t('Block')}</button>
           </form>
-          <p className="wnote">Never shown, never suggested, and nothing can override them.</p>
+          <p className="wnote">{t('Never shown, never suggested, and nothing can override them.')}</p>
         </div>
       );
     case 'savedFant':
@@ -546,20 +547,20 @@ function Body({ w, open }) {
           {w.fantasies.length ? w.fantasies.map((f) => (
             <button type="button" key={f.id} className="mini" onClick={() => setFilters({ fantasy: f.id })}>
               <span className="thumbbox"><span className="thumb sq" style={{ '--c': rgba('#F6C35B', f.saved ? 0.7 : 0.3), borderRadius: '50%' }} /></span>
-              <span className="mini-text"><span className="mini-title">{f.name}</span><span className="mini-meta">{f.kinks.map((k) => k.name).join(' + ') || 'no kinks yet'} · {f.match}%</span></span>
+              <span className="mini-text"><span className="mini-title">{f.name}</span><span className="mini-meta">{f.kinks.map((k) => k.name).join(' + ') || t('no kinks yet')} · {f.match}%</span></span>
             </button>
-          )) : <p className="wnote">No fantasies yet. Save one from a journey, or write one in Memory.</p>}
-          <div className="wbtns"><button type="button" className="ghost-btn small" onClick={() => openMode('memory')}>Write a fantasy</button></div>
+          )) : <p className="wnote">{t('No fantasies yet. Save one from a journey, or write one in Memory.')}</p>}
+          <div className="wbtns"><button type="button" className="ghost-btn small" onClick={() => openMode('memory')}>{t('Write a fantasy')}</button></div>
         </div>
       );
     case 'journey':
       return (
         <div className="win-body">
-          <p className="wtext">A finite, guided path. The assistant picks every step; you only move forward, and it ends when it ends.</p>
+          <p className="wtext">{t('A finite, guided path. The assistant picks every step; you only move forward, and it ends when it ends.')}</p>
           <div className="wbtns col">
-            {w.kinks[0] ? <button type="button" className="ghost-btn small" onClick={() => openMode('journey', { kink: w.kinks[0].id, mode: 'branch' })}><Icon name="route" />Branch out from {w.kinks[0].name}</button> : null}
-            {w.kinks[1] ? <button type="button" className="ghost-btn small" onClick={() => openMode('journey', { kink: w.kinks[1].id, mode: 'close' })}><Icon name="route" />Go deep into {w.kinks[1].name}</button> : null}
-            <button type="button" className="ghost-btn small" onClick={() => openMode('journey', { mode: 'surprise' })}><Icon name="route" />Surprise me</button>
+            {w.kinks[0] ? <button type="button" className="ghost-btn small" onClick={() => openMode('journey', { kink: w.kinks[0].id, mode: 'branch' })}><Icon name="route" />{t('Branch out from {name}', { name: w.kinks[0].name })}</button> : null}
+            {w.kinks[1] ? <button type="button" className="ghost-btn small" onClick={() => openMode('journey', { kink: w.kinks[1].id, mode: 'close' })}><Icon name="route" />{t('Go deep into {name}', { name: w.kinks[1].name })}</button> : null}
+            <button type="button" className="ghost-btn small" onClick={() => openMode('journey', { mode: 'surprise' })}><Icon name="route" />{t('Surprise me')}</button>
           </div>
         </div>
       );
@@ -579,28 +580,28 @@ function Body({ w, open }) {
         </div>
       );
     case 'recentSaved':
-      return <div className="win-body">{items.length ? <div className="wgrid">{items.map((it) => <Tile key={it.id} it={it} onOpen={open} />)}</div> : <p className="wnote">Save a post with the bookmark icon and it lands here.</p>}</div>;
+      return <div className="win-body">{items.length ? <div className="wgrid">{items.map((it) => <Tile key={it.id} it={it} onOpen={open} />)}</div> : <p className="wnote">{t('Save a post with the bookmark icon and it lands here.')}</p>}</div>;
     case 'discussion':
     case 'hotThread': {
-      const t = items[0];
-      if (!t) return null;
+      const th = items[0];
+      if (!th) return null;
       return (
         <div className="win-body hotthread" style={{ '--c': w.color }}>
-          <MatchBar value={t.match} />
-          <button type="button" className="threadq" onClick={() => open(t)}>
-            <span className="serif">{t.title}</span>
-            {t.aiSummary ? <span className="mini-meta">{t.aiSummary}</span> : null}
+          <MatchBar value={th.match} />
+          <button type="button" className="threadq" onClick={() => open(th)}>
+            <span className="serif">{th.title}</span>
+            {th.aiSummary ? <span className="mini-meta">{th.aiSummary}</span> : null}
           </button>
-          <TopReplies item={t} compact />
-          <div className="rowline"><span className="mini-meta">{[t.comments ? `${fmtNum(t.comments)} replies` : null, t.upvotes ? `${fmtNum(t.upvotes)} up` : null].filter(Boolean).join(' · ')}</span><button type="button" className="ghost-btn small" onClick={() => open(t)}>Open thread</button></div>
+          <TopReplies item={th} compact />
+          <div className="rowline"><span className="mini-meta">{[th.comments ? tn(th.comments, '{n} reply', '{n} replies', { n: fmtNum(th.comments) }) : null, th.upvotes ? t('{n} up', { n: fmtNum(th.upvotes) }) : null].filter(Boolean).join(' · ')}</span><button type="button" className="ghost-btn small" onClick={() => open(th)}>{t('Open thread')}</button></div>
         </div>
       );
     }
     case 'memory':
       return (
         <div className="win-body">
-          {w.memories.length ? w.memories.map((m) => <p key={m.id} className="memline">{m.status === 'proposed' ? <em>suggested</em> : null}{m.content}</p>) : <p className="wnote">Nothing remembered yet. The assistant suggests memories as it learns, and you can write your own.</p>}
-          <div className="wbtns"><button type="button" className="ghost-btn small" onClick={() => openMode('memory')}><Icon name="brain" />Open memory</button></div>
+          {w.memories.length ? w.memories.map((m) => <p key={m.id} className="memline">{m.status === 'proposed' ? <em>{t('suggested')}</em> : null}{m.content}</p>) : <p className="wnote">{t('Nothing remembered yet. The assistant suggests memories as it learns, and you can write your own.')}</p>}
+          <div className="wbtns"><button type="button" className="ghost-btn small" onClick={() => openMode('memory')}><Icon name="brain" />{t('Open memory')}</button></div>
         </div>
       );
     default:
@@ -624,9 +625,9 @@ export function Window({ w }) {
       <header className="win-head">
         <span className="win-dot" style={{ '--c': w.color }} />
         <div className="win-title"><strong>{w.title}</strong><span>{w.meta}</span></div>
-        {active ? <span className="incenter">In center</span> : null}
-        <button type="button" className="icon-btn" onClick={() => setMin(!min)} aria-label={min ? 'Open window' : 'Minimize window'}><Icon name={min ? 'plus' : 'min'} /></button>
-        {canExpand ? <button type="button" className="icon-btn" onClick={() => (w.type === 'map' ? openMode('map') : setFilters(w.filter, { win: w.uid }))} aria-label="Show in center"><Icon name="expand" /></button> : null}
+        {active ? <span className="incenter">{t('In center')}</span> : null}
+        <button type="button" className="icon-btn" onClick={() => setMin(!min)} aria-label={min ? t('Open window') : t('Minimize window')}><Icon name={min ? 'plus' : 'min'} /></button>
+        {canExpand ? <button type="button" className="icon-btn" onClick={() => (w.type === 'map' ? openMode('map') : setFilters(w.filter, { win: w.uid }))} aria-label={t('Show in center')}><Icon name="expand" /></button> : null}
       </header>
       {!min ? <Body w={w} open={open} /> : null}
     </section>

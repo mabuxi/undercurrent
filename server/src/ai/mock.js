@@ -56,6 +56,7 @@ export async function mockChat({ kind, user, schema }) {
     const tags = [...new Set([...src.slice(0, 4), ...extra])].map((name, i) => ({ name, kind: 'theme', weight: Math.max(0.3, 0.9 - i * 0.1) }));
     return { tags, summary: `Mock description of "${title.slice(0, 60)}".`, minor_risk: false };
   }
+  if (kind === 'translate') return `[FR] ${user}`;
   if (kind === 'ask-parse') return null;
   if (kind === 'search-parse' && schema?.properties?.concepts) {
     const found = (user.match(/quick split found: ([^(.\n]*)/) || [])[1] || '';

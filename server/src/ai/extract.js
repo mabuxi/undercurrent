@@ -1,6 +1,8 @@
 import { getDb, normalizeTag } from '../db.js';
 import { performerNames } from '../sources/stars.js';
 import { namesIn, handlesIn, cleanPersonName } from '../names.js';
+import { detectLang } from '../langdetect.js';
+import { frenchTagsIn } from '../vocab.js';
 
 const STOP = new Set([
   'hd', 'porn', 'sex', 'video', 'videos', 'xxx', 'free', 'new', 'full', 'best', 'hot', 'sexy', 'the', 'and', 'with', 'for', 'her', 'his', 'she', 'he',
@@ -123,6 +125,9 @@ export function extractFromText(title, body = '') {
       if (n > 1) for (let k = i; k < i + n; k++) used.add(k);
     }
   }
+  // A French title or text gives the same English tags as an English one would.
+  const text = `${title || ''} ${String(body || '').slice(0, 1500)}`;
+  if (detectLang(text, { min: 2 }) === 'fr') for (const tag of frenchTagsIn(text)) { const name = normalizeTag(tag); if (name && !tags.has(name)) tags.set(name, 0.45); }
   // Names written out in the title or text ("Drew Sebastian", "PIERCE PARIS") that are not on the performer list yet.
   for (const n of namesIn(`${title || ''}\n${String(body || '').slice(0, 1500)}`)) if (![...people].some((p) => cleanPersonName(p) === n)) people.add(n.replace(/(^|\s)\S/g, (m) => m.toUpperCase()));
   for (const h of handlesIn(`${title || ''}\n${String(body || '').slice(0, 600)}`, { isWord: (w) => lex.phrases.has(w) || STOP.has(w), isKnown: (w) => lex.performers.has(w) || knownHandle(w) })) if (![...people].some((p) => p.toLowerCase() === h.toLowerCase())) people.add(h);

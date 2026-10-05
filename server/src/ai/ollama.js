@@ -2,6 +2,7 @@ import os from 'node:os';
 import { config } from '../config.js';
 import { getDb, getSetting, setSetting, now } from '../db.js';
 import { mockChat } from './mock.js';
+import { tr } from '../i18n.js';
 
 export const session = { started: now(), requests: 0, promptTokens: 0, completionTokens: 0, ms: 0, errors: 0, lastError: null };
 
@@ -40,7 +41,7 @@ export async function pullModel(name) {
   (async () => {
     try {
       const res = await fetch(`${config.ollamaUrl}/api/pull`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: name, stream: true }) });
-      if (!res.ok || !res.body) throw new Error(`Ollama answered ${res.status}`);
+      if (!res.ok || !res.body) throw new Error(tr('Ollama answered {status}', { status: res.status }));
       const reader = res.body.getReader();
       const dec = new TextDecoder();
       let buf = '';
@@ -84,15 +85,16 @@ async function ollama(path, body, timeout = 600000, external = null) {
     try { data = JSON.parse(text); } catch {}
     if (!res.ok) {
       const msg = data?.error || text || res.statusText;
-      const err = new Error(/not found/i.test(msg) ? `The model isn't installed yet. Run: ollama pull ${body?.model || activeModel()}` : `Ollama: ${msg}`);
+      const err = new Error(/not found/i.test(msg) ? tr("The model isn't installed yet. Run: ollama pull {model}", { model: body?.model || activeModel() }) : `Ollama: ${msg}`);
       err.status = res.status;
+      if (/not found/i.test(msg)) err.unavailable = true;
       throw err;
     }
     return data;
   } catch (err) {
-    if (external?.aborted) { const e = new Error('Paused so your request could go first.'); e.yielded = true; throw e; }
-    if (err.name === 'AbortError') throw new Error('The local model took too long to answer.');
-    if (err.cause?.code === 'ECONNREFUSED' || /fetch failed/i.test(err.message)) throw new Error('Ollama is not running. Start the Ollama app, then try again.');
+    if (external?.aborted) { const e = new Error(tr('Paused so your request could go first.')); e.yielded = true; throw e; }
+    if (err.name === 'AbortError') throw Object.assign(new Error(tr('The local model took too long to answer.')), { unavailable: true });
+    if (err.cause?.code === 'ECONNREFUSED' || /fetch failed/i.test(err.message)) throw Object.assign(new Error(tr('Ollama is not running. Start the Ollama app, then try again.')), { unavailable: true });
     throw err;
   } finally {
     clearTimeout(timer);
@@ -131,11 +133,11 @@ export async function running() {
 export function systemInfo() {
   const gb = os.totalmem() / 1024 ** 3;
   let rec;
-  if (gb >= 64) rec = { tag: 'q8_0', note: 'Plenty of memory: the 8-bit version gives the best quality.' };
-  else if (gb >= 36) rec = { tag: 'q6_K', note: 'Room for the 6-bit version with a good context size.' };
-  else if (gb >= 30) rec = { tag: 'q4_K_M', note: 'The recommended 4-bit version fits with some room left.' };
-  else if (gb >= 22) rec = { tag: 'iq4_xs', note: 'The 27B fits, but tightly. Close heavy apps while tagging.' };
-  else rec = { tag: null, note: 'The 27B model is too big for this machine. Pick a smaller model (7B to 12B) in the list below.' };
+  if (gb >= 64) rec = { tag: 'q8_0', note: tr('Plenty of memory: the 8-bit version gives the best quality.') };
+  else if (gb >= 36) rec = { tag: 'q6_K', note: tr('Room for the 6-bit version with a good context size.') };
+  else if (gb >= 30) rec = { tag: 'q4_K_M', note: tr('The recommended 4-bit version fits with some room left.') };
+  else if (gb >= 22) rec = { tag: 'iq4_xs', note: tr('The 27B fits, but tightly. Close heavy apps while tagging.') };
+  else rec = { tag: null, note: tr('The 27B model is too big for this machine. Pick a smaller model (7B to 12B) in the list below.') };
   return { platform: os.platform(), arch: os.arch(), cpu: os.cpus()[0]?.model, cores: os.cpus().length, memoryGb: Math.round(gb), recommendation: rec };
 }
 

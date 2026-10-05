@@ -9,6 +9,7 @@ import { listKinks, kinkIndex, kinksForTags, listFantasies } from './kinks.js';
 import { getSearchSpec, getProfileItems, pool, invalidatePool } from './searchstate.js';
 import { starCard } from './sources/stars.js';
 import { cleanPersonName } from './names.js';
+import { tr } from './i18n.js';
 
 const FORMAT_KEYS = ['long', 'short', 'gif', 'image', 'set', 'story', 'discussion'];
 const GROUP = { long: 'video', short: 'clips', gif: 'clips', image: 'images', set: 'images', story: 'text', discussion: 'text' };
@@ -415,7 +416,7 @@ function presentCollection(x, sibs) {
     ...base,
     format: 'set',
     media: { ...x.it.media, kind: 'gallery', items: items.slice(0, 24) },
-    collection: { members: members.map((m) => m.it.id), count: members.length, sources, why: sameAuthor ? `${members.length} posts from ${x.it.author}` : `${members.length} posts with the same look` },
+    collection: { members: members.map((m) => m.it.id), count: members.length, sources, why: sameAuthor ? tr('{n} posts from {author}', { n: members.length, author: x.it.author }) : tr('{n} posts with the same look', { n: members.length }) },
     match: Math.round(members.reduce((a, m) => a + m.s.match, 0) / members.length)
   };
 }
@@ -430,10 +431,10 @@ const GENERIC_WHY = /^(gay|straight|hetero|lesbian|bi|bisexual|men|man|male|wome
 // your balance setting), and near-duplicates ("gay" next to "verified amateurs gay") are shown once.
 export function why(x) {
   const reasons = [];
-  if (x.label === 'discovery') reasons.push(`New to you: you haven't spent time on ${x.tags.slice(0, 2).map((t) => t.name).join(' or ') || 'this'} yet.`);
-  if (x.s.followed) reasons.push(`From ${x.it.author && x.it.source !== 'reddit' ? x.it.author : x.it.community}, which you follow.`);
+  if (x.label === 'discovery') reasons.push(x.tags.length ? tr("New to you: you haven't spent time on {what} yet.", { what: x.tags.slice(0, 2).map((t) => t.name).join(` ${tr('or')} `) }) : tr("New to you: you haven't spent time on this yet."));
+  if (x.s.followed) reasons.push(tr('From {name}, which you follow.', { name: x.it.author && x.it.source !== 'reddit' ? x.it.author : x.it.community }));
   const strongKinks = x.ks.filter((k) => (k.allTime + k.lately) / 2 >= 58).sort((a, b) => (b.allTime + b.lately) - (a.allTime + a.lately)).slice(0, 2);
-  if (strongKinks.length) reasons.push(`Fits ${strongKinks.length > 1 ? 'your kinks' : 'your kink'} ${strongKinks.map((k) => k.name).join(' and ')}.`);
+  if (strongKinks.length) reasons.push(strongKinks.length > 1 ? tr('Fits your kinks {list}.', { list: strongKinks.map((k) => k.label || k.name).join(` ${tr('and')} `) }) : tr('Fits your kink {list}.', { list: strongKinks[0].label || strongKinks[0].name }));
   const inKinks = new Set(strongKinks.flatMap((k) => k.tags.map((t) => t.name)));
   const pos = [];
   for (const c of x.s.contrib.filter((c) => c.value > 0.03 && c.long > 0.3 && c.kind !== 'performer' && !GENERIC_WHY.test(c.name) && !inKinks.has(c.name)).sort((a, b) => b.value - a.value)) {
@@ -441,14 +442,14 @@ export function why(x) {
     pos.push(c.name);
     if (pos.length >= 3) break;
   }
-  if (pos.length) reasons.push(`You often go for ${pos.join(', ')}.`);
+  if (pos.length) reasons.push(tr('You often go for {tags}.', { tags: pos.join(', ') }));
   const src = (x.s.srcBits || []).filter((b) => b.v > 0.15).sort((a, b) => b.v - a.v)[0];
-  if (src && !x.s.followed) reasons.push(src.what === 'author' ? `You liked earlier posts from ${src.name}.` : `You like what ${src.name} posts.`);
-  if (x.it.aiFit != null && x.it.aiFit >= 70) reasons.push(`The AI read it and rates it ${x.it.aiFit}% for you.`);
-  if (x.label === 'popular') reasons.push('One of the most popular posts on its source right now.');
+  if (src && !x.s.followed) reasons.push(src.what === 'author' ? tr('You liked earlier posts from {name}.', { name: src.name }) : tr('You like what {name} posts.', { name: src.name }));
+  if (x.it.aiFit != null && x.it.aiFit >= 70) reasons.push(tr('The AI read it and rates it {n}% for you.', { n: x.it.aiFit }));
+  if (x.label === 'popular') reasons.push(tr('One of the most popular posts on its source right now.'));
   const neg = x.s.contrib.filter((c) => c.value < -0.05 && c.long < -0.5 && !GENERIC_WHY.test(c.name)).sort((a, b) => a.value - b.value).slice(0, 2).map((c) => c.name);
-  if (neg.length) reasons.push(`Ranked a bit lower for ${neg.join(' and ')}, which you usually skip.`);
-  if (!reasons.length) reasons.push('Not much to go on yet: recent, and popular where it was posted.');
+  if (neg.length) reasons.push(tr('Ranked a bit lower for {tags}, which you usually skip.', { tags: neg.join(` ${tr('and')} `) }));
+  if (!reasons.length) reasons.push(tr('Not much to go on yet: recent, and popular where it was posted.'));
   return reasons;
 }
 
@@ -489,7 +490,7 @@ export function present(x) {
     label: x.label,
     why: why(x),
     tags: rankTags(x.tags).slice(0, 26).map((t) => t.name),
-    kinks: x.ks.slice(0, 3).map((k) => ({ id: k.id, name: k.name, color: k.color })),
+    kinks: x.ks.slice(0, 3).map((k) => ({ id: k.id, name: k.label || k.name, color: k.color })),
     lengthCat: lengthCat(x.it)
   };
 }

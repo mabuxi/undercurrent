@@ -1,4 +1,5 @@
 import { rgba } from './api.js';
+import { t, tn } from './i18n.js';
 
 function solid(c, t, to = '#1A1420') {
   const h = (x) => { const m = String(x || '#999999').replace('#', ''); const f = m.length === 3 ? m.split('').map((y) => y + y).join('') : m.padEnd(6, '9'); return [0, 2, 4].map((i) => parseInt(f.slice(i, i + 2), 16)); };
@@ -117,7 +118,7 @@ export function drawGraph(canvas, graph, { big = true, selected = null, height }
     ctx.fillStyle = '#81737B';
     ctx.font = '13px Manrope, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(big ? 'Your map fills in as you rate, save and spend time on posts.' : 'Builds as you browse', w / 2, h / 2);
+    ctx.fillText(big ? t('Your map fills in as you rate, save and spend time on posts.') : t('Builds as you browse'), w / 2, h / 2);
     return hits;
   }
   const pos = layout(nodes, edges, w, h);
@@ -184,10 +185,10 @@ export function drawGraph(canvas, graph, { big = true, selected = null, height }
       ctx.font = '500 11px "IBM Plex Mono", monospace';
       if (nd.kind === 'group') {
         ctx.fillStyle = '#B6A8B0';
-        ctx.fillText(`${nd.count} kinks · click to open`, x, y + r + 37);
+        ctx.fillText(tn(nd.count, '{n} kink · click to open', '{n} kinks · click to open'), x, y + r + 37);
       } else if (!nd.faded) {
         ctx.fillStyle = nd.d >= 0 ? '#7FC49B' : '#E07070';
-        ctx.fillText(`${nd.d >= 0 ? '+' : ''}${nd.d} lately`, x, y + r + 31);
+        ctx.fillText(t('{d} lately', { d: `${nd.d >= 0 ? '+' : ''}${nd.d}` }), x, y + r + 31);
       }
     }
     hits.push({ x, y, r: r + 8, node: nd });

@@ -1,4 +1,5 @@
 import { Component } from 'react';
+import { t } from '../i18n.js';
 
 export function reportError(message, stack) {
   try {
@@ -25,8 +26,8 @@ export default class ErrorBoundary extends Component {
     if (this.props.quiet) return null;
     return (
       <div className={this.props.big ? 'empty' : 'post gone'}>
-        {this.props.big ? 'This part of the page ran into a problem. ' : 'This post could not be shown. '}
-        <button type="button" className="linkbtn" onClick={() => this.setState({ error: null })}>Try again</button>
+        {`${this.props.big ? t('This part of the page ran into a problem.') : t('This post could not be shown.')} `}
+        <button type="button" className="linkbtn" onClick={() => this.setState({ error: null })}>{t('Try again')}</button>
       </div>
     );
   }

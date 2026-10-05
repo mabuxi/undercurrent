@@ -7,6 +7,8 @@ import { getDb, getSetting, setSetting, now } from './db.js';
 import { health, setModel } from './ai/ollama.js';
 import { FAMILIES, familyOf, conceptName, knownVariants, conceptsOf, isKinkConcept } from './concepts.js';
 import { log } from './log.js';
+import { tr, lang } from './i18n.js';
+import { conceptLabel, familyLabel } from './vocab.js';
 
 // First run: the local AI (Ollama and its models), then what you like. Everything here can be done again later
 // from Settings; nothing leaves this computer except downloading Ollama and the models themselves.
@@ -67,7 +69,7 @@ export function recommendedModels() {
   for (const role of Object.keys(CATALOG)) {
     const name = recommendFor(role);
     const o = CATALOG[role].options.find((x) => x.name === name);
-    out[role] = { role, name, size: o.size, what: CATALOG[role].what };
+    out[role] = { role, name, size: o.size, what: tr(CATALOG[role].what) };
   }
   return out;
 }
@@ -81,7 +83,7 @@ function wanted() {
   for (const role of Object.keys(CATALOG)) {
     const name = chosenModel(role);
     const o = CATALOG[role].options.find((x) => x.name === name);
-    out[role] = { role, name, size: o?.size ?? null, what: CATALOG[role].what, label: CATALOG[role].label };
+    out[role] = { role, name, size: o?.size ?? null, what: tr(CATALOG[role].what), label: tr(CATALOG[role].label) };
   }
   return out;
 }
@@ -93,9 +95,9 @@ export async function modelOptions() {
   for (const [role, r] of Object.entries(CATALOG)) {
     const rec = recommendFor(role);
     const chosen = chosenModel(role);
-    const options = r.options.map((o) => ({ ...o, installed: have.has(o.name), recommended: o.name === rec, fits: o.minGb <= sys.memoryGb }));
-    if (!options.some((o) => o.name === chosen)) options.push({ name: chosen, size: null, minGb: null, note: 'Your own choice.', installed: have.has(chosen), recommended: false, fits: true, custom: true });
-    roles[role] = { label: r.label, what: r.what, chosen, recommended: rec, options };
+    const options = r.options.map((o) => ({ ...o, note: tr(o.note), installed: have.has(o.name), recommended: o.name === rec, fits: o.minGb <= sys.memoryGb }));
+    if (!options.some((o) => o.name === chosen)) options.push({ name: chosen, size: null, minGb: null, note: tr('Your own choice.'), installed: have.has(chosen), recommended: false, fits: true, custom: true });
+    roles[role] = { label: tr(r.label), what: tr(r.what), chosen, recommended: rec, options };
   }
   return { system: sys, roles, installed: [...have] };
 }
@@ -105,7 +107,7 @@ export function chooseModels(choice = {}) {
   for (const role of Object.keys(CATALOG)) {
     const name = String(choice[role] || '').trim();
     if (!name) continue;
-    if (!/^[\w./:-]{2,120}$/.test(name)) throw Object.assign(new Error(`"${name}" is not a model name.`), { status: 400 });
+    if (!/^[\w./:-]{2,120}$/.test(name)) throw Object.assign(new Error(tr('"{name}" is not a model name.', { name })), { status: 400 });
     if (role === 'main') setModel(name); else setSetting(SETTING[role], name);
   }
   setSetting('modelsChosen', true);
@@ -153,7 +155,7 @@ async function pullOne(name) {
   pulls.set(name, st);
   try {
     const res = await fetch(`${config.ollamaUrl}/api/pull`, { method: 'POST', body: JSON.stringify({ name, stream: true }) });
-    if (!res.ok || !res.body) throw new Error(`Ollama answered ${res.status}`);
+    if (!res.ok || !res.body) throw new Error(tr('Ollama answered {status}', { status: res.status }));
     const reader = res.body.getReader();
     const dec = new TextDecoder();
     let buf = '';
@@ -195,7 +197,7 @@ export async function pullModels() {
   setSetting('modelsChosen', true);
   if (pulling) return { started: false, busy: true };
   const have = await localModels();
-  if (!have) return { started: false, error: 'Ollama is not running yet.' };
+  if (!have) return { started: false, error: tr('Ollama is not running yet.') };
   const missing = [...new Set(Object.values(w).map((m) => m.name))].filter((n) => !have.has(n));
   pulling = (async () => { for (const n of missing) await pullOne(n); })().finally(() => { pulling = null; });
   return { started: missing.length > 0, missing };
@@ -203,7 +205,7 @@ export async function pullModels() {
 
 // Installs Ollama from ollama.com when it is not on this Mac yet: the official app, into Applications.
 export async function installOllama() {
-  if (config.mock || os.platform() !== 'darwin') return { ok: false, error: 'Only on a Mac. Get Ollama from ollama.com.' };
+  if (config.mock || os.platform() !== 'darwin') return { ok: false, error: tr('Only on a Mac. Get Ollama from ollama.com.') };
   if (ollamaInstalled()) return { ok: true, already: true };
   if (install.state === 'downloading' || install.state === 'unpacking') return { ok: true, busy: true };
   Object.assign(install, { state: 'downloading', received: 0, total: 0, error: null });
@@ -211,7 +213,7 @@ export async function installOllama() {
     const tmp = path.join(os.tmpdir(), `ollama-${Date.now()}.zip`);
     try {
       const res = await fetch('https://ollama.com/download/Ollama-darwin.zip');
-      if (!res.ok || !res.body) throw new Error(`download failed (${res.status})`);
+      if (!res.ok || !res.body) throw new Error(tr('download failed ({status})', { status: res.status }));
       install.total = Number(res.headers.get('content-length')) || 0;
       const out = fs.createWriteStream(tmp);
       const reader = res.body.getReader();
@@ -245,12 +247,12 @@ export function conceptCatalog() {
     for (const r of db.prepare(`SELECT t.name, COUNT(*) n FROM item_tags it JOIN tags t ON t.id = it.tag_id WHERE it.weight >= 0.45 AND t.kind != 'performer'
       GROUP BY t.id ORDER BY n DESC LIMIT 4000`).all()) for (const c of conceptsOf(r.name)) counts.set(c, (counts.get(c) || 0) + r.n);
   } catch {}
-  const families = Object.entries(FAMILIES).map(([key, f]) => ({ key, name: f.name, color: f.color, concepts: [] }));
+  const families = Object.entries(FAMILIES).map(([key, f]) => ({ key, name: familyLabel(f.name, lang()), color: f.color, concepts: [] }));
   const byKey = new Map(families.map((f) => [f.key, f]));
   for (const c of new Set([...ALL_CONCEPTS])) {
     const f = familyOf(c);
     if (!f || !byKey.has(f) || !isKinkConcept(c)) continue;
-    byKey.get(f).concepts.push({ concept: c, name: conceptName(c), n: counts.get(c) || 0 });
+    byKey.get(f).concepts.push({ concept: c, name: conceptLabel(c, lang(), conceptName(c)), n: counts.get(c) || 0 });
   }
   // Most common in what is already here first; on a fresh install, the usual favourites of each family first.
   const rank = new Map(ALL_CONCEPTS.map((c, i) => [c, i]));
@@ -287,7 +289,7 @@ export function suggestFor(picked = []) {
     }
   } catch {}
   for (const p of picked) { const f = familyOf(p); if (f) for (const c of ALL_CONCEPTS) if (familyOf(c) === f) add(c, 0.4); }
-  return [...score.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([c]) => ({ concept: c, name: conceptName(c), family: familyOf(c), color: FAMILIES[familyOf(c)]?.color }));
+  return [...score.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([c]) => ({ concept: c, name: conceptLabel(c, lang(), conceptName(c)), family: familyOf(c), color: FAMILIES[familyOf(c)]?.color }));
 }
 
 // Sources in the order most people use them, for the last step.

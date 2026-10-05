@@ -1,4 +1,5 @@
 import { getDb, now } from './db.js';
+import { tr } from './i18n.js';
 
 export const CATEGORIES = ['Right now', 'Kinks and interests', 'Fantasies', 'Turn-offs and limits', 'Formats and moods', 'Creators and communities', 'Notes'];
 
@@ -15,13 +16,18 @@ export function expireRightNow() {
 export function grouped() {
   expireRightNow();
   const all = listMemory();
-  return CATEGORIES.map((c) => ({ category: c, items: all.filter((m) => m.category === c) }))
-    .concat(all.some((m) => !CATEGORIES.includes(m.category)) ? [{ category: 'Other', items: all.filter((m) => !CATEGORIES.includes(m.category)) }] : []);
+  return CATEGORIES.map((c) => ({ category: c, label: tr(c), items: all.filter((m) => m.category === c) }))
+    .concat(all.some((m) => !CATEGORIES.includes(m.category)) ? [{ category: 'Other', label: tr('Other'), items: all.filter((m) => !CATEGORIES.includes(m.category)) }] : []);
+}
+
+// The category names in the language of the interface, for showing them; the English names stay the stored values.
+export function categoryLabels() {
+  return Object.fromEntries(CATEGORIES.map((c) => [c, tr(c)]));
 }
 
 export function addMemory({ category = 'Notes', content, origin = 'user', status = 'active', evidence = null, pinned = false }) {
   const text = String(content || '').trim();
-  if (!text) throw new Error('A memory needs some text.');
+  if (!text) throw new Error(tr('A memory needs some text.'));
   const dup = getDb().prepare("SELECT id FROM memory WHERE lower(content) = lower(?) AND status != 'archived'").get(text);
   if (dup) return dup.id;
   return Number(getDb().prepare('INSERT INTO memory(category, content, origin, status, pinned, evidence, created, updated) VALUES(?, ?, ?, ?, ?, ?, ?, ?)')

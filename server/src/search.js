@@ -19,6 +19,8 @@ import { runCommand, rulesParse } from './ai/agent.js';
 import { mockItems } from './sources/mock.js';
 import { lev, mentions } from './names.js';
 import { log } from './log.js';
+import { tr, trn, replyIn, lang } from './i18n.js';
+import { searchVariants, EN_SEARCH_FR } from './vocab.js';
 
 // The search bar. Short terms ("woman with big tits") are split into tags, widened with synonyms and searched
 // for right away on every source that is switched on, next to what is already here. Sentences ("I want to see
@@ -98,8 +100,8 @@ export function localParse(q) {
   let young = false;
   let minors = false;
   s = s.replace(MINOR, (w) => { if (/^(teens?|teenagers?|teenie|young|younger|youngest|barely legal)$/i.test(w.trim())) young = true; else minors = true; return ' '; });
-  if (minors) notes.push('Searching for minors is never allowed. Everything here is 18 or older.');
-  if (young) notes.push('Everyone here is an adult: "teen" and "young" are read as young adults, 18 and over.');
+  if (minors) notes.push(tr('Searching for minors is never allowed. Everything here is 18 or older.'));
+  if (young) notes.push(tr('Everyone here is an adult: "teen" and "young" are read as young adults, 18 and over.'));
   const formats = new Set();
   for (const [re, fm] of FORMAT_WORDS) if (re.test(s)) { fm.forEach((x) => formats.add(x)); break; }
   const words = s.replace(/[^a-z0-9+&,'\s-]/g, ' ').replace(/,/g, ' , ').split(/\s+/).filter(Boolean);
@@ -126,11 +128,11 @@ export function localParse(q) {
     const name = normalizeTag(c);
     if (!name || seen.has(name) || name.length < 2) continue;
     const bad = safeTerm(name);
-    if (bad) { notes.push(`Left out "${name}": ${bad === 'safety' ? 'never allowed' : 'you blocked it'}.`); continue; }
+    if (bad) { notes.push(bad === 'safety' ? tr('Left out "{name}": never allowed.', { name }) : tr('Left out "{name}": you blocked it.', { name })); continue; }
     seen.add(name);
     concepts.push({ name, syn: [], label: displayTag(name) });
   }
-  if (young) concepts.push({ ...YOUNG, syn: [...YOUNG.syn] });
+  if (young) concepts.push({ ...YOUNG, label: tr(YOUNG.label), syn: [...YOUNG.syn] });
   let gender = null;
   if (gay) gender = 'men-only';
   else if (les) gender = 'women-only';
@@ -147,13 +149,14 @@ export function localParse(q) {
 }
 
 // Real sentences go to the bigger model; lists of terms are searched right away.
+const NL_FR = /(?:^|\s)(je|j'\S+|moi|montre|montre-moi|trouve|cherche|veux|voudrais|ajoute|supprime|retire|enlève|bloque|oublie|souviens|pourquoi|comment|quoi|qui|où|aime|adore|déteste|suis|suivre|plus de|moins de|jamais|arrête|affiche|mets|peux|pourrais|s'il)(?=\s|$)/i;
 const NL_WORDS = /\b(i|i'm|im|i've|me|my|want|wanna|show|find|give|can|could|would|please|remove|add|delete|stop|don't|dont|never|remember|forget|what|why|how|who|where|which|like|love|hate|into|looking|see|watch|follow|unfollow|block|turn|enable|disable|switch|make|create|set|less|should|help|tell|explain|about|lately|anymore)\b/i;
 export function isNatural(q) {
   const s = String(q || '').trim();
   if (/\?$/.test(s)) return true;
   const n = s.split(/\s+/).length;
   if (n >= 8) return true;
-  return NL_WORDS.test(s) && n >= 3;
+  return (NL_WORDS.test(s) || NL_FR.test(s)) && n >= 3;
 }
 
 const PERSON_RE = /^(?:(?:i'?m|i am)\s+)?(?:(?:looking|searching)\s+for\s+|find\s+(?:me\s+)?|show\s+(?:me\s+)?|search\s+(?:for\s+)?|i\s+want\s+(?:to\s+see\s+)?)?(?:(?:all\s+)?(?:the\s+|more\s+)?(?:content|videos?|posts?|stuff|pics?|photos?|clips?|everything|porn|scenes?)\s+(?:from|by|featuring|starring)|who\s+is|profiles?\s+(?:of|for))\s+@?(?:u\/)?([a-z0-9_.' -]{2,40}?)\s*[?.!]*$/i;
@@ -215,7 +218,7 @@ async function refine(job, q, local) {
     const people = [...new Set([...local.people, ...(out.people || []).map((p) => String(p).trim()).filter((p) => p && p.length < 40)])];
     return { ...local, concepts: concepts.slice(0, 6), gender, people };
   } catch (err) {
-    if (err.message !== 'slow') step(job, 'syn', 'Finding similar tags', 'fail', 'the local model did not answer, searching with your words');
+    if (err.message !== 'slow') step(job, 'syn', tr('Finding similar tags'), 'fail', tr('the local model did not answer, searching with your words'));
     return local;
   }
 }
@@ -234,14 +237,14 @@ function localSynonyms(name) {
 
 function chipsFor(spec) {
   const chips = [];
-  const G = { women: 'At least one woman', men: 'At least one man', both: 'Man and woman', 'women-only': 'Only women', 'men-only': 'Only men' };
+  const G = { women: tr('At least one woman'), men: tr('At least one man'), both: tr('Man and woman'), 'women-only': tr('Only women'), 'men-only': tr('Only men') };
   if (spec.gender) chips.push({ kind: 'gender', text: G[spec.gender], value: spec.gender });
   for (const c of spec.concepts) {
     chips.push({ kind: 'tag', text: c.label || c.name, value: c.name });
     for (const s of c.syn.slice(0, 6)) chips.push({ kind: 'syn', text: s, value: s, of: c.name });
   }
   for (const p of spec.people) chips.push({ kind: 'person', text: p, value: p });
-  for (const f of spec.formats || []) chips.push({ kind: 'format', text: { long: 'Long form', short: 'Short form', gif: 'GIFs', image: 'Images', set: 'Image sets', story: 'Stories', discussion: 'Threads' }[f] || f, value: f });
+  for (const f of spec.formats || []) chips.push({ kind: 'format', text: { long: tr('Long form'), short: tr('Short form'), gif: tr('GIFs'), image: tr('Images'), set: tr('Image sets'), story: tr('Stories'), discussion: tr('Threads') }[f] || f, value: f });
   return chips;
 }
 
@@ -308,11 +311,11 @@ async function searchProviders(job, terms, { page = 1 } = {}) {
     step(job, key, label);
     try {
       const r = await withTimeout(fn(), 30000);
-      if (r === null) step(job, key, label, 'fail', 'took too long');
+      if (r === null) step(job, key, label, 'fail', tr('took too long'));
       else step(job, key, label, 'done', r);
     } catch (err) {
       const msg = String(err.message || err);
-      if (/one feed request per minute|rate limit|429/i.test(msg)) step(job, key, label, 'skip', 'Reddit allows one request a minute without a feed key, skipped this time');
+      if (err.busy || err.rateLimited || /one feed request per minute|rate limit|429/i.test(msg)) step(job, key, label, 'skip', tr('Reddit allows one request a minute without a feed key, skipped this time'));
       else step(job, key, label, 'fail', msg.slice(0, 80));
     }
   })());
@@ -341,7 +344,7 @@ async function searchProviders(job, terms, { page = 1 } = {}) {
   for (const id of TUBES) {
     if (!on(id) || !terms.length) continue;
     const label = PROVIDERS[id].label;
-    run(`${id}-${page}`, `Searching ${label} for “${terms[0]}”${terms.length > 1 ? ` and ${terms.length - 1} more` : ''}`, async () => {
+    run(`${id}-${page}`, terms.length > 1 ? tr('Searching {source} for “{term}” and {n} more', { source: label, term: terms[0], n: terms.length - 1 }) : tr('Searching {source} for “{term}”', { source: label, term: terms[0] }), async () => {
       let n = 0; let added = 0;
       // The whole search first; single words only when the whole search finds little, and what they bring
       // must still match the search here.
@@ -355,11 +358,11 @@ async function searchProviders(job, terms, { page = 1 } = {}) {
           n += r.ids.length; added += r.added;
         }
       }
-      return `${n} found${added ? `, ${added} new` : ''}`;
+      return added ? tr('{n} found, {added} new', { n, added }) : tr('{n} found', { n });
     });
   }
   if (on('redgifs') && terms.length && !config.mock) {
-    run(`redgifs-${page}`, `Searching RedGIFs tags and niches for “${terms[0]}”`, async () => {
+    run(`redgifs-${page}`, tr('Searching RedGIFs tags and niches for “{term}”', { term: terms[0] }), async () => {
       let n = 0;
       for (const [i, term] of terms.slice(0, 3).entries()) {
         if (i > 0 && n >= 25) break;
@@ -374,28 +377,28 @@ async function searchProviders(job, terms, { page = 1 } = {}) {
         const list = (await redgifs.nicheGifs(ni.id, { order: 'top', count: 30 }).catch(() => [])).map((g) => ({ ...redgifs.normalizeGif(g), community: ni.id }));
         n += storeFound(job, list, 'redgifs', ni.name).ids.length;
       }
-      return `${n} found${niches.length ? `, niches: ${niches.slice(0, 2).map((x) => x.name).join(', ')}` : ''}`;
+      return niches.length ? tr('{n} found, niches: {list}', { n, list: niches.slice(0, 2).map((x) => x.name).join(', ') }) : tr('{n} found', { n });
     });
   }
   if (on('lemmy') && terms.length && !config.mock) {
-    run(`lemmy-${page}`, `Searching Lemmy communities for “${terms[0]}”`, async () => {
+    run(`lemmy-${page}`, tr('Searching Lemmy communities for “{term}”', { term: terms[0] }), async () => {
       const list = await PROVIDERS.lemmy.fetch({ mode: 'search', value: terms[0], page, sort: 'month' }).catch(() => []);
       note(list);
       for (const n of list) if (n.community) found.communities.set(`lemmy|${n.community}`, { provider: 'lemmy', mode: 'community', value: n.community, label: `Lemmy: ${n.community}` });
-      return `${storeFound(job, list, 'lemmy', terms[0]).ids.length} found`;
+      return tr('{n} found', { n: storeFound(job, list, 'lemmy', terms[0]).ids.length });
     });
   }
   for (const id of ['rule34', 'gelbooru']) {
     if (!on(id) || !terms.length) continue;
-    run(`${id}-${page}`, `Searching ${PROVIDERS[id].label} for “${terms[0]}”`, async () => `${storeFound(job, await PROVIDERS[id].fetch({ mode: 'search', value: terms[0] }).catch(() => []), id, terms[0]).ids.length} found`);
+    run(`${id}-${page}`, tr('Searching {source} for “{term}”', { source: PROVIDERS[id].label, term: terms[0] }), async () => tr('{n} found', { n: storeFound(job, await PROVIDERS[id].fetch({ mode: 'search', value: terms[0] }).catch(() => []), id, terms[0]).ids.length }));
   }
   if (on('reddit') && terms.length && !config.mock) {
-    run(`reddit-${page}`, `Searching Reddit posts, users and subreddits for “${terms[0]}”`, async () => {
+    run(`reddit-${page}`, tr('Searching Reddit posts, users and subreddits for “{term}”', { term: terms[0] }), async () => {
       const list = await rss.search(terms[0], page > 1 ? 'month' : 'hot', { maxWaitMs: 30000 });
       note(list);
       const r = storeFound(job, list, 'reddit', terms[0]);
       const subs = [...found.communities.values()].filter((c) => c.provider === 'reddit' && c.hits >= 2).length;
-      return `${r.ids.length} found${subs ? `, ${subs} subreddits` : ''}`;
+      return subs ? tr('{n} found, {subs} subreddits', { n: r.ids.length, subs }) : tr('{n} found', { n: r.ids.length });
     });
   }
   await Promise.all(tasks);
@@ -405,18 +408,18 @@ async function searchProviders(job, terms, { page = 1 } = {}) {
   const perfs = [...found.performers.values()].sort((a, b) => b.hits - a.hits).slice(0, 10);
   for (const pf of perfs) {
     const info = performerInfo(pf.name);
-    addProfile(job, { platform: pf.source, kind: 'performer', value: pf.name, handle: `${pf.hits} in these results`, name: info?.display || pf.name, url: pf.source === 'pornhub' ? `https://www.pornhub.com/pornstar/${normalizeTag(pf.name).replace(/\s+/g, '-')}` : null, avatar: info?.thumb || null, posts: info?.videos ?? null, provider: pf.source, mode: 'creator' });
+    addProfile(job, { platform: pf.source, kind: 'performer', value: pf.name, handle: tr('{n} in these results', { n: pf.hits }), name: info?.display || pf.name, url: pf.source === 'pornhub' ? `https://www.pornhub.com/pornstar/${normalizeTag(pf.name).replace(/\s+/g, '-')}` : null, avatar: info?.thumb || null, posts: info?.videos ?? null, provider: pf.source, mode: 'creator' });
   }
   const makers = [...found.users.values()].filter((u) => u.hits >= 2).sort((a, b) => b.hits - a.hits).slice(0, 8);
   await Promise.all(makers.map(async (u) => {
     let followers = null; let posts = null; let avatar = null;
     if (u.provider === 'redgifs') { const x = await redgifs.userInfo(u.value).catch(() => null); followers = x?.followers ?? null; posts = x?.publishedGifs ?? x?.gifs ?? null; avatar = x?.profileImageUrl || null; }
-    addProfile(job, { platform: u.provider, kind: 'user', value: u.value, handle: `${u.hits} in these results`, name: u.value, url: LINK[u.provider]?.(u.value) || null, followers, posts, avatar, provider: u.provider, mode: 'creator' });
+    addProfile(job, { platform: u.provider, kind: 'user', value: u.value, handle: tr('{n} in these results', { n: u.hits }), name: u.value, url: LINK[u.provider]?.(u.value) || null, followers, posts, avatar, provider: u.provider, mode: 'creator' });
   }));
   for (const c of [...found.communities.values()].filter((x) => (x.hits ?? 2) >= 2)) {
-    addProfile(job, { platform: c.provider, kind: 'community', value: c.value, handle: c.hits ? `${c.hits} in these results` : '', name: c.label.replace(/^(RedGIFs niche|Lemmy): /, ''), url: c.provider === 'reddit' ? `https://www.reddit.com/r/${c.value}/` : null, provider: c.provider, mode: 'community' });
+    addProfile(job, { platform: c.provider, kind: 'community', value: c.value, handle: c.hits ? tr('{n} in these results', { n: c.hits }) : '', name: c.label.replace(/^(RedGIFs niche|Lemmy): /, ''), url: c.provider === 'reddit' ? `https://www.reddit.com/r/${c.value}/` : null, provider: c.provider, mode: 'community' });
   }
-  const strip = ({ hits, ...x }) => x;
+  const strip = ({ hits, ...x }) => ({ ...x, label: String(x.label).replace(/^RedGIFs niche: (.*)$/s, (m, name) => tr('RedGIFs niche: {name}', { name })) });
   job.sources = [...[...found.communities.values()].filter((c) => (c.hits ?? 2) >= 2).sort((a, b) => (b.hits ?? 2) - (a.hits ?? 2)), ...[...found.users.values()].filter((u) => u.hits >= 2).sort((a, b) => b.hits - a.hits)].map(strip).slice(0, 10);
   invalidatePool();
 }
@@ -495,19 +498,19 @@ async function profileSearch(job, q, run) {
     return;
   }
   const { request } = await import('./http.js');
-  if (on('bluesky')) run(`p-bs-${q}`, `Finding Bluesky profiles for “${q}”`, async () => {
+  if (on('bluesky')) run(`p-bs-${q}`, tr('Finding Bluesky profiles for “{q}”', { q }), async () => {
     const d = await request(`https://public.api.bsky.app/xrpc/app.bsky.actor.searchActors?${new URLSearchParams({ q, limit: '25' })}`, { purpose: 'Bluesky profiles' });
     const actors = (d.actors || []).slice(0, 25);
-    if (!actors.length) return 'none';
+    if (!actors.length) return tr('none');
     const pr = await request(`https://public.api.bsky.app/xrpc/app.bsky.actor.getProfiles?${actors.map((x) => `actors=${encodeURIComponent(x.did)}`).join('&')}`, { purpose: 'Bluesky profiles' }).catch(() => ({ profiles: [] }));
     const byDid = new Map((pr.profiles || []).map((x) => [x.did, x]));
     for (const x of actors) {
       const full = byDid.get(x.did) || x;
       addProfile(job, { platform: 'bluesky', kind: 'user', value: x.handle, handle: x.handle, name: full.displayName || x.handle, url: LINK.bluesky(x.handle), avatar: full.avatar || null, followers: full.followersCount ?? null, posts: full.postsCount ?? null, about: String(full.description || '').slice(0, 140), provider: 'bluesky', mode: 'creator' });
     }
-    return `${actors.length} profiles`;
+    return trn(actors.length, '{n} profile', '{n} profiles');
   });
-  if (on('lemmy')) run(`p-lm-${q}`, `Finding Lemmy users and communities for “${q}”`, async () => {
+  if (on('lemmy')) run(`p-lm-${q}`, tr('Finding Lemmy users and communities for “{q}”', { q }), async () => {
     const inst = (await import('./sources/lemmy.js')).lemmyInstance();
     const base = `https://${inst}/api/v3/search`;
     const [u, c] = await Promise.all([
@@ -516,13 +519,13 @@ async function profileSearch(job, q, run) {
     ]);
     for (const x of u.users || []) addProfile(job, { platform: 'lemmy', kind: 'user', value: x.person.name, handle: x.person.name, name: x.person.display_name || x.person.name, url: x.person.actor_id, avatar: x.person.avatar || null, posts: x.counts?.post_count ?? null, provider: 'lemmy', mode: 'creator' });
     for (const x of c.communities || []) addProfile(job, { platform: 'lemmy', kind: 'community', value: x.community.name, handle: x.community.name, name: x.community.title || x.community.name, url: x.community.actor_id, avatar: x.community.icon || null, followers: x.counts?.subscribers ?? null, posts: x.counts?.posts ?? null, provider: 'lemmy', mode: 'community' });
-    return `${(u.users || []).length} users, ${(c.communities || []).length} communities`;
+    return tr('{users} users, {communities} communities', { users: (u.users || []).length, communities: (c.communities || []).length });
   });
-  if (on('redgifs')) run(`p-rg-${q}`, `Finding RedGIFs creators and niches for “${q}”`, async () => {
+  if (on('redgifs')) run(`p-rg-${q}`, tr('Finding RedGIFs creators and niches for “{q}”', { q }), async () => {
     const [u, niches] = await Promise.all([redgifs.userInfo(flat).catch(() => null), redgifs.searchNiches(q, 8).catch(() => [])]);
     if (u) addProfile(job, { platform: 'redgifs', kind: 'user', value: u.username, handle: u.username, name: u.name || u.username, url: LINK.redgifs(u.username), avatar: u.profileImageUrl || null, followers: u.followers ?? null, posts: u.publishedGifs ?? u.gifs ?? null, provider: 'redgifs', mode: 'creator' });
     for (const ni of niches) addProfile(job, { platform: 'redgifs', kind: 'community', value: ni.id, handle: ni.id, name: ni.name, url: `https://www.redgifs.com/niches/${ni.id}`, avatar: ni.thumbnail || null, followers: ni.subscribers ?? null, posts: ni.gifs ?? null, provider: 'redgifs', mode: 'community' });
-    return `${u ? 1 : 0} creator, ${niches.length} niches`;
+    return tr('{creators} creator, {niches} niches', { creators: u ? 1 : 0, niches: niches.length });
   });
   ensureStarsTable();
   const low = q.toLowerCase();
@@ -530,13 +533,13 @@ async function profileSearch(job, q, run) {
     addProfile(job, { platform: 'pornhub', kind: 'performer', value: r.display || r.name, handle: r.display || r.name, name: r.display || r.name, url: `https://www.pornhub.com/pornstar/${String(r.name).replace(/\s+/g, '-')}`, avatar: r.thumb || null, posts: r.videos || null, provider: 'pornhub', mode: 'creator' });
   }
   // Without a Reddit feed key Reddit allows one request a minute, which goes to posts; with the key, subreddits and users too.
-  if (on('reddit') && rss.feedToken()) run(`p-rd-${q}`, `Finding subreddits and Reddit users for “${q}”`, async () => {
+  if (on('reddit') && rss.feedToken()) run(`p-rd-${q}`, tr('Finding subreddits and Reddit users for “{q}”', { q }), async () => {
     const subs = await rss.searchSubreddits(q, { maxWaitMs: 60000 });
     for (const x of subs.slice(0, 12)) addProfile(job, { platform: 'reddit', kind: 'community', value: x.name, handle: `r/${x.name}`, name: x.title && x.title !== x.name ? x.title : `r/${x.name}`, url: `https://www.reddit.com/r/${x.name}/`, followers: x.subscribers, about: x.about, provider: 'reddit', mode: 'community' });
     let users = [];
     try { users = await rss.searchUsers(q, { maxWaitMs: 60000 }); } catch {}
     for (const x of users.slice(0, 12)) addProfile(job, { platform: 'reddit', kind: 'user', value: x.name, handle: `u/${x.name}`, name: `u/${x.name}`, url: LINK.reddit(x.name), provider: 'reddit', mode: 'creator' });
-    return `${subs.length} subreddits, ${users.length} users`;
+    return tr('{subs} subreddits, {users} users', { subs: subs.length, users: users.length });
   });
 }
 
@@ -589,22 +592,22 @@ async function personSearch(job, rawName) {
   const tasks = [];
   const run = (key, label, fn) => tasks.push((async () => {
     step(job, key, label);
-    try { const r = await withTimeout(fn(), /rd-/.test(key) ? 75000 : 35000); step(job, key, label, r === null ? 'fail' : 'done', r === null ? 'took too long' : r); } catch (e) {
+    try { const r = await withTimeout(fn(), /rd-/.test(key) ? 75000 : 35000); step(job, key, label, r === null ? 'fail' : 'done', r === null ? tr('took too long') : r); } catch (e) {
       const msg = String(e.message || e);
-      if (/one feed request per minute|rate limit|429/i.test(msg)) step(job, key, label, 'skip', 'Reddit is rate limiting right now, try again in a few minutes');
+      if (e.busy || e.rateLimited || /one feed request per minute|rate limit|429/i.test(msg)) step(job, key, label, 'skip', tr('Reddit is rate limiting right now, try again in a few minutes'));
       else step(job, key, label, 'fail', msg.slice(0, 80));
     }
   })());
 
   // 1. Videos that name them on the tube sites, all time, most viewed first. This also tells how they really spell it.
-  step(job, 'who', `Looking for ${name} on the video sites`);
+  step(job, 'who', tr('Looking for {name} on the video sites', { name }));
   const found = [];
   await Promise.all(TUBES.filter(on).map(async (id) => {
     const list = await fetchFrom(id, { mode: 'name', value: name }).catch(() => []);
     for (const n of list) found.push({ ...n, _src: id });
   }));
   const spelled = spellingIn(found, name);
-  if (spelled) { job.notes.push(`Showing results for ${spelled} (you typed ${name}).`); name = spelled; person.display = spelled; }
+  if (spelled) { job.notes.push(tr('Showing results for {spelled} (you typed {name}).', { spelled, name })); name = spelled; person.display = spelled; }
   const flat = name.replace(/\s+/g, '');
   const handles = new Set([flat]);
   ensureStarsTable();
@@ -622,14 +625,14 @@ async function personSearch(job, rawName) {
     person.views = views;
     for (const id of TUBES) {
       const n = mine.filter((x) => x._src === id).length;
-      if (n) addProfile(job, { platform: id, kind: 'name', value: flat.toLowerCase(), handle: name, name: `${person.display} on ${PROVIDERS[id].label}`, url: tubeSearchUrl(id, name), posts: n, provider: id, mode: 'search', views: mine.filter((x) => x._src === id).reduce((a, x) => a + (Number(x.media?.views) || 0), 0) });
+      if (n) addProfile(job, { platform: id, kind: 'name', value: flat.toLowerCase(), handle: name, name: tr('{name} on {source}', { name: person.display, source: PROVIDERS[id].label }), url: tubeSearchUrl(id, name), posts: n, provider: id, mode: 'search', views: mine.filter((x) => x._src === id).reduce((a, x) => a + (Number(x.media?.views) || 0), 0) });
     }
   }
-  step(job, 'who', null, 'done', `${mine.length} videos name ${person.display}${perf ? `, Pornhub performer with ${perf.videos} videos` : ''}`);
+  step(job, 'who', null, 'done', `${trn(mine.length, '{n} video names {name}', '{n} videos name {name}', { name: person.display })}${perf ? trn(perf.videos, ', Pornhub performer with {n} video', ', Pornhub performer with {n} videos') : ''}`);
 
   // 2. Their usernames elsewhere, from the web (only with a key).
   if (webKey()) {
-    step(job, 'web', `Searching the web for ${name}'s profiles`);
+    step(job, 'web', tr("Searching the web for {name}'s profiles", { name }));
     try {
       const results = await webSearch(`${name} profiles reddit redgifs onlyfans`, 6);
       if (results.length) {
@@ -642,8 +645,8 @@ async function personSearch(job, rawName) {
           if (['reddit', 'redgifs', 'bluesky'].includes(h.platform)) handles.add(handle);
           if (LINK[h.platform] && !person.links.some((l) => l.url === LINK[h.platform](handle))) person.links.push({ platform: h.platform, handle, url: LINK[h.platform](handle) });
         }
-        step(job, 'web', null, 'done', `${person.links.length} profiles named on the web`);
-      } else step(job, 'web', null, 'done', 'nothing found');
+        step(job, 'web', null, 'done', trn(person.links.length, '{n} profile named on the web', '{n} profiles named on the web'));
+      } else step(job, 'web', null, 'done', tr('nothing found'));
     } catch (err) { step(job, 'web', null, 'fail', err.message.slice(0, 80)); }
   }
   spec.people = [...new Set([name, ...handles, ...(spelled ? [String(rawName).trim()] : [])])];
@@ -651,27 +654,27 @@ async function personSearch(job, rawName) {
   // 3. Profiles with that name (or close to it) everywhere, and their posts when a profile clearly is them.
   await profileSearch(job, name, run);
   for (const h of [...handles].slice(0, 3)) {
-    if (on('reddit') && !config.mock) run(`rd-${h}`, `Finding Reddit user u/${h}`, async () => {
+    if (on('reddit') && !config.mock) run(`rd-${h}`, tr('Finding Reddit user u/{name}', { name: h }), async () => {
       let list = [];
       try { list = await rss.user(h, { maxWaitMs: 60000 }); } catch (e) {
-        if (/404|not found/i.test(e.message)) return 'no such user';
+        if (e.status === 404 || /404|not found/i.test(e.message)) return tr('no such user');
         throw e;
       }
-      if (!list.length) return 'no posts';
+      if (!list.length) return tr('no posts');
       person.profiles.push({ platform: 'reddit', handle: h, url: LINK.reddit(h), posts: list.length, avatar: null });
       addProfile(job, { platform: 'reddit', kind: 'user', value: h, handle: `u/${h}`, name: `u/${h}`, url: LINK.reddit(h), posts: list.length, provider: 'reddit', mode: 'creator' });
       j_itemsFor(job, `reddit|user|${h.toLowerCase()}`, storeFound(job, list, 'reddit', h).ids);
-      return `${list.length} posts`;
+      return trn(list.length, '{n} post', '{n} posts');
     });
   }
-  if (perf) for (const id of ['pornhub', 'redtube']) if (on(id)) run(`star-${id}`, `Finding ${PROVIDERS[id].label} videos with ${person.display}`, async () => {
+  if (perf) for (const id of ['pornhub', 'redtube']) if (on(id)) run(`star-${id}`, tr('Finding {source} videos with {name}', { source: PROVIDERS[id].label, name: person.display }), async () => {
     const list = await fetchFrom(id, { mode: 'creator', value: person.display, sort: 'top' }).catch(() => []);
-    return `${storeFound(job, list, id, person.display).ids.length} videos`;
+    return trn(storeFound(job, list, id, person.display).ids.length, '{n} video', '{n} videos');
   });
-  if (on('redgifs') && !config.mock) run('name-redgifs', `Searching RedGIFs for “${name}”`, async () => {
+  if (on('redgifs') && !config.mock) run('name-redgifs', tr('Searching {source} for “{term}”', { source: 'RedGIFs', term: name }), async () => {
     const list = (await redgifs.search({ tag: name, order: 'top28', count: 40 }).catch(() => [])).map(redgifs.normalizeGif);
     const hit = list.filter((n) => mentions(`${n.title} ${n.author || ''} ${(n.tags || []).join(' ')}`, name));
-    return `${storeFound(job, hit, 'redgifs', name, { strong: false }).ids.length} mention ${name}`;
+    return trn(storeFound(job, hit, 'redgifs', name, { strong: false }).ids.length, '{n} mentions {name}', '{n} mention {name}', { name });
   });
   await Promise.all(tasks);
   // A profile whose handle is the name itself is them: their posts join the results.
@@ -696,16 +699,18 @@ function j_itemsFor(job, key, ids) {
 // ---------- Plain terms ----------
 
 async function termsSearch(job, text, { presetFormats = null, extraPeople = [] } = {}) {
-  step(job, 'split', 'Reading your search');
-  const local = localParse(text);
+  step(job, 'split', tr('Reading your search'));
+  // In French, French words are read as the English tags the sources use, and the French word is searched too.
+  const variants = searchVariants(text, lang());
+  const local = localParse(variants[0]);
   if (presetFormats?.length) local.formats = presetFormats;
   local.people.push(...extraPeople);
   Object.assign(job.spec, { concepts: local.concepts, gender: local.gender, trans: local.trans, formats: local.formats });
   job.notes.push(...local.notes);
   job.chips = chipsFor({ ...job.spec, people: local.people });
-  step(job, 'split', null, 'done', local.concepts.map((c) => c.label || c.name).join(', ') || 'no tags');
+  step(job, 'split', null, 'done', local.concepts.map((c) => c.label || c.name).join(', ') || tr('no tags'));
   job.filter = { search: job.id, searchLabel: text };
-  step(job, 'syn', 'Finding similar tags with the local model');
+  step(job, 'syn', tr('Finding similar tags with the local model'));
   const r = await refine(job, text, local);
   // Synonyms that point at the other gender than the one asked for (or set in the balance) are left out.
   const side = r.gender || (genderMode() === 'men' ? 'men-only' : genderMode() === 'women' ? 'women-only' : null);
@@ -713,10 +718,11 @@ async function termsSearch(job, text, { presetFormats = null, extraPeople = [] }
   const MASC = /\b(cock|dick|penis|guys?|man|men|male|husband|dad|daddy|gay|twinks?|bears?|jocks?|hunks?)\b/;
   const fits = (t) => !((side === 'men-only' || side === 'men') && FEM.test(t) && !(side === 'men' && MASC.test(t))) && !((side === 'women-only' || side === 'women') && MASC.test(t) && !(side === 'women' && FEM.test(t)));
   for (const c of r.concepts) if (c.name !== YOUNG.name) c.syn = [...new Set([...c.syn, ...localSynonyms(c.name)])].filter(fits).slice(0, 8);
+  if (lang() === 'fr') for (const c of r.concepts) { const fr = c.name !== YOUNG.name ? EN_SEARCH_FR[c.name] : null; if (fr && !c.syn.includes(fr)) c.syn = [fr, ...c.syn].slice(0, 8); }
   Object.assign(job.spec, { concepts: r.concepts, gender: r.gender, trans: r.trans, formats: r.formats });
   job.chips = chipsFor({ ...job.spec, people: r.people });
-  if (job.steps.find((s) => s.key === 'syn')?.state === 'run') step(job, 'syn', null, 'done', `${r.concepts.reduce((a, c) => a + c.syn.length, 0)} similar tags`);
-  step(job, 'local', 'Filtering what is already here');
+  if (job.steps.find((s) => s.key === 'syn')?.state === 'run') step(job, 'syn', null, 'done', trn(r.concepts.reduce((a, c) => a + c.syn.length, 0), '{n} similar tag', '{n} similar tags'));
+  step(job, 'local', tr('Filtering what is already here'));
   step(job, 'local', null, 'done');
   const people = r.people.filter(Boolean);
   if (people.length && !r.concepts.length) { await personSearch(job, people[0]); job.chips = chipsFor(job.spec); return; }
@@ -725,12 +731,15 @@ async function termsSearch(job, text, { presetFormats = null, extraPeople = [] }
   const tasks = [];
   const run = (key, label, fn) => tasks.push((async () => {
     step(job, key, label);
-    try { const r = await withTimeout(fn(), 75000); step(job, key, label, r === null ? 'fail' : 'done', r === null ? 'took too long' : r); } catch (e) {
+    try { const r = await withTimeout(fn(), 75000); step(job, key, label, r === null ? 'fail' : 'done', r === null ? tr('took too long') : r); } catch (e) {
       const msg = String(e.message || e);
-      step(job, key, label, /one feed request per minute|rate limit|429/i.test(msg) ? 'skip' : 'fail', /one feed request per minute|rate limit|429/i.test(msg) ? 'Reddit is rate limiting right now' : msg.slice(0, 80));
+      const limited = e.busy || e.rateLimited || /one feed request per minute|rate limit|429/i.test(msg);
+      step(job, key, label, limited ? 'skip' : 'fail', limited ? tr('Reddit is rate limiting right now') : msg.slice(0, 80));
     }
   })());
   const terms = remoteTerms(job.spec);
+  // The French version of the search as a whole, after the English ones, so French posts turn up as well.
+  if (lang() === 'fr' && variants.length > 1) { const other = variants.find((v) => v !== variants[0]); if (other && !safeTerm(other) && !terms.includes(other)) terms.push(other); }
   await Promise.all([searchProviders(job, terms), profileSearch(job, (terms[0] || text).replace(/^(gay|lesbian) /, ''), run)]);
   await Promise.all(tasks);
   if (people.length) await personSearch(job, people[0]);
@@ -789,11 +798,12 @@ Actions (use only the fields each one needs):
 Rules:
 - Wanting to see something is a search, never memory. "videos about X" is a search for X with formats long, short and gif.
 - Everyone is an adult. Never search for anything that suggests someone under 18; "teen" or "young" become "college".
-- answer: one or two short plain sentences: what you did, or the answer to his question. Never use em dashes.
+- answer: one or two short plain sentences: what you did, or the answer to his question. Never use em dashes. ${replyIn()}
+- He may write in French or English. Everything inside actions (terms, tags, kink names for new kinks, memory text) is always in English, because the sources and his tags are English. Only the answer follows his language.${lang() === 'fr' ? ' For a search, also add the French word for the main thing at the end of terms when there is a common one (for example "feet, pieds"), so French posts are found too.' : ''}
 - When he names one of his kinks, fantasies or sources, use the exact name from the lists below.
 - A question about himself ("what am I into lately?") is answered from the context below, with no actions.
 
-His kinks: ${kinks.map((k) => `${k.name}${k.status === 'proposed' ? ' (suggested)' : ''}`).join(', ') || 'none yet'}
+His kinks: ${kinks.map((k) => `${k.name}${k.label && k.label !== k.name ? ` (${k.label})` : ''}${k.status === 'proposed' ? ' (suggested)' : ''}`).join(', ') || 'none yet'}
 His fantasies: ${fans.map((f) => f.name).join(', ') || 'none yet'}
 Tags he responds to most: ${tags.join(', ') || 'not known yet'}
 Sources switched on: ${Object.keys(st).filter((k) => st[k].enabled).map((k) => PROVIDERS[k].label).join(', ')}
@@ -812,7 +822,7 @@ Examples:
 function findKink(name) {
   const n = String(name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const all = listKinks({ includeHidden: false });
-  return all.find((k) => k.name.toLowerCase().replace(/[^a-z0-9]/g, '') === n) || all.find((k) => { const x = k.name.toLowerCase().replace(/[^a-z0-9]/g, ''); return n.length > 3 && (x.includes(n) || n.includes(x)); });
+  return all.find((k) => k.name.toLowerCase().replace(/[^a-z0-9]/g, '') === n || String(k.label || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '') === n) || all.find((k) => { const x = k.name.toLowerCase().replace(/[^a-z0-9]/g, ''); return n.length > 3 && (x.includes(n) || n.includes(x)); });
 }
 
 async function doAction(job, a, i) {
@@ -831,7 +841,7 @@ async function doAction(job, a, i) {
       return;
     }
     case 'filter': {
-      step(job, key, 'Changing the feed');
+      step(job, key, tr('Changing the feed'));
       const f = {};
       if (a.formats?.length) f.formats = a.formats;
       if (a.window && a.window !== 'mixed') f.window = a.window;
@@ -844,75 +854,75 @@ async function doAction(job, a, i) {
     }
     case 'kink_add': {
       const nm = String(a.name || tags[0] || '').trim();
-      step(job, key, `Adding the kink ${nm}`);
-      if (!nm) return step(job, key, null, 'fail', 'no name');
+      step(job, key, tr('Adding the kink {name}', { name: nm }));
+      if (!nm) return step(job, key, null, 'fail', tr('no name'));
       const ex = findKink(nm);
-      if (ex) { updateKink(ex.id, { status: 'active' }); return step(job, key, null, 'done', 'already there, marked as yours'); }
+      if (ex) { updateKink(ex.id, { status: 'active' }); return step(job, key, null, 'done', tr('already there, marked as yours')); }
       createKink({ name: nm.slice(0, 40), tags: tags.length ? tags : [normalizeTag(nm)], origin: 'user', status: 'active' });
       job.client.push({ type: 'meta' });
       return step(job, key, null, 'done');
     }
     case 'kink_remove': {
-      step(job, key, `Removing the kink ${a.name}`);
+      step(job, key, tr('Removing the kink {name}', { name: a.name }));
       const k = findKink(a.name);
-      if (!k) return step(job, key, null, 'fail', 'no kink with that name');
+      if (!k) return step(job, key, null, 'fail', tr('no kink with that name'));
       updateKink(k.id, { status: 'hidden' });
       job.client.push({ type: 'meta' });
-      return step(job, key, null, 'done', k.name);
+      return step(job, key, null, 'done', k.label || k.name);
     }
     case 'tags_like': case 'tags_less': {
-      step(job, key, `${a.type === 'tags_like' ? 'Showing more' : 'Showing less'} ${tags.join(', ')}`);
-      if (!tags.length) return step(job, key, null, 'fail', 'no tags');
+      step(job, key, a.type === 'tags_like' ? tr('Showing more {tags}', { tags: tags.join(', ') }) : tr('Showing less {tags}', { tags: tags.join(', ') }));
+      if (!tags.length) return step(job, key, null, 'fail', tr('no tags'));
       boostTags(tags, a.type === 'tags_like' ? 1.5 : -1.5);
       job.client.push({ type: 'refresh' });
       return step(job, key, null, 'done');
     }
     case 'tags_block': {
-      step(job, key, `Blocking ${tags.join(', ')} for good`);
-      if (!tags.length) return step(job, key, null, 'fail', 'no tags');
+      step(job, key, tr('Blocking {tags} for good', { tags: tags.join(', ') }));
+      if (!tags.length) return step(job, key, null, 'fail', tr('no tags'));
       for (const t of tags) getDb().prepare('INSERT OR IGNORE INTO limits(tag, created) VALUES(?, ?)').run(t, now());
       const r = recheckBlocks();
       boostTags(tags, -2);
-      addMemory({ category: 'Turn-offs and limits', content: `Never show ${tags.join(', ')}`, origin: 'user', status: 'active' });
+      addMemory({ category: 'Turn-offs and limits', content: tr('Never show {what}', { what: tags.join(', ') }), origin: 'user', status: 'active' });
       job.client.push({ type: 'refresh' });
-      return step(job, key, null, 'done', r.blocked ? `${r.blocked} posts hidden` : null);
+      return step(job, key, null, 'done', r.blocked ? trn(r.blocked, '{n} post hidden', '{n} posts hidden') : null);
     }
     case 'fantasy_add': {
-      step(job, key, `Saving the fantasy ${a.name}`);
-      if (!a.name) return step(job, key, null, 'fail', 'no name');
+      step(job, key, tr('Saving the fantasy {name}', { name: a.name }));
+      if (!a.name) return step(job, key, null, 'fail', tr('no name'));
       const ids = (a.kinks || []).map(findKink).filter(Boolean).map((k) => k.id);
       saveFantasy({ name: a.name.slice(0, 60), description: a.description || '', kinks: ids, saved: 1, origin: 'user' });
       job.client.push({ type: 'meta' });
       return step(job, key, null, 'done');
     }
     case 'fantasy_remove': {
-      step(job, key, `Removing the fantasy ${a.name}`);
+      step(job, key, tr('Removing the fantasy {name}', { name: a.name }));
       const n = String(a.name || '').toLowerCase();
       const f = listFantasies().find((x) => x.name.toLowerCase() === n) || listFantasies().find((x) => n && x.name.toLowerCase().includes(n));
-      if (!f) return step(job, key, null, 'fail', 'not found');
+      if (!f) return step(job, key, null, 'fail', tr('not found'));
       deleteFantasy(f.id);
       job.client.push({ type: 'meta' });
       return step(job, key, null, 'done', f.name);
     }
     case 'memory_add': {
-      step(job, key, 'Saving to your memory');
-      if (!a.text) return step(job, key, null, 'fail', 'nothing to save');
+      step(job, key, tr('Saving to your memory'));
+      if (!a.text) return step(job, key, null, 'fail', tr('nothing to save'));
       addMemory({ category: CATEGORIES.includes(a.category) ? a.category : 'Notes', content: a.text.slice(0, 300), origin: 'user', status: 'active' });
       return step(job, key, null, 'done', a.text.slice(0, 60));
     }
     case 'memory_remove': {
-      step(job, key, 'Removing from your memory');
+      step(job, key, tr('Removing from your memory'));
       const words = String(a.text || '').toLowerCase().split(/\s+/).filter((w) => w.length > 3);
       const m = listMemory({ status: 'active' }).map((x) => ({ x, hit: words.filter((w) => x.content.toLowerCase().includes(w)).length })).filter((y) => y.hit >= Math.max(1, Math.ceil(words.length / 2))).sort((p, q) => q.hit - p.hit)[0];
-      if (!m) return step(job, key, null, 'fail', 'no matching memory');
+      if (!m) return step(job, key, null, 'fail', tr('no matching memory'));
       updateMemory(m.x.id, { status: 'archived' });
       return step(job, key, null, 'done', m.x.content.slice(0, 60));
     }
     case 'source_add': {
       const p = a.provider;
       const v = String(a.value || '').replace(/^\/?r\//i, '').replace(/^\/?u\//i, '').trim();
-      step(job, key, `Adding ${PROVIDERS[p]?.label || p}: ${v}`);
-      if (!PROVIDERS[p] || !v) return step(job, key, null, 'fail', 'unclear source');
+      step(job, key, tr('Adding {source}: {value}', { source: PROVIDERS[p]?.label || p, value: v }));
+      if (!PROVIDERS[p] || !v) return step(job, key, null, 'fail', tr('unclear source'));
       const mode = a.mode || 'search';
       if (p === 'reddit' && mode === 'community') follow('subreddit', v, { label: `r/${v}` });
       else if (p === 'reddit' && mode === 'creator') follow('reddit_user', v, { label: `u/${v}` });
@@ -921,23 +931,23 @@ async function doAction(job, a, i) {
       return step(job, key, null, 'done');
     }
     case 'source_toggle': {
-      step(job, key, `${a.on === false ? 'Pausing' : 'Switching on'} ${a.name}`);
+      step(job, key, a.on === false ? tr('Pausing {name}', { name: a.name }) : tr('Switching on {name}', { name: a.name }));
       const n = String(a.name || '').toLowerCase();
       const f = listFollows().find((x) => `${x.label || ''} ${x.value}`.toLowerCase().includes(n));
-      if (!f) return step(job, key, null, 'fail', 'no source with that name');
+      if (!f) return step(job, key, null, 'fail', tr('no source with that name'));
       getDb().prepare('UPDATE follows SET active = ?, dormant_since = NULL WHERE id = ?').run(a.on === false ? 0 : 1, f.id);
       return step(job, key, null, 'done', f.label || f.value);
     }
     case 'provider_toggle': {
-      step(job, key, `${a.on === false ? 'Switching off' : 'Switching on'} ${PROVIDERS[a.provider]?.label || a.provider}`);
-      if (!PROVIDERS[a.provider]) return step(job, key, null, 'fail', 'unknown source');
+      step(job, key, a.on === false ? tr('Switching off {name}', { name: PROVIDERS[a.provider]?.label || a.provider }) : tr('Switching on {name}', { name: PROVIDERS[a.provider]?.label || a.provider }));
+      if (!PROVIDERS[a.provider]) return step(job, key, null, 'fail', tr('unknown source'));
       setProvider(a.provider, { enabled: a.on !== false });
       invalidatePool();
       job.client.push({ type: 'refresh' });
       return step(job, key, null, 'done');
     }
     case 'gender': {
-      step(job, key, 'Changing the gender balance');
+      step(job, key, tr('Changing the gender balance'));
       const patch = {};
       if (Number.isFinite(a.male)) patch.male = a.male;
       if (typeof a.auto === 'boolean') patch.auto = a.auto;
@@ -965,7 +975,7 @@ function quickCommand(q) {
 
 async function agentSearch(job, q, deep) {
   if (!deep && quickCommand(q)) {
-    step(job, 'think', 'Doing it right away');
+    step(job, 'think', tr('Doing it right away'));
     const r = await runCommand(q, { sessionId: job.sessionId });
     step(job, 'think', null, 'done');
     job.answer = r.reply;
@@ -973,12 +983,12 @@ async function agentSearch(job, q, deep) {
     return;
   }
   const model = deep ? activeModel() : deepModel();
-  step(job, 'think', deep ? 'Thinking it through with the big model' : 'Thinking');
+  step(job, 'think', deep ? tr('Thinking it through with the big model') : tr('Thinking'));
   let out = null;
   try {
     out = await chat({ kind: 'search-agent', model, schema: AGENT_SCHEMA, temperature: 0.2, numPredict: deep ? 2500 : 700, think: !!deep, system: agentSystem(), user: q });
   } catch (err) {
-    step(job, 'think', null, 'fail', 'the local model did not answer');
+    step(job, 'think', null, 'fail', tr('the local model did not answer'));
   }
   if (!out) {
     // Without the model the old rules still handle clear commands; everything else becomes a plain search.
@@ -1006,7 +1016,7 @@ async function agentSearch(job, q, deep) {
   }
   // The answer never claims something that did not work.
   const failed = job.steps.filter((x) => /^a\d+$/.test(x.key) && x.state === 'fail');
-  if (failed.length) job.answer = `${job.answer ? `${job.answer} ` : ''}Not done: ${failed.map((x) => `${x.label.charAt(0).toLowerCase()}${x.label.slice(1)} (${x.detail})`).join('; ')}.`;
+  if (failed.length) job.answer = `${job.answer ? `${job.answer} ` : ''}${tr('Not done: {list}.', { list: failed.map((x) => `${x.label.charAt(0).toLowerCase()}${x.label.slice(1)} (${x.detail})`).join('; ') })}`;
 }
 
 // ---------- Jobs ----------
@@ -1059,11 +1069,12 @@ function summaryFor(job) {
   const s = job.spec;
   if (job.person && !job.found) {
     const skipped = job.steps.some((x) => x.state === 'skip');
-    return `Nothing from ${job.person.display} turned up: no RedGIFs or Bluesky profile under that name and no videos on the tube sites${skipped ? ', and Reddit was rate limiting, so try again in a few minutes' : ''}.${webKey() ? '' : ' With a web search key in Settings I can also find the other usernames they use.'}`;
+    return `${tr('Nothing from {name} turned up: no RedGIFs or Bluesky profile under that name and no videos on the tube sites{more}.', { name: job.person.display, more: skipped ? tr(', and Reddit was rate limiting, so try again in a few minutes') : '' })}${webKey() ? '' : ` ${tr('With a web search key in Settings I can also find the other usernames they use.')}`}`;
   }
-  const what = job.person ? job.person.display : [s.gender && { women: 'women', men: 'men', both: 'men and women', 'women-only': 'only women', 'men-only': 'only men' }[s.gender], ...s.concepts.map((c) => c.label || c.name)].filter(Boolean).join(', ');
-  const failed = job.steps.filter((x) => x.state === 'fail' && /Searching|Finding/.test(x.label)).length;
-  return `${what ? `Showing ${what}` : 'Showing your search'}: ${job.found} posts from your sources${job.added ? `, ${job.added} of them new here` : ''}, plus what already matched.${failed ? ` ${failed} source${failed === 1 ? '' : 's'} did not answer.` : ''}${job.notes.length ? ` ${job.notes.join(' ')}` : ''}`;
+  const what = job.person ? job.person.display : [s.gender && { women: tr('women'), men: tr('men'), both: tr('men and women'), 'women-only': tr('only women'), 'men-only': tr('only men') }[s.gender], ...s.concepts.map((c) => c.label || c.name)].filter(Boolean).join(', ');
+  const failed = job.steps.filter((x) => x.state === 'fail' && !['split', 'local', 'who', 'think'].includes(x.key) && !/^a\d+$/.test(x.key)).length;
+  const head = what ? tr('Showing {what}', { what }) : tr('Showing your search');
+  return `${tr('{head}: {posts} from your sources{added}, plus what already matched.', { head, posts: trn(job.found, '{n} post', '{n} posts'), added: job.added ? tr(', {n} of them new here', { n: job.added }) : '' })}${failed ? ` ${trn(failed, '{n} source did not answer.', '{n} sources did not answer.')}` : ''}${job.notes.length ? ` ${job.notes.join(' ')}` : ''}`;
 }
 
 export function jobView(id) {
@@ -1116,6 +1127,6 @@ export function keepSearchSource(itemId) {
   const existing = getDb().prepare('SELECT id, active FROM follows WHERE kind = ? AND value = ?').get(kind, value);
   if (existing) return false;
   follow(kind, value, { label: `${PROVIDERS[provider].label}: ${term}`, synced: 'auto', active: 0 });
-  getDb().prepare('UPDATE follows SET dormant_since = ?, topic = ?, why = ? WHERE kind = ? AND value = ?').run(now(), term, `You liked a result of your search for "${term}"`, kind, value);
+  getDb().prepare('UPDATE follows SET dormant_since = ?, topic = ?, why = ? WHERE kind = ? AND value = ?').run(now(), term, tr('You liked a result of your search for "{term}"', { term }), kind, value);
   return true;
 }

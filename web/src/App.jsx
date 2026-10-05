@@ -13,6 +13,7 @@ import { refreshWindows } from './components/SideColumn.jsx';
 import { begin, end } from './activity.js';
 import Onboarding from './components/Onboarding.jsx';
 import { useUpdates, UpdateModal, WhatsNew } from './components/Updates.jsx';
+import { t, tn } from './i18n.js';
 
 export default function App() {
   const [filters, setFiltersState] = useState({});
@@ -63,8 +64,8 @@ export default function App() {
     refreshMeta();
     api('/setup/status').then((st) => { if (!st.onboarded) setOnboarding(true); }).catch(() => {});
     api('/settings').then(setSettings).catch(() => {});
-    const t = setInterval(refreshMeta, 60000);
-    return () => clearInterval(t);
+    const timer = setInterval(refreshMeta, 60000);
+    return () => clearInterval(timer);
   }, [refreshMeta]);
 
   const scrollToCenter = useCallback(() => {
@@ -100,7 +101,7 @@ export default function App() {
     if (!m) return;
     if (opts.mood === id) { setFilters({}); return; }
     setFilters(m.filters, { mood: id, mix: m.mix ?? 15 });
-    setAskOut(`Mood set to ${m.label.toLowerCase()}. The feed follows it until you change it.`);
+    setAskOut(t('Mood set to {mood}. The feed follows it until you change it.', { mood: m.label.toLowerCase() }));
   }, [opts.mood, setFilters]);
 
   const openMode = useCallback((m, spec = null) => {
@@ -190,18 +191,18 @@ export default function App() {
     if (key === 'search') { clearSearch(); return; }
     if (key === 'mood') { setFilters({}); return; }
     if (key === 'profile') { patchFilters({ profile: null, profileLabel: null }); return; }
-    if (key.startsWith('tag:')) { patchFilters({ tags: (filters.tags || []).filter((t) => `tag:${t}` !== key) }); return; }
+    if (key.startsWith('tag:')) { patchFilters({ tags: (filters.tags || []).filter((tag) => `tag:${tag}` !== key) }); return; }
     patchFilters({ [key]: null });
   }, [clearSearch, setFilters, patchFilters, filters]);
 
   // Only the posts of one profile or community from the search: their posts are fetched first.
   const openProfile = useCallback(async (p) => {
     if (!search) return;
-    begin(`prof${p.key}`, `Loading posts from ${p.name}`);
+    begin(`prof${p.key}`, t('Loading posts from {name}', { name: p.name }));
     try {
       const r = await api(`/search/${search.id}/profile`, { method: 'POST', body: { key: p.key } });
       setFilters(r.filter, { keepMix: true, top: true });
-      end(`prof${p.key}`, 'done', `${r.count} posts`);
+      end(`prof${p.key}`, 'done', tn(r.count, '{n} post', '{n} posts'));
     } catch (e) { end(`prof${p.key}`, 'fail', e.message); toast(e.message); }
   }, [search, setFilters, toast]);
 
@@ -215,7 +216,7 @@ export default function App() {
     <AppCtx.Provider value={ctx}>
       <div className="shell">
         <TopBar />
-        {settings?.mock ? <div className="mockbar">Test mode: fake posts and a fake model, so you can try everything without accounts.</div> : null}
+        {settings?.mock ? <div className="mockbar">{t('Test mode: fake posts and a fake model, so you can try everything without accounts.')}</div> : null}
         <div className="grid">
           <SideColumn side={0} />
           <main className="center" ref={centerRef}>
@@ -231,7 +232,7 @@ export default function App() {
         </div>
       </div>
       {toastMsg ? <div className="toast" role="status">{toastMsg}</div> : null}
-      {onboarding ? <Onboarding onDone={() => { setOnboarding(false); refreshMeta(); setFeedKey((k) => k + 1); toast('Welcome. Your feed is filling up.'); }} /> : null}
+      {onboarding ? <Onboarding onDone={() => { setOnboarding(false); refreshMeta(); setFeedKey((k) => k + 1); toast(t('Welcome. Your feed is filling up.')); }} /> : null}
       {!onboarding && updates.news ? <WhatsNew info={updates.news} onClose={updates.closeNews} /> : null}
       {updateOpen && updates.info ? <UpdateModal info={updates.info} onClose={() => setUpdateOpen(false)} /> : null}
     </AppCtx.Provider>

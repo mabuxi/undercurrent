@@ -79,7 +79,7 @@ export function brain({ maxTags = 18 } = {}) {
   for (const k of kinks) {
     const tg = k.parentId ? topGroup(k.parentId) : null;
     nodes.push({
-      key: `k${k.id}`, id: k.id, type: 'kink', name: k.name, status: k.status, origin: k.origin, description: k.description || '',
+      key: `k${k.id}`, id: k.id, type: 'kink', name: k.label || k.name, baseName: k.name, status: k.status, origin: k.origin, description: k.description || '',
       color: tg ? groupColor.get(tg.id) || k.color : k.color, ownColor: k.color, group: k.parentId || null, topGroup: tg?.id || null,
       allTime: k.allTime, lately: k.lately, now: k.now, activity: Math.round((act.get(`k${k.id}`) || 0) * 10) / 10, last: last.get(`k${k.id}`) || null,
       tags: k.tags.slice(0, 8).map((t) => t.name)

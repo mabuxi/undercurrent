@@ -7,6 +7,7 @@ import { config } from './config.js';
 import { getSetting, setSetting, now } from './db.js';
 import { log } from './log.js';
 import { restartServer } from './ai/lifecycle.js';
+import { tr, lang } from './i18n.js';
 
 // Updates come from GitHub: every version is a tag (v0.14.0, v0.15.0, …) with its notes in CHANGELOG.md.
 // The downloaded app (packaged) reads the newest GitHub Release, downloads its Undercurrent-mac.zip, swaps the app
@@ -83,7 +84,7 @@ export function pickRelease(releases, current) {
 
 async function getJson(url) {
   const res = await fetch(url, { headers: UA, signal: AbortSignal.timeout(15000) });
-  if (!res.ok) throw Object.assign(new Error(`GitHub answered ${res.status}`), { status: res.status });
+  if (!res.ok) throw Object.assign(new Error(tr('GitHub answered {status}', { status: res.status })), { status: res.status });
   return res.json();
 }
 
@@ -97,22 +98,37 @@ async function releaseStatus(base) {
       base.latest = rel.version;
       base.available = true;
       base.release = rel;
-      let text = '';
-      try {
-        const r = await fetch(`https://raw.githubusercontent.com/${config.repo}/${rel.tag}/CHANGELOG.md`, { headers: { 'User-Agent': UA['User-Agent'] }, signal: AbortSignal.timeout(15000) });
-        if (r.ok) text = await r.text();
-      } catch {}
-      base.notes = changelogSince(text, config.version, rel.version);
+      const raw = async (file) => {
+        try {
+          const r = await fetch(`https://raw.githubusercontent.com/${config.repo}/${rel.tag}/${file}`, { headers: { 'User-Agent': UA['User-Agent'] }, signal: AbortSignal.timeout(15000) });
+          return r.ok ? await r.text() : '';
+        } catch { return ''; }
+      };
+      const [text, textFr] = await Promise.all([raw('CHANGELOG.md'), lang() === 'fr' ? raw('CHANGELOG.fr.md') : '']);
+      base.notes = localNotes(text, textFr, config.version, rel.version);
       if (!base.notes.length && rel.body) base.notes = [{ version: rel.version, date: '', text: rel.body }];
     }
   } catch (err) {
     base.error = err.status === 403 || err.status === 429
-      ? 'GitHub is limiting update checks for a while. Try again in an hour.'
-      : err.status === 404 ? 'The Undercurrent repository is not public on GitHub, so this app cannot check for updates.'
-      : `Could not reach GitHub to check for updates (${err.message}).`;
+      ? tr('GitHub is limiting update checks for a while. Try again in an hour.')
+      : err.status === 404 ? tr('The Undercurrent repository is not public on GitHub, so this app cannot check for updates.')
+      : tr('Could not reach GitHub to check for updates ({error}).', { error: err.message });
   }
   cache = { at: now(), v: base };
   return base;
+}
+
+// The change notes in the interface language: CHANGELOG.fr.md for French, version by version, English where a
+// version has no French notes.
+export function localNotes(en, fr, since, upTo = null, l = lang()) {
+  const list = changelogSince(en, since, upTo);
+  if (l !== 'fr' || !fr) return list;
+  const byV = new Map(changelogSince(fr, since, upTo).map((n) => [n.version, n]));
+  return list.map((n) => byV.get(n.version) || n);
+}
+
+function readLocal(name) {
+  try { return fs.readFileSync(path.join(config.root, name), 'utf8'); } catch { return ''; }
 }
 
 let cache = { at: 0, v: null };
@@ -120,12 +136,12 @@ export async function updateStatus({ fresh = false } = {}) {
   if (!fresh && cache.v && now() - cache.at < 30 * 60000) return cache.v;
   const base = { current: config.version, latest: config.version, available: false, notes: [], connected: false, git: false, dirty: false, error: null, checkedAt: now(), packaged: config.packaged };
   if (config.packaged && !config.mock) return releaseStatus(base);
-  if (config.mock || !fs.existsSync(path.join(config.root, '.git'))) { cache = { at: now(), v: { ...base, error: 'This copy is not linked to GitHub, so it cannot update itself.' } }; return cache.v; }
+  if (config.mock || !fs.existsSync(path.join(config.root, '.git'))) { cache = { at: now(), v: { ...base, error: tr('This copy is not linked to GitHub, so it cannot update itself.') } }; return cache.v; }
   base.git = true;
   try {
     await prepareSsh();
     base.remote = await git('remote', 'get-url', 'origin').catch(() => null);
-    if (!base.remote) throw new Error('No GitHub address set for this copy.');
+    if (!base.remote) throw new Error(tr('No GitHub address set for this copy.'));
     await git('fetch', '--tags', '--force', '--quiet', 'origin');
     base.connected = true;
     const tags = (await git('tag', '-l', 'v*')).split('\n').map((t) => t.trim()).filter((t) => parseVersion(t));
@@ -134,13 +150,14 @@ export async function updateStatus({ fresh = false } = {}) {
       base.latest = latest.replace(/^v/, '');
       base.available = true;
       const log2 = await git('show', `${latest}:CHANGELOG.md`).catch(() => '');
-      base.notes = changelogSince(log2, config.version, base.latest);
+      const log2fr = lang() === 'fr' ? await git('show', `${latest}:CHANGELOG.fr.md`).catch(() => '') : '';
+      base.notes = localNotes(log2, log2fr, config.version, base.latest);
     }
     base.dirty = (await git('status', '--porcelain', '--untracked-files=no')).length > 0;
   } catch (err) {
     base.error = /Permission denied|publickey|Could not read from remote|Authentication|denied|access rights|repository exists|not found/i.test(err.message)
-      ? 'This Mac cannot reach the GitHub repository yet (it needs the SSH key of this Mac on the GitHub account, and the repository has to exist), so it cannot check for updates.'
-      : `Could not check for updates: ${err.message}`;
+      ? tr('This Mac cannot reach the GitHub repository yet (it needs the SSH key of this Mac on the GitHub account, and the repository has to exist), so it cannot check for updates.')
+      : tr('Could not check for updates: {error}', { error: err.message });
   }
   cache = { at: now(), v: base };
   return base;
@@ -179,13 +196,13 @@ export function cleanupUpdate() {
 
 async function download(url, file, size) {
   const res = await fetch(url, { headers: { 'User-Agent': UA['User-Agent'] }, redirect: 'follow' });
-  if (!res.ok || !res.body) throw new Error(`The download failed (GitHub answered ${res.status}).`);
+  if (!res.ok || !res.body) throw new Error(tr('The download failed (GitHub answered {status}).', { status: res.status }));
   const total = Number(res.headers.get('content-length')) || size || 0;
   let got = 0;
   const body = Readable.fromWeb(res.body);
   body.on('data', (c) => { got += c.length; job.progress = total ? Math.min(100, Math.round((got / total) * 100)) : null; });
   await pipeline(body, fs.createWriteStream(file));
-  if (size && fs.statSync(file).size !== size) throw new Error('The download was incomplete. Try again.');
+  if (size && fs.statSync(file).size !== size) throw new Error(tr('The download was incomplete. Try again.'));
 }
 
 async function applyRelease(st) {
@@ -198,29 +215,29 @@ async function applyRelease(st) {
   try {
     fs.accessSync(dir, fs.constants.W_OK);
   } catch {
-    throw new Error(`Undercurrent cannot write to ${dir}. Move Undercurrent.app to your Applications folder and try again.`);
+    throw new Error(tr('Undercurrent cannot write to {dir}. Move Undercurrent.app to your Applications folder and try again.', { dir }));
   }
   try {
     fs.rmSync(work, { recursive: true, force: true });
     fs.mkdirSync(work, { recursive: true });
     const zip = path.join(work, ASSET);
-    step(`Downloading version ${rel.version}`);
+    step(tr('Downloading version {v}', { v: rel.version }));
     await download(rel.url, zip, rel.size);
-    step(`Downloading version ${rel.version}`, 'done');
-    step('Checking the new app');
+    step(tr('Downloading version {v}', { v: rel.version }), 'done');
+    step(tr('Checking the new app'));
     await sh('/usr/bin/ditto', ['-x', '-k', zip, work]);
     const fresh = path.join(work, 'Undercurrent.app');
     const pkg = JSON.parse(fs.readFileSync(path.join(fresh, 'Contents', 'Resources', 'app', 'package.json'), 'utf8'));
-    if (pkg.version !== rel.version) throw new Error(`The download is version ${pkg.version}, not ${rel.version}.`);
-    if (!fs.existsSync(path.join(fresh, 'Contents', 'Resources', 'node', 'node'))) throw new Error('The download is missing parts of the app.');
+    if (pkg.version !== rel.version) throw new Error(tr('The download is version {got}, not {want}.', { got: pkg.version, want: rel.version }));
+    if (!fs.existsSync(path.join(fresh, 'Contents', 'Resources', 'node', 'node'))) throw new Error(tr('The download is missing parts of the app.'));
     await sh('/usr/bin/xattr', ['-dr', 'com.apple.quarantine', fresh]).catch(() => {});
-    step('Checking the new app', 'done');
-    step('Installing it');
+    step(tr('Checking the new app'), 'done');
+    step(tr('Installing it'));
     fs.rmSync(previous, { recursive: true, force: true });
     fs.renameSync(target, previous);
     swapped = true;
     fs.renameSync(fresh, target);
-    step('Installing it', 'done');
+    step(tr('Installing it'), 'done');
   } catch (err) {
     if (swapped && !fs.existsSync(target)) { try { fs.renameSync(previous, target); } catch {} }
     fs.rmSync(work, { recursive: true, force: true });
@@ -231,9 +248,9 @@ async function applyRelease(st) {
 export async function applyUpdate() {
   if (job.state === 'running') return job;
   const st = await updateStatus({ fresh: true });
-  if (!st.available) return { ...job, state: 'none', error: st.error || 'You already have the newest version.' };
+  if (!st.available) return { ...job, state: 'none', error: st.error || tr('You already have the newest version.') };
   if (st.mode === 'release') {
-    if (!config.appBundle) return { ...job, state: 'failed', error: 'Open Undercurrent from the app to update it.' };
+    if (!config.appBundle) return { ...job, state: 'failed', error: tr('Open Undercurrent from the app to update it.') };
     Object.assign(job, { state: 'running', steps: [], error: null, version: st.latest, restart: false, appRebuilt: false, relaunch: false, progress: null });
     (async () => {
       try {
@@ -252,30 +269,30 @@ export async function applyUpdate() {
     })();
     return job;
   }
-  if (st.dirty) return { ...job, state: 'failed', error: 'There are changes in the code folder that are not on GitHub, so updating could lose them.' };
+  if (st.dirty) return { ...job, state: 'failed', error: tr('There are changes in the code folder that are not on GitHub, so updating could lose them.') };
   Object.assign(job, { state: 'running', steps: [], error: null, version: st.latest, restart: false, appRebuilt: false });
   (async () => {
     const before = await git('rev-parse', 'HEAD');
     try {
-      step(`Getting version ${st.latest}`);
+      step(tr('Getting version {v}', { v: st.latest }));
       await git('checkout', '--quiet', 'main').catch(() => {});
       await git('merge', '--ff-only', '--quiet', `v${st.latest}`);
-      step(`Getting version ${st.latest}`, 'done');
+      step(tr('Getting version {v}', { v: st.latest }), 'done');
       const changed = (await git('diff', '--name-only', before, 'HEAD')).split('\n');
       if (await depsChanged(before, changed)) {
-        step('Installing what the new version needs');
+        step(tr('Installing what the new version needs'));
         await run(fs.existsSync(path.join(path.dirname(process.execPath), 'npm')) ? path.join(path.dirname(process.execPath), 'npm') : 'npm', ['install', '--no-audit', '--no-fund'], { timeout: 600000 });
-        step('Installing what the new version needs', 'done');
+        step(tr('Installing what the new version needs'), 'done');
       }
-      step('Building the app');
+      step(tr('Building the app'));
       await run(path.join(path.dirname(process.execPath), 'node'), [path.join(config.root, 'node_modules', 'vite', 'bin', 'vite.js'), 'build', path.join(config.root, 'web')], { timeout: 300000 });
-      step('Building the app', 'done');
+      step(tr('Building the app'), 'done');
       // The Mac app is rebuilt when its code changed or the version did (so About shows the right one).
       if (changed.some((f) => f.startsWith('mac/') || f === 'package.json') && process.platform === 'darwin' && fs.existsSync(path.join(config.root, 'mac', 'build.sh'))) {
-        step('Updating the Mac app');
+        step(tr('Updating the Mac app'));
         await run('/bin/bash', [path.join(config.root, 'mac', 'build.sh'), '--install'], { timeout: 600000 });
         job.appRebuilt = true;
-        step('Updating the Mac app', 'done');
+        step(tr('Updating the Mac app'), 'done');
       }
       setSetting('updatedFrom', config.version);
       if (!getSetting('versionSeen', null)) setSetting('versionSeen', config.version);
@@ -300,9 +317,7 @@ export function whatsNew() {
   const seen = getSetting('versionSeen', null);
   if (!seen) { setSetting('versionSeen', config.version); return { show: false, version: config.version, notes: [] }; }
   if (!newer(config.version, seen)) return { show: false, version: config.version, notes: [] };
-  let text = '';
-  try { text = fs.readFileSync(path.join(config.root, 'CHANGELOG.md'), 'utf8'); } catch {}
-  return { show: true, version: config.version, from: seen, notes: changelogSince(text, seen, config.version) };
+  return { show: true, version: config.version, from: seen, notes: localNotes(readLocal('CHANGELOG.md'), readLocal('CHANGELOG.fr.md'), seen, config.version) };
 }
 
 export function markSeen() {
@@ -310,7 +325,5 @@ export function markSeen() {
 }
 
 export function changelog(limit = 10) {
-  let text = '';
-  try { text = fs.readFileSync(path.join(config.root, 'CHANGELOG.md'), 'utf8'); } catch {}
-  return changelogSince(text, null).slice(0, limit);
+  return localNotes(readLocal('CHANGELOG.md'), readLocal('CHANGELOG.fr.md'), null).slice(0, limit);
 }

@@ -20,6 +20,12 @@ The first time, the welcome steps walk you through the local AI, who you want to
 
 Quitting the app (⌘Q, or closing its window) stops the server, unloads the models and quits Ollama.
 
+## Languages
+
+Undercurrent speaks English and French: Settings, Language, or the switch on the first welcome step (the first start follows your Mac's language). Kink names, the assistant and every message follow the language; tags stay in English so what you like counts the same in both. Searching in French also searches the English words the sources use. Posts in another language get a Translate button (and a small one next to the title), done by the local AI and kept for next time.
+
+Texts live in the code in English and are looked up in `web/src/i18n/fr/` and `server/src/i18n/fr/`; `npm test` fails when a text has no French. Change notes in French are in `CHANGELOG.fr.md`.
+
 ## Profiles
 
 Settings, Profiles: each profile has its own kinks, history, sources and settings (the AI models are shared). Add one and it opens with the welcome steps; switch, rename, back up, restore a backup as a new profile, or delete. Backups are in `~/Library/Application Support/Undercurrent/backups`.

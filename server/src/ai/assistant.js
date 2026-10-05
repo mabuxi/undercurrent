@@ -5,6 +5,7 @@ import { syncKinks, syncGroups, learnFamilies, logSummary } from '../kinkengine.
 import { topTags } from '../profile.js';
 import { memoryForPrompt, addMemory, listMemory, CATEGORIES } from '../memory.js';
 import { itemTags } from '../store.js';
+import { tr, trn, replyIn } from '../i18n.js';
 
 const FORMATS = ['long', 'short', 'gif', 'image', 'set', 'story', 'discussion'];
 
@@ -36,15 +37,15 @@ export function fallbackParse(q, kinks = listKinks(), fantasies = listFantasies(
   const s = q.toLowerCase();
   const out = { action: 'feed', filters: {}, reply: '' };
   const fan = fantasies.find((f) => s.includes(f.name.toLowerCase()));
-  const kink = kinks.find((k) => s.includes(k.name.toLowerCase()));
+  const kink = kinks.find((k) => s.includes(k.name.toLowerCase()) || (k.label && s.includes(k.label.toLowerCase())));
   if (/journey|guide me|take me/.test(s)) {
     out.action = 'journey';
     out.journey = { fantasy: fan?.name, kink: kink?.name, mode: /branch|new|different|explore/.test(s) ? 'branch' : fan || kink ? 'close' : 'surprise' };
-    out.reply = 'Starting a journey.';
+    out.reply = tr('Starting a journey.');
     return out;
   }
-  if (/lately|my map|pattern|what (am i|do i) (into|like)/.test(s)) return { action: 'map', filters: {}, reply: 'Opening your map.' };
-  if (/memory|remember/.test(s)) return { action: 'memory', filters: {}, reply: 'Opening your memory.' };
+  if (/lately|my map|pattern|what (am i|do i) (into|like)/.test(s)) return { action: 'map', filters: {}, reply: tr('Opening your map.') };
+  if (/memory|remember/.test(s)) return { action: 'memory', filters: {}, reply: tr('Opening your memory.') };
   const f = out.filters;
   if (fan) f.fantasy = fan.name;
   if (kink) f.kink = kink.name;
@@ -74,7 +75,7 @@ export function fallbackParse(q, kinks = listKinks(), fantasies = listFantasies(
   const hits = tagHits.filter((h) => !kn.includes(h));
   if (hits.length) f.tags = [...new Set(hits)];
   const any = Object.keys(f).length;
-  out.reply = any ? 'Center feed updated.' : 'I couldn’t turn that into a view. Try a kink, a format, a length, a mood, or ask for a journey.';
+  out.reply = any ? tr('Center feed updated.') : tr('I couldn’t turn that into a view. Try a kink, a format, a length, a mood, or ask for a journey.');
   if (!any) out.action = 'answer';
   return out;
 }
@@ -91,7 +92,7 @@ Their fantasies: ${fantasies.map((f) => f.name).join(', ') || 'none yet'}.
 Tags they know: ${tags.join(', ') || 'none yet'}.
 What you remember about them:
 ${memoryForPrompt() || '- nothing yet'}
-Use kink and fantasy names exactly as listed. Put anything else specific in filters.tags. reply is one short sentence saying what you did.`;
+Use kink and fantasy names exactly as listed. Put anything else specific in filters.tags. reply is one short sentence saying what you did. ${replyIn()}`;
   try {
     const out = await chat({ kind: 'ask-parse', system, user: q, schema: ASK_SCHEMA, temperature: 0.1 });
     if (out && out.action) return { ...out, engine: 'model' };
@@ -103,7 +104,7 @@ Use kink and fantasy names exactly as listed. Put anything else specific in filt
 
 export async function askItem(item, question, comments = []) {
   const tags = itemTags(item.id).map((t) => t.name).slice(0, 25);
-  const system = `You answer questions about one post in a private, local adult-content browser used by one adult. Be direct and specific, under 120 words. Use only the post details and comments given; say so when something isn't in them.
+  const system = `You answer questions about one post in a private, local adult-content browser used by one adult. Be direct and specific, under 120 words. Use only the post details and comments given; say so when something isn't in them. ${replyIn()}
 What you remember about the user:
 ${memoryForPrompt(20) || '- nothing yet'}`;
   const user = [
@@ -144,11 +145,11 @@ export function sessionStats(sessionId, sinceMs = 3 * 3600 * 1000) {
 
 export async function summarizeSession(sessionId) {
   const s = sessionStats(sessionId);
-  const plain = `${s.minutes} minutes, ${s.seen} posts seen, ${s.saved} saved, ${s.rated} rated. Right now you're drawn to ${s.topTagsNow.slice(0, 3).join(', ') || 'a bit of everything'}.`;
+  const plain = tr("{minutes}, {seen}, {saved} saved, {rated} rated. Right now you're drawn to {tags}.", { minutes: trn(s.minutes, '{n} minute', '{n} minutes'), seen: trn(s.seen, '{n} post seen', '{n} posts seen'), saved: s.saved, rated: s.rated, tags: s.topTagsNow.slice(0, 3).join(', ') || tr('a bit of everything') });
   try {
     const text = await chat({
       kind: 'summary',
-      system: 'Summarize one evening session of a private adult-content browser for its adult user in two or three plain sentences, second person, no judgement.',
+      system: `Summarize one evening session of a private adult-content browser for its adult user in two or three plain sentences, second person, no judgement. ${replyIn()}`,
       user: JSON.stringify(s),
       temperature: 0.5
     });
@@ -182,13 +183,13 @@ export async function reflect() {
     'Rated 4 or 5 flames:', ...rated.map((r) => `- ${r.title} (${r.community}, ${r.rating})`),
     'Already remembered:', existing || '- nothing'
   ].join('\n');
-  const system = `You maintain the memory of a private, local adult-content browser for one adult user. From the behaviour data, propose at most 6 new, specific memories that are not already remembered. Each memory is one sentence in plain language about the user's tastes, fantasies, dislikes, format preferences or favourite creators. Include short evidence. Don't repeat or rephrase existing memories. Keep an open mind: note shifts, not just constants.`;
+  const system = `You maintain the memory of a private, local adult-content browser for one adult user. From the behaviour data, propose at most 6 new, specific memories that are not already remembered. Each memory is one sentence in plain language about the user's tastes, fantasies, dislikes, format preferences or favourite creators. Include short evidence. Don't repeat or rephrase existing memories. Keep an open mind: note shifts, not just constants. ${replyIn()}`;
   let proposals = [];
   try {
     const out = await chat({ kind: 'reflect', system, user, schema: REFLECT_SCHEMA, temperature: 0.4 });
     proposals = out?.memories || [];
   } catch (err) {
-    proposals = rising.slice(0, 3).map((t) => ({ category: 'Kinks and interests', content: `Lately more into ${t.name} than usual.`, evidence: 'Rising over the last week' }));
+    proposals = rising.slice(0, 3).map((t) => ({ category: 'Kinks and interests', content: tr('Lately more into {tag} than usual.', { tag: t.name }), evidence: tr('Rising over the last week') }));
     if (!proposals.length) throw err;
   }
   const ids = [];

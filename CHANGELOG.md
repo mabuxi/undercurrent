@@ -3,6 +3,28 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.17.0 · 5 October 2026
+
+### French
+- Undercurrent speaks French. Switch between English and French in Settings, Language, or on the first welcome step; the first start follows your Mac's language.
+- Every screen, message, search step, error, update note and the Mac app's own menus follow the language.
+- Kink and family names are shown in French. Tags stay in English everywhere.
+- The assistant answers in the language you chose.
+- Searching in French also searches the English words the sources use, and the French word too: "pieds poilus" finds feet and hairy, plus posts titled in French.
+
+### Translate
+- Posts written in another language than yours get a Translate button under their text and a small one next to the title. The local AI on this Mac translates them, and translations are kept, so the second time is instant.
+- The buttons only show when the language of the post is clearly known and differs from yours.
+
+### The language does not change what you get
+- French titles and texts give the same English tags as English ones, so French posts land in the same kinks.
+- The taggers always tag in English, also for French posts.
+- Ranking, kinks and learning are the same in both languages.
+
+### Other
+- Dates and numbers use European formats in both languages.
+- Counts read correctly in the singular ("1 reply", "1 flame").
+
 ## 0.16.1 · 4 October 2026
 
 ### Fixes

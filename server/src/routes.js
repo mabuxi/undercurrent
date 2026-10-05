@@ -44,6 +44,9 @@ import { invalidatePool } from './searchstate.js';
 import { setupStatus, pullModels, installOllama, conceptCatalog, suggestFor, SOURCE_ORDER, modelOptions, chooseModels } from './setup.js';
 import { listProfiles, createProfile, renameProfile, setProfileColor, switchProfile, deleteProfile, backupProfile, restoreBackup, deleteBackup, revealInFinder } from './profiles.js';
 import { updateStatus, applyUpdate, job as updateJob, whatsNew, markSeen, changelog } from './update.js';
+import { lang, languageSet, setLanguage, LANGS, tr, trn, replyIn } from './i18n.js';
+import { kinkLabel, translateItem } from './translate.js';
+import { conceptLabel } from './vocab.js';
 import { conceptName as cName, knownVariants, familyOf } from './concepts.js';
 import { boostTags } from './profile.js';
 import { syncGroups } from './kinkengine.js';
@@ -116,14 +119,14 @@ api.post('/events', wrap((req, res) => {
 
 api.get('/items/:id/top', wrap(async (req, res) => {
   const it = getItem(Number(req.params.id));
-  if (!it) return res.status(404).json({ error: 'Not found' });
+  if (!it) return res.status(404).json({ error: tr('Not found') });
   const n = Math.max(2, Math.min(40, Number(req.query.n) || 2));
   try { res.json({ top: await topReplies(it, { waitMs: n > 2 ? 20000 : 6000, n }), n }); } catch (err) { res.json({ top: it.media?.top || [], pending: true, note: err.message }); }
 }));
 
 api.get('/items/:id', wrap((req, res) => {
   const it = getItem(Number(req.params.id));
-  if (!it) return res.status(404).json({ error: 'Not found' });
+  if (!it) return res.status(404).json({ error: tr('Not found') });
   res.json({ ...presentOne(it), allTags: itemTags(it.id) });
 }));
 
@@ -143,7 +146,7 @@ async function loadComments(it) {
 
 api.get('/items/:id/comments', wrap(async (req, res) => {
   const it = getItem(Number(req.params.id));
-  if (!it) return res.status(404).json({ error: 'Not found' });
+  if (!it) return res.status(404).json({ error: tr('Not found') });
   res.json({ comments: await loadComments(it), url: it.url });
 }));
 
@@ -161,11 +164,20 @@ function clientActions(client) {
   });
 }
 
+// A post's title or text in the interface language, by the local AI (kept, so it is quick the next time).
+api.post('/translate', wrap(async (req, res) => {
+  try {
+    res.json(await translateItem(req.body?.id, req.body?.field));
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+}));
+
 api.post('/items/:id/ask', wrap(async (req, res) => {
   const it = getItem(Number(req.params.id));
   const q = String(req.body?.question || '').trim();
-  if (!it) return res.status(404).json({ error: 'Not found' });
-  if (!q) return res.status(400).json({ error: 'Type a question first.' });
+  if (!it) return res.status(404).json({ error: tr('Not found') });
+  if (!q) return res.status(400).json({ error: tr('Type a question first.') });
   applyEvent({ itemId: it.id, type: 'ask', sessionId: req.body?.sessionId });
   const r = await runCommand(q, { itemId: it.id, sessionId: req.body?.sessionId });
   res.json({ answer: r.reply, client: clientActions(r.client), engine: r.engine });
@@ -174,7 +186,7 @@ api.post('/items/:id/ask', wrap(async (req, res) => {
 const refreshing = new Map();
 api.post('/items/:id/refresh-media', wrap(async (req, res) => {
   const it = getItem(Number(req.params.id));
-  if (!it) return res.status(404).json({ error: 'Not found' });
+  if (!it) return res.status(404).json({ error: tr('Not found') });
   const p = tubes[it.source];
   if (config.mock || !p?.byId || it.media?.kind !== 'embed') return res.json({ media: it.media, refreshed: false });
   if (Date.now() - (it.media.thumbsAt || 0) < 60_000) return res.json({ media: it.media, refreshed: false });
@@ -279,7 +291,7 @@ api.post('/items/:id/rate', wrap((req, res) => {
 api.post('/items/:id/kinks', wrap((req, res) => {
   const id = Number(req.params.id);
   const k = listKinks({ includeHidden: true }).find((x) => x.id === Number(req.body?.kink));
-  if (!k || k.isGroup || !getItem(id)) return res.status(404).json({ error: 'Not found' });
+  if (!k || k.isGroup || !getItem(id)) return res.status(404).json({ error: tr('Not found') });
   const db = getDb();
   if (req.body?.on === false) {
     const ids = k.tags.map((t) => t.id);
@@ -304,7 +316,7 @@ api.post('/items/:id/retag', wrap(async (req, res) => {
 api.get('/media/redgifs/:id', wrap(async (req, res) => {
   if (config.mock) return res.json({ hd: '/api/mock/video/vertical.webm', sd: '/api/mock/video/vertical.webm', poster: null });
   const g = await redgifs.resolveOne(req.params.id, req.query.fresh === '1');
-  if (!g) return res.status(404).json({ error: 'This RedGIFs clip is gone or private.' });
+  if (!g) return res.status(404).json({ error: tr('This RedGIFs clip is gone or private.') });
   const it = getDb().prepare("SELECT id, media FROM items WHERE source IN ('redgifs','reddit') AND json_extract(media, '$.redgifsId') = ?").all(req.params.id.toLowerCase());
   for (const row of it) {
     let m = {};
@@ -369,27 +381,44 @@ api.get('/home/summary', wrap((req, res) => {
   if (t - prev > 30 * 60000) { setSetting('prevVisit', prev); setSetting('lastVisit', t); }
   const since = getSetting('prevVisit', 0) || t - 86400000;
   const kinks = listKinks().filter((k) => !k.isGroup && k.status !== 'hidden');
-  const lean = kinks.slice().sort((a, b) => (b.lately + b.now) - (a.lately + a.now)).slice(0, 2).map((k) => k.name);
+  const lean = kinks.slice().sort((a, b) => (b.lately + b.now) - (a.lately + a.now)).slice(0, 2).map((k) => k.label || k.name);
   const rising = kinks.filter((k) => k.lately - k.allTime >= 4).sort((a, b) => (b.lately - b.allTime) - (a.lately - a.allTime))[0];
   const fresh = db.prepare('SELECT COUNT(*) c FROM items i LEFT JOIN item_state s ON s.item_id = i.id WHERE i.blocked = 0 AND i.fetched_at > ? AND COALESCE(s.seen, 0) = 0').get(since).c;
   const fol = followed();
   let fromFollowed = 0;
   for (const r of db.prepare('SELECT author, community FROM items WHERE blocked = 0 AND fetched_at > ?').all(since)) if ((r.community && fol.communities.has(r.community.toLowerCase())) || (r.author && fol.authors.has(String(r.author).toLowerCase()))) fromFollowed++;
-  const newKinks = db.prepare("SELECT name FROM kinks WHERE created > ? AND status = 'proposed' AND COALESCE(is_group, 0) = 0").all(since).map((r) => r.name).slice(0, 2);
+  const newKinks = db.prepare("SELECT name FROM kinks WHERE created > ? AND status = 'proposed' AND COALESCE(is_group, 0) = 0").all(since).map((r) => kinkLabel({ name: r.name })).slice(0, 2);
   const ideas = db.prepare("SELECT COUNT(*) c FROM suggestions WHERE status = 'new' AND kind = 'fantasy'").get().c;
   const last = db.prepare(`SELECT i.id FROM events e JOIN items i ON i.id = e.item_id WHERE e.ts BETWEEN ? AND ? AND e.type IN ('up', 'save', 'rate', 'complete', 'rewatch') ORDER BY e.ts DESC LIMIT 40`).all(since - 7 * 86400000, since);
   const lastTags = new Map();
   for (const r of last) for (const tg of itemTags(r.id).filter((x) => x.kind !== 'performer' && x.weight >= 0.5).slice(0, 4)) lastTags.set(tg.name, (lastTags.get(tg.name) || 0) + 1);
   const lastTop = [...lastTags.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2).map((x) => x[0]);
   const parts = [];
-  if (lean.length) parts.push(`Tonight leans into ${lean.join(' and ')}${rising && !lean.includes(rising.name) ? `, with ${rising.name} rising` : ''}.`);
-  if (fresh) parts.push(`${fresh} posts you haven't seen since last time${fromFollowed ? `, ${fromFollowed} from who you follow` : ''}.`);
-  if (lastTop.length) parts.push(`Last time you were into ${lastTop.join(' and ')}.`);
-  if (newKinks.length) parts.push(`New to try: ${newKinks.join(', ')}.`);
-  if (ideas) parts.push(`${ideas} fantasy ${ideas === 1 ? 'idea waits' : 'ideas wait'} in your windows.`);
-  res.json({ text: parts.join(' ') || 'Scroll, like and heat a few posts and the feed starts shaping itself around you.' });
+  const both = (l) => (l.length > 1 ? tr('{a} and {b}', { a: l.slice(0, -1).join(', '), b: l[l.length - 1] }) : l[0]);
+  if (lean.length) parts.push(rising && !lean.includes(rising.label || rising.name) ? tr('Tonight leans into {kinks}, with {rising} rising.', { kinks: both(lean), rising: rising.label || rising.name }) : tr('Tonight leans into {kinks}.', { kinks: both(lean) }));
+  if (fresh) parts.push(fromFollowed ? trn(fresh, "{n} post you haven't seen since last time, {f} from who you follow.", "{n} posts you haven't seen since last time, {f} from who you follow.", { f: fromFollowed }) : trn(fresh, "{n} post you haven't seen since last time.", "{n} posts you haven't seen since last time."));
+  if (lastTop.length) parts.push(tr('Last time you were into {tags}.', { tags: both(lastTop) }));
+  if (newKinks.length) parts.push(tr('New to try: {kinks}.', { kinks: newKinks.join(', ') }));
+  if (ideas) parts.push(trn(ideas, '{n} fantasy idea waits in your windows.', '{n} fantasy ideas wait in your windows.'));
+  res.json({ text: parts.join(' ') || tr('Scroll, like and heat a few posts and the feed starts shaping itself around you.') });
 }));
 
+// What a request to another site was for, in the interface language (stored in English).
+function purposeLabel(p) {
+  const v = String(p || '');
+  let m = v.match(/^(.+) content$/);
+  if (m && !['reddit', 'redgifs'].includes(m[1])) return tr('{site} content', { site: m[1] });
+  m = v.match(/^Scraper server: (.+)$/);
+  if (m) return tr('Scraper server: {site}', { site: m[1] });
+  return tr(v);
+}
+
+api.get('/settings/language', wrap((req, res) => res.json({ language: languageSet() ? lang() : null, languages: LANGS })));
+api.put('/settings/language', wrap((req, res) => {
+  const b = req.body || {};
+  if (b.guessed && languageSet()) return res.json({ language: lang() });
+  res.json({ language: setLanguage(b.language) });
+}));
 api.get('/settings/gender', wrap((req, res) => res.json({ ...genderPrefs(), autoValue: autoMale() })));
 api.put('/settings/gender', wrap((req, res) => {
   const b = req.body || {};
@@ -403,7 +432,7 @@ api.put('/settings/gender', wrap((req, res) => {
 
 api.get('/people/lookup', wrap(async (req, res) => {
   const handle = String(req.query.handle || '').trim();
-  if (!handle) return res.status(400).json({ error: 'Which person?' });
+  if (!handle) return res.status(400).json({ error: tr('Which person?') });
   res.json(await lookupPerson(handle, { platform: String(req.query.platform || 'any') }));
 }));
 
@@ -433,7 +462,7 @@ api.get('/providers', wrap((req, res) => {
     autoDiscover: getSetting('autoDiscover', true),
     autoTags: autoTags(),
     providers: Object.entries(PROVIDERS).map(([id, p]) => ({
-      id, label: p.label, about: p.about, formats: p.formats, keys: p.keys, can: p.can, enabled: state[id].enabled, hasKeys: hasKeys(id), needs: p.needs || null, alsoScraper: !!lustUrl() && ['pornhub', 'redtube', 'eporner'].includes(id),
+      id, label: p.label, about: tr(p.about), formats: p.formats, keys: p.keys, can: p.can, enabled: state[id].enabled, hasKeys: hasKeys(id), needs: p.needs || null, alsoScraper: !!lustUrl() && ['pornhub', 'redtube', 'eporner'].includes(id),
       stats: { ...(stats[id] || {}), ...(counts[id] || { items: 0, filtered: 0 }) },
       follows: follows.filter((f) => f.target?.provider === id),
       ...(id === 'reddit' ? { rss: { ...rss.rssStatus(), queue: redditQueueSize() } } : {})
@@ -442,7 +471,7 @@ api.get('/providers', wrap((req, res) => {
 }));
 
 api.put('/providers/:id', wrap((req, res) => {
-  if (!PROVIDERS[req.params.id]) return res.status(404).json({ error: 'Unknown source' });
+  if (!PROVIDERS[req.params.id]) return res.status(404).json({ error: tr('Unknown source') });
   if ('enabled' in (req.body || {})) setProvider(req.params.id, { enabled: !!req.body.enabled });
   if (req.body?.enabled) runIngest({ only: req.params.id, force: true }).catch(() => {});
   res.json({ ok: true });
@@ -484,7 +513,7 @@ api.get('/following/latest', wrap((req, res) => {
 
 api.post('/follow', wrap(async (req, res) => {
   const { kind, value, on = true, label } = req.body || {};
-  if (!kind || !value) return res.status(400).json({ error: 'Pick what to follow.' });
+  if (!kind || !value) return res.status(400).json({ error: tr('Pick what to follow.') });
   if (on) follow(kind, String(value).trim(), { label, synced: kind === 'subreddit' || kind === 'community' ? 'source' : null }); else unfollow(kind, value);
   let synced = false;
   if (kind === 'subreddit' && !config.mock && getSetting('syncFollows', true) && reddit.redditConfigured()) {
@@ -514,7 +543,7 @@ api.get('/journey', wrap((req, res) => {
 
 api.post('/ask', wrap(async (req, res) => {
   const q = String(req.body?.q || '').trim();
-  if (!q) return res.status(400).json({ error: 'Type a question or a request first.' });
+  if (!q) return res.status(400).json({ error: tr('Type a question or a request first.') });
   const r = await runCommand(q, { sessionId: req.body?.sessionId });
   res.json({ reply: r.reply, client: clientActions(r.client), engine: r.engine });
 }));
@@ -522,33 +551,33 @@ api.post('/ask', wrap(async (req, res) => {
 // The search bar: a search runs as a job whose steps the bar shows while they happen.
 api.post('/search', wrap((req, res) => {
   const q = String(req.body?.q || '').trim();
-  if (!q) return res.status(400).json({ error: 'Type something to search for, or ask for something.' });
+  if (!q) return res.status(400).json({ error: tr('Type something to search for, or ask for something.') });
   const id = startSearch({ q, deep: !!req.body?.deep, sessionId: req.body?.sessionId || null });
   res.json(jobView(id));
 }));
 api.get('/search/:id', wrap((req, res) => {
   const v = jobView(req.params.id);
-  if (!v) return res.status(404).json({ error: 'That search has expired. Search again.' });
+  if (!v) return res.status(404).json({ error: tr('That search has expired. Search again.') });
   res.json(v);
 }));
 api.post('/search/:id/chip', wrap((req, res) => {
   const v = editChip(req.params.id, req.body || {});
-  if (!v) return res.status(404).json({ error: 'That search has expired. Search again.' });
+  if (!v) return res.status(404).json({ error: tr('That search has expired. Search again.') });
   res.json(v);
 }));
 api.post('/search/:id/more', wrap(async (req, res) => {
   const v = await searchMore(req.params.id);
-  if (!v) return res.status(404).json({ error: 'That search has expired. Search again.' });
+  if (!v) return res.status(404).json({ error: tr('That search has expired. Search again.') });
   res.json(v);
 }));
 api.post('/search/:id/profile', wrap(async (req, res) => {
   const r = await openProfile(req.params.id, String(req.body?.key || ''));
-  if (!r) return res.status(404).json({ error: 'That search has expired. Search again.' });
+  if (!r) return res.status(404).json({ error: tr('That search has expired. Search again.') });
   res.json(r);
 }));
 api.post('/search/:id/follow', wrap((req, res) => {
   const { provider, mode, value, label } = req.body || {};
-  if (!PROVIDERS[provider] || !value) return res.status(400).json({ error: 'Unknown source.' });
+  if (!PROVIDERS[provider] || !value) return res.status(400).json({ error: tr('Unknown source.') });
   // Added as a source: its posts come into the feed, but it is not something you "follow".
   if (provider === 'reddit' && mode === 'community') follow('subreddit', value, { label: label || `r/${value}`, synced: 'source' });
   else if (provider === 'reddit' && mode === 'creator') follow('reddit_user', value, { label: label || `u/${value}`, synced: 'source' });
@@ -560,7 +589,7 @@ api.get('/settings/lustpress', wrap((req, res) => res.json({ url: lustUrl() || n
 api.put('/settings/lustpress', wrap(async (req, res) => {
   const url = String(req.body?.url || '').trim().replace(/\/+$/, '');
   if (!url) { setSetting('lustpressUrl', null); invalidatePool(); return res.json({ url: null }); }
-  if (!/^https?:\/\//i.test(url)) return res.status(400).json({ error: 'Give the full address, starting with https://' });
+  if (!/^https?:\/\//i.test(url)) return res.status(400).json({ error: tr('Give the full address, starting with https://') });
   try {
     const n = await lustTest(url);
     setSetting('lustpressUrl', url);
@@ -568,7 +597,7 @@ api.put('/settings/lustpress', wrap(async (req, res) => {
     invalidatePool();
     runIngest().catch(() => {});
     res.json({ url, ok: true, results: n });
-  } catch (err) { res.status(400).json({ error: `That server did not answer like a Lustpress server: ${err.message}` }); }
+  } catch (err) { res.status(400).json({ error: tr('That server did not answer like a Lustpress server: {error}', { error: err.message }) }); }
 }));
 api.get('/settings/websearch', wrap((req, res) => res.json({ set: !!webKey(), fromEnv: !getSetting('ollamaApiKey', null) && !!process.env.OLLAMA_API_KEY })));
 api.put('/settings/websearch', wrap(async (req, res) => {
@@ -581,7 +610,7 @@ api.put('/settings/websearch', wrap(async (req, res) => {
 api.get('/session/summary', wrap(async (req, res) => res.json(await summarizeSession(req.query.session || null))));
 api.get('/session/stats', wrap((req, res) => res.json(sessionStats(req.query.session || null))));
 
-api.get('/kinks', wrap((req, res) => res.json({ kinks: listKinks({ includeHidden: true }) })));
+api.get('/kinks', wrap((req, res) => res.json({ kinks: listKinks({ includeHidden: true }).map((k) => ({ ...k, name: k.label || k.name, baseName: k.name })) })));
 api.post('/kinks', wrap((req, res) => res.json({ id: createKink({ ...req.body, origin: 'user' }) })));
 api.patch('/kinks/:id', wrap((req, res) => res.json({ ok: updateKink(Number(req.params.id), req.body || {}) })));
 api.delete('/kinks/:id', wrap((req, res) => { deleteKink(Number(req.params.id)); res.json({ ok: true }); }));
@@ -589,14 +618,14 @@ api.post('/kinks/refresh', wrap(async (req, res) => res.json(await refreshKinks(
 api.post('/kinks/organize', wrap(async (req, res) => res.json(await organizeKinks())));
 api.post('/kinks/groups', wrap((req, res) => {
   const name = String(req.body?.name || '').trim();
-  if (!name) return res.status(400).json({ error: 'Give the group a name.' });
+  if (!name) return res.status(400).json({ error: tr('Give the group a name.') });
   const id = createKink({ name, isGroup: true, origin: 'user', color: req.body?.color || undefined });
   for (const k of req.body?.kinks || []) updateKink(Number(k), { parentId: id });
   res.json({ id });
 }));
 api.post('/kinks/:id/merge', wrap((req, res) => res.json({ id: mergeKinks(Number(req.params.id), Number(req.body?.into)) })));
 api.post('/kinks/:id/unlock', wrap(async (req, res) => { unlockKink(Number(req.params.id)); res.json(await refreshKinks()); }));
-api.get('/kinks/removed', wrap((req, res) => res.json({ removed: [...removedConcepts()].map((c) => ({ concept: c, name: conceptName(c) })) })));
+api.get('/kinks/removed', wrap((req, res) => res.json({ removed: [...removedConcepts()].map((c) => ({ concept: c, name: conceptLabel(c, lang(), conceptName(c)) })) })));
 api.delete('/kinks/removed/:concept', wrap(async (req, res) => { forgetRemoved(String(req.params.concept)); res.json(await refreshKinks()); }));
 api.get('/kinks/rising', wrap((req, res) => res.json({ rising: risingConcepts(12), rules: RULES })));
 api.post('/kinks/links', wrap((req, res) => { setLink(req.body?.a, req.body?.b, req.body?.why || '', 'user'); res.json({ ok: true }); }));
@@ -605,17 +634,18 @@ api.delete('/kinks/links/:a/:b', wrap((req, res) => { removeLink(req.params.a, r
 api.get('/brain', wrap((req, res) => res.json(brain())));
 api.get('/brain/node/:key', wrap((req, res) => {
   const d = nodeDetail(String(req.params.key));
-  if (!d) return res.status(404).json({ error: 'Not found' });
+  if (!d) return res.status(404).json({ error: tr('Not found') });
   res.json(d);
 }));
 const insightCache = new Map();
 api.get('/brain/insight/:key', wrap(async (req, res) => {
   const key = String(req.params.key);
-  const hit = insightCache.get(key);
+  const cacheKey = `${lang()}|${key}`;
+  const hit = insightCache.get(cacheKey);
   if (hit && Date.now() - hit.at < 10 * 60000 && req.query.fresh !== '1') return res.json({ text: hit.text, cached: true });
   const b = brain();
   const node = b.nodes.find((n) => n.key === key);
-  if (!node) return res.status(404).json({ error: 'Not found' });
+  if (!node) return res.status(404).json({ error: tr('Not found') });
   const d = nodeDetail(key) || {};
   const names = new Map(b.nodes.map((n) => [n.key, n.name]));
   const links = b.edges.filter((e) => e.a === key || e.b === key).sort((x, y) => y.w - x.w).slice(0, 6).map((e) => `${names.get(e.a === key ? e.b : e.a)} (${Math.round(e.w * 100)}%)`);
@@ -630,9 +660,9 @@ api.get('/brain/insight/:key', wrap(async (req, res) => {
   ].filter(Boolean).join('\n');
   try {
     const text = await chat({ kind: 'summary', model: fastModel(), numPredict: 170, temperature: 0.4,
-      system: 'You are the private, local assistant of one adult using an adult-content browser. In 2 or 3 short sentences, second person, no judgement, say what this kink means for his taste right now: how strong it is, whether it is rising or fading, what it pairs with, and one specific thing worth exploring next. Plain words, no lists.',
+      system: `You are the private, local assistant of one adult using an adult-content browser. In 2 or 3 short sentences, second person, no judgement, say what this kink means for his taste right now: how strong it is, whether it is rising or fading, what it pairs with, and one specific thing worth exploring next. Plain words, no lists. ${replyIn()}`,
       user: facts });
-    insightCache.set(key, { text, at: Date.now() });
+    insightCache.set(cacheKey, { text, at: Date.now() });
     res.json({ text });
   } catch (err) {
     res.json({ text: null, error: err.message });
@@ -689,7 +719,7 @@ api.post('/suggestions/refresh', wrap(async (req, res) => {
 }));
 api.post('/suggestions/:id', wrap((req, res) => {
   const row = getDb().prepare('SELECT * FROM suggestions WHERE id = ?').get(Number(req.params.id));
-  if (!row) return res.status(404).json({ error: 'Not found' });
+  if (!row) return res.status(404).json({ error: tr('Not found') });
   const data = JSON.parse(row.data || '{}');
   if (req.body?.action === 'save' && row.kind === 'fantasy') {
     const id = saveFantasy({ name: row.title, description: row.body, kinks: (data.kinks || []).map((k) => k.id), saved: 1, origin: 'ai' });
@@ -704,7 +734,7 @@ api.get('/fantasies', wrap((req, res) => res.json({ fantasies: listFantasies() }
 api.post('/fantasies', wrap((req, res) => res.json({ id: saveFantasy(req.body || {}) })));
 api.patch('/fantasies/:id', wrap((req, res) => {
   const cur = listFantasies().find((f) => f.id === Number(req.params.id));
-  if (!cur) return res.status(404).json({ error: 'Not found' });
+  if (!cur) return res.status(404).json({ error: tr('Not found') });
   res.json({ id: saveFantasy({ id: cur.id, name: cur.name, description: cur.description, kinks: cur.kinks.map((k) => k.id), saved: cur.saved, ...req.body }) });
 }));
 api.delete('/fantasies/:id', wrap((req, res) => { deleteFantasy(Number(req.params.id)); res.json({ ok: true }); }));
@@ -720,7 +750,7 @@ api.post('/memory/reflect', wrap(async (req, res) => res.json({ proposed: (await
 api.get('/limits', wrap((req, res) => res.json({ limits: userLimits(), safetyTerms: hardBlockList().length })));
 api.post('/limits', wrap((req, res) => {
   const t = normalizeTag(req.body?.tag);
-  if (!t) return res.status(400).json({ error: 'Type a tag to block.' });
+  if (!t) return res.status(400).json({ error: tr('Type a tag to block.') });
   getDb().prepare('INSERT OR IGNORE INTO limits(tag, created) VALUES(?, ?)').run(t, now());
   const r = recheckBlocks();
   res.json({ ok: true, hidden: r.blocked });
@@ -762,7 +792,7 @@ api.post('/reddit/sync', wrap(async (req, res) => { const r = await syncRedditSu
 api.post('/reddit/import', wrap(async (req, res) => res.json(await importRedditHistory())));
 
 api.put('/settings/booru/:name', wrap((req, res) => {
-  if (!BOORUS[req.params.name]) return res.status(404).json({ error: 'Unknown board' });
+  if (!BOORUS[req.params.name]) return res.status(404).json({ error: tr('Unknown board') });
   const cur = getSetting(`booru.${req.params.name}`, {}) || {};
   setSetting(`booru.${req.params.name}`, { userId: req.body?.userId ?? cur.userId, apiKey: req.body?.apiKey || cur.apiKey });
   res.json({ ok: true });
@@ -774,7 +804,7 @@ api.put('/settings/reddit-feed', wrap((req, res) => {
   let feed = req.body?.feed;
   let user = req.body?.user;
   try { const u = new URL(raw); feed = u.searchParams.get('feed') || feed; user = u.searchParams.get('user') || user; } catch {}
-  if (!feed || !user) return res.status(400).json({ error: 'Paste one of the private feed links from reddit.com/prefs/feeds. It contains feed= and user=.' });
+  if (!feed || !user) return res.status(400).json({ error: tr('Paste one of the private feed links from reddit.com/prefs/feeds. It contains feed= and user=.') });
   setSetting('redditFeed', { feed, user });
   res.json({ ok: true, set: true, user });
 }));
@@ -790,7 +820,7 @@ api.put('/settings/ai', wrap((req, res) => {
 
 api.post('/models/pull', wrap(async (req, res) => {
   const name = String(req.body?.name || '').trim();
-  if (!/^[\w.\-/:]+$/.test(name)) return res.status(400).json({ error: 'That does not look like a model name.' });
+  if (!/^[\w.\-/:]+$/.test(name)) return res.status(400).json({ error: tr('That does not look like a model name.') });
   res.json(await pullModel(name));
 }));
 api.get('/models/pull', wrap((req, res) => res.json({ pulls: [...pulls.values()] })));
@@ -817,12 +847,12 @@ api.get('/models', wrap(async (req, res) => {
   let error = null;
   try { models = await listModels(); } catch (err) { error = err.message; }
   for (const m of models) { try { const i = await modelInfo(m.name); m.vision = i.vision; m.capabilities = i.capabilities; } catch {} }
-  res.json({ models, running: await running(), active: activeModel(), fast: fastModel(), system: systemInfo(), error, suggested: SUGGESTED_FAST });
+  res.json({ models, running: await running(), active: activeModel(), fast: fastModel(), system: systemInfo(), error, suggested: SUGGESTED_FAST.map((m) => ({ ...m, size: tr(m.size), note: tr(m.note) })) });
 }));
 api.put('/models/active', wrap((req, res) => { setModel(String(req.body?.name || '')); res.json({ ok: true, active: activeModel() }); }));
 api.post('/models/test', wrap(async (req, res) => {
   const t = Date.now();
-  const reply = await chat({ kind: 'test', user: 'Answer with one short sentence: are you ready to tag posts for a private adult-content browser?', temperature: 0.2 });
+  const reply = await chat({ kind: 'test', user: `Answer with one short sentence: are you ready to tag posts for a private adult-content browser? ${replyIn()}`, temperature: 0.2 });
   res.json({ reply, ms: Date.now() - t });
 }));
 
@@ -844,7 +874,7 @@ api.post('/setup/suggest', wrap((req, res) => res.json({ suggestions: suggestFor
 api.get('/setup/sources', wrap((req, res) => {
   const st = providerState();
   const order = (id) => { const i = SOURCE_ORDER.indexOf(id); return i < 0 ? 99 : i; };
-  res.json({ sources: Object.entries(PROVIDERS).map(([id, p]) => ({ id, label: p.label, about: p.about, formats: p.formats, enabled: st[id].enabled, hasKeys: hasKeys(id), needs: p.needs || null }))
+  res.json({ sources: Object.entries(PROVIDERS).map(([id, p]) => ({ id, label: p.label, about: tr(p.about), formats: p.formats, enabled: st[id].enabled, hasKeys: hasKeys(id), needs: p.needs || null }))
     .sort((a, b) => order(a.id) - order(b.id)) });
 }));
 // A few fantasies from what you picked: written by the local model when it is ready, simple pairings otherwise.
@@ -858,20 +888,21 @@ api.post('/setup/fantasies', wrap(async (req, res) => {
       const out = await Promise.race([chat({
         kind: 'summary', model: fastModel(), temperature: 0.8, numPredict: 700,
         schema: { type: 'object', properties: { fantasies: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, description: { type: 'string' }, kinks: { type: 'array', items: { type: 'string' } } }, required: ['name', 'description', 'kinks'] } } }, required: ['fantasies'] },
-        system: 'You suggest fantasies for one adult using a private adult-content browser. A fantasy is a short scenario that ties two or three of his picked kinks together. Give 5. name: 2 to 4 plain words. description: one sentence, second person, explicit is fine, all adults. kinks: the exact picked kink names it uses.',
+        system: `You suggest fantasies for one adult using a private adult-content browser. A fantasy is a short scenario that ties two or three of his picked kinks together. Give 5. name: 2 to 4 plain words. description: one sentence, second person, explicit is fine, all adults. kinks: the exact picked kink names it uses, unchanged. ${replyIn()}`,
         user: `Picked kinks: ${names.join(', ')}`
       }), new Promise((_, rej) => setTimeout(() => rej(new Error('slow')), 30000))]);
       list = (out?.fantasies || []).map((f) => ({ name: String(f.name || '').slice(0, 50), description: String(f.description || '').slice(0, 240), concepts: (f.kinks || []).map((k) => picked[names.findIndex((n) => n.toLowerCase() === String(k).toLowerCase())]).filter(Boolean) }))
         .filter((f) => f.name && f.concepts.length >= 2);
     } catch {}
   }
+  const byAi = list.length > 0;
   if (list.length < 3) {
     for (let i = 0; i < picked.length && list.length < 5; i++) for (let j = i + 1; j < picked.length && list.length < 5; j++) {
       if (familyOf(picked[i]) === familyOf(picked[j])) continue;
-      list.push({ name: `${names[i]} and ${names[j].toLowerCase()}`, description: `Scenes where ${names[i].toLowerCase()} and ${names[j].toLowerCase()} come together.`, concepts: [picked[i], picked[j]] });
+      list.push({ name: tr('{a} and {b}', { a: names[i], b: names[j].toLowerCase() }), description: tr('Scenes where {a} and {b} come together.', { a: names[i].toLowerCase(), b: names[j].toLowerCase() }), concepts: [picked[i], picked[j]] });
     }
   }
-  res.json({ fantasies: list.slice(0, 5), byAi: list.length > 0 && !list[0].description.startsWith('Scenes where') });
+  res.json({ fantasies: list.slice(0, 5), byAi });
 }));
 // Saves everything from the welcome steps at once.
 api.post('/setup/finish', wrap(async (req, res) => {
@@ -939,14 +970,16 @@ api.get('/status', wrap(async (req, res) => {
   const db = getDb();
   const since = Number(req.query.since) || 0;
   const net = db.prepare('SELECT host, purpose, COUNT(*) n, COALESCE(SUM(bytes_out),0) bytesOut, COALESCE(SUM(bytes_in),0) bytesIn FROM net_log WHERE ts > ? GROUP BY host, purpose ORDER BY n DESC').all(since);
+  for (const r of net) r.purpose = purposeLabel(r.purpose);
   const counts = db.prepare('SELECT COUNT(*) items, SUM(blocked) blocked, SUM(CASE WHEN ai_status = \'done\' THEN 1 ELSE 0 END) tagged FROM items').get();
   res.json({
     version: config.version,
+    language: lang(),
     app: config.app,
     profile: config.profile,
     webSearch: !!webKey(),
     mock: config.mock,
-    model: config.mock ? 'test model (mock mode)' : activeModel(),
+    model: config.mock ? tr('test model (mock mode)') : activeModel(),
     ollama: await health(),
     running: await running(),
     tagger: taggerStatus(),
@@ -970,7 +1003,7 @@ api.get('/export', wrap((req, res) => {
 }));
 
 api.post('/reset-profile', wrap((req, res) => {
-  if (req.body?.confirm !== 'reset') return res.status(400).json({ error: 'Send confirm: "reset" to wipe your profile.' });
+  if (req.body?.confirm !== 'reset') return res.status(400).json({ error: tr('Send confirm: "reset" to wipe your profile.') });
   const db = getDb();
   db.transaction(() => { db.exec('DELETE FROM affinity; DELETE FROM events; DELETE FROM item_state;'); })();
   res.json({ ok: true });

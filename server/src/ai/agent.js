@@ -8,6 +8,7 @@ import { getItem, itemTags, recheckBlocks, addTags } from '../store.js';
 import { follow, rememberSearch } from '../ingest.js';
 import { PROVIDERS } from '../sources/providers.js';
 import { sourcesForTopic } from '../discover.js';
+import { tr, trn, replyIn } from '../i18n.js';
 
 const FORMATS = ['long', 'short', 'gif', 'image', 'set', 'story', 'discussion'];
 
@@ -62,7 +63,7 @@ export function rulesParse(q, item) {
   const s = q.toLowerCase().trim();
   const kinks = listKinks({ includeHidden: true });
   const fantasies = listFantasies();
-  const kink = kinks.find((k) => s.includes(k.name.toLowerCase()));
+  const kink = kinks.find((k) => s.includes(k.name.toLowerCase()) || (k.label && s.includes(k.label.toLowerCase())));
   const fan = fantasies.find((f) => s.includes(f.name.toLowerCase()));
   const actions = [];
   let m;
@@ -162,7 +163,7 @@ Their kinks: ${kinks.join(', ') || 'none yet'}. Fantasies: ${fantasies.join(', '
 Memory:
 ${memoryForPrompt(25) || '- nothing yet'}${ctx}
 Searches, questions and one-off requests are never memory: only use like, dislike, into_now, stop_showing or remember when they state something about their taste.
-If they only ask a question about the post, answer it in reply with no actions. reply is one short, plain sentence saying what you did or the answer.`;
+If they only ask a question about the post, answer it in reply with no actions. reply is one short, plain sentence saying what you did or the answer. ${replyIn()}`;
   return chat({ kind: 'ask-parse', system, user: q, schema: SCHEMA, temperature: 0.1, model: fastModel() });
 }
 
@@ -192,7 +193,7 @@ export async function runCommand(q, { itemId = null, sessionId = null } = {}) {
       engine = 'model';
       reply = parsed?.reply || null;
     } catch (err) {
-      return { reply: `I couldn't reach the local model (${err.message}). Try a simpler command like "long form videos", "search latex" or "remember I like slow builds".`, client: [], engine: 'none' };
+      return { reply: tr("I couldn't reach the local model ({error}). Try a simpler command like \"long form videos\", \"search latex\" or \"remember I like slow builds\".", { error: err.message }), client: [], engine: 'none' };
     }
   }
   const client = [];
@@ -217,17 +218,17 @@ export async function runCommand(q, { itemId = null, sessionId = null } = {}) {
         if (learn.length) boostTags(learn, 0.35);
         applyEvent({ itemId: null, type: 'search', value: null, sessionId });
       }
-      done.push(`showing ${[a.search && `"${a.search}"`, a.kink, a.fantasy, ...(a.tags || []), ...(a.formats || []).map((x) => ({ long: 'long form', short: 'short form', set: 'image sets' }[x] || `${x}s`)), a.length && a.length !== 'any' && `${a.length} ones`, a.only_new && 'new to you', a.following && 'following', a.saved && 'saved'].filter(Boolean).join(', ') || 'your mixed feed'}`);
+      done.push(tr('showing {what}', { what: [a.search && `"${a.search}"`, a.kink, a.fantasy, ...(a.tags || []), ...(a.formats || []).map((x) => ({ long: tr('long form'), short: tr('short form'), set: tr('image sets') }[x] || tr(`${x}s`))), a.length && a.length !== 'any' && ({ quick: tr('quick ones'), medium: tr('medium ones'), long: tr('long ones') }[a.length] || `${a.length} ones`), a.only_new && tr('new to you'), a.following && tr('following'), a.saved && tr('saved')].filter(Boolean).join(', ') || tr('your mixed feed') }));
     } else if (a.type === 'open') {
       client.push({ type: 'open', view: a.view || 'feed' });
-      done.push(`opened ${a.view}`);
+      done.push({ feed: tr('opened the feed'), map: tr('opened your map'), memory: tr('opened memory'), settings: tr('opened settings') }[a.view] || tr('opened {view}', { view: a.view }));
     } else if (a.type === 'journey') {
       client.push({ type: 'journey', kink: a.kink || null, fantasy: a.fantasy || null, mode: a.mode || 'surprise' });
-      done.push('started a journey');
+      done.push(tr('started a journey'));
     } else if (a.type === 'remember' && a.text) {
       addMemory({ category: CATEGORIES.includes(a.category) ? a.category : 'Notes', content: a.text, origin: 'user' });
       memoryNote = true;
-      done.push('saved that to your memory');
+      done.push(tr('saved that to your memory'));
     } else if ((a.type === 'block' || a.type === 'stop_showing') && a.name) {
       // Hidden completely: a hard limit plus a memory, as asked.
       const t = normalizeTag(a.name);
@@ -235,49 +236,49 @@ export async function runCommand(q, { itemId = null, sessionId = null } = {}) {
       for (const x of [t, ...also]) getDb().prepare('INSERT OR IGNORE INTO limits(tag, created) VALUES(?, ?)').run(x, now());
       const r = recheckBlocks();
       boostTags([t, ...also], -2);
-      addMemory({ category: 'Turn-offs and limits', content: `Never show ${a.name.trim()}`, origin: 'user', status: 'active' });
+      addMemory({ category: 'Turn-offs and limits', content: tr('Never show {what}', { what: a.name.trim() }), origin: 'user', status: 'active' });
       memoryNote = true;
       const list = `"${[t, ...also].join('", "')}"`;
-      done.push(`${a.type === 'block' ? `blocked ${list}` : `you won't see ${list} anymore`}${r.blocked ? ` (${r.blocked} posts hidden)` : ''}; it is a hard limit now and saved to memory`);
+      done.push(tr('{what}{hidden}; it is a hard limit now and saved to memory', { what: a.type === 'block' ? tr('blocked {list}', { list }) : tr("you won't see {list} anymore", { list }), hidden: r.blocked ? ` ${trn(r.blocked, '({n} post hidden)', '({n} posts hidden)')}` : '' }));
       client.push({ type: 'refresh' });
     } else if (a.type === 'into_now') {
       const tags = a.fromItem || !a.text ? (item ? itemTags(item.id).filter((t) => t.kind !== 'performer' && t.weight >= 0.45).slice(0, 4).map((t) => t.name) : []) : await textToTags(a.text, item);
-      if (!tags.length) { done.push('couldn’t tell what you mean'); continue; }
+      if (!tags.length) { done.push(tr('couldn’t tell what you mean')); continue; }
       boostTags(tags, 1.2);
-      addMemory({ category: 'Right now', content: `Into ${a.text || tags.slice(0, 3).join(', ')} right now`, origin: 'user', status: 'active' });
+      addMemory({ category: 'Right now', content: tr('Into {what} right now', { what: a.text || tags.slice(0, 3).join(', ') }), origin: 'user', status: 'active' });
       memoryNote = true;
       let srcs = [];
       try { srcs = await sourcesForTopic(a.text || tags[0], tags, { origin: 'ask' }); } catch {}
       if (srcs.length) client.push({ type: 'fetch' });
       client.push({ type: 'filter', filters: { tags: tags.slice(0, 2) } });
-      done.push(`noted you are into ${tags.slice(0, 3).join(', ')} right now; saved under "Right now"${srcs.length ? `, added ${srcs.slice(0, 3).join(', ')} as sources` : ''} and showing more of it`);
+      done.push(tr('noted you are into {tags} right now; saved under "Right now"{sources} and showing more of it', { tags: tags.slice(0, 3).join(', '), sources: srcs.length ? tr(', added {list} as sources', { list: srcs.slice(0, 3).join(', ') }) : '' }));
     } else if (a.type === 'create_kink' && a.name) {
       createKink({ name: a.name, tags: (a.tags?.length ? a.tags : [a.name]).map(normalizeTag), origin: 'user' });
-      done.push(`created the kink "${a.name}"`);
+      done.push(tr('created the kink "{name}"', { name: a.name }));
       client.push({ type: 'meta' });
     } else if (a.type === 'save_item' && item) {
       applyEvent({ itemId: item.id, type: 'save', sessionId });
       client.push({ type: 'item', patch: { saved: true } });
-      done.push('saved it');
+      done.push(tr('saved it'));
     } else if (a.type === 'rate_item' && item && a.rating) {
       const v = Math.max(1, Math.min(5, Math.round(a.rating)));
       applyEvent({ itemId: item.id, type: 'rate', value: v, sessionId });
       client.push({ type: 'item', patch: { rating: v } });
-      done.push(`rated it ${v} flames`);
+      done.push(trn(v, 'rated it {n} flame', 'rated it {n} flames'));
     } else if (a.type === 'hide_item' && item) {
       applyEvent({ itemId: item.id, type: 'less', sessionId });
       client.push({ type: 'item', patch: { hidden: true } });
-      done.push('hid it and will show less like it');
+      done.push(tr('hid it and will show less like it'));
     } else if (a.type === 'more_like_item' && item) {
       const tags = itemTags(item.id).filter((t) => t.kind !== 'performer').slice(0, 3).map((t) => t.name);
       applyEvent({ itemId: item.id, type: 'more', sessionId });
       client.push({ type: 'filter', filters: { tags }, focus: item.id });
-      done.push(`showing more with ${tags.join(', ')}`);
+      done.push(tr('showing more with {tags}', { tags: tags.join(', ') }));
     } else if ((a.type === 'like' || a.type === 'dislike') && a.text) {
       const tags = await textToTags(a.text, null);
       const pos = a.type === 'like';
       boostTags(tags, pos ? 1.5 : -1.5);
-      addMemory({ category: pos ? 'Kinks and interests' : 'Turn-offs and limits', content: `${pos ? 'Likes' : 'Not really into'} ${a.text}`, origin: 'user', status: 'active' });
+      addMemory({ category: pos ? 'Kinks and interests' : 'Turn-offs and limits', content: pos ? tr('Likes {what}', { what: a.text }) : tr('Not really into {what}', { what: a.text }), origin: 'user', status: 'active' });
       memoryNote = true;
       let srcs = [];
       if (pos && tags.length) {
@@ -286,23 +287,23 @@ export async function runCommand(q, { itemId = null, sessionId = null } = {}) {
       }
       if (pos && tags.length) client.push({ type: 'filter', filters: { tags } });
       else client.push({ type: 'refresh' });
-      done.push(pos ? `noted that you like ${tags.join(', ') || a.text}, saved it to memory${srcs.length ? `, added ${srcs.slice(0, 4).join(', ')} as sources` : ''} and showing it now` : `noted, less ${tags.join(', ') || a.text} from now on (say "block ${tags[0] || a.text}" to never see it)`);
+      done.push(pos ? tr('noted that you like {what}, saved it to memory{sources} and showing it now', { what: tags.join(', ') || a.text, sources: srcs.length ? tr(', added {list} as sources', { list: srcs.slice(0, 4).join(', ') }) : '' }) : tr('noted, less {what} from now on (say "block {tag}" to never see it)', { what: tags.join(', ') || a.text, tag: tags[0] || a.text }));
     } else if (a.type === 'like_reason' && item && a.text) {
       const tags = await textToTags(a.text, item);
       if (tags.length) addTags(item.id, tags.map((name) => ({ name, weight: 1 })), 'user');
       applyEvent({ itemId: item.id, type: 'reason', value: null, sessionId });
       boostTags(tags, 1.2);
       client.push({ type: 'item', patch: { reasonTags: tags } });
-      done.push(tags.length ? `got it: ${tags.join(', ')}. That counts for your feed now` : 'noted');
+      done.push(tags.length ? tr('got it: {tags}. That counts for your feed now', { tags: tags.join(', ') }) : tr('noted'));
     } else if (a.type === 'follow') {
       const name = a.name || performerOf(item);
-      if (!name) { done.push('couldn’t tell who to follow'); continue; }
+      if (!name) { done.push(tr('couldn’t tell who to follow')); continue; }
       for (const f of sourcesFor(name, item)) follow(f.kind, f.value, { label: name });
-      done.push(`following ${name}`);
+      done.push(tr('following {name}', { name }));
       client.push({ type: 'fetch' });
     }
   }
-  const text = reply || (done.length ? `${done[0][0].toUpperCase()}${done.join(', ').slice(1)}.` : 'I couldn’t turn that into an action. Try "search latex", "long form videos", "remember I like slow builds" or "block feet".');
+  const text = reply || (done.length ? `${done[0][0].toUpperCase()}${done.join(', ').slice(1)}.` : tr('I couldn’t turn that into an action. Try "search latex", "long form videos", "remember I like slow builds" or "block feet".'));
   const types = (parsed?.actions || []).map((a) => a.type);
   const kind = memoryNote ? 'memory' : types.includes('filter') ? 'search' : !types.length ? 'question' : types.includes('like_reason') ? 'feedback' : 'command';
   try { logPrompt({ text: q, kind, result: text, itemId: item?.id }); } catch {}

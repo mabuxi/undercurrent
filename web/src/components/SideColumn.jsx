@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, sessionId } from '../api.js';
 import { Window } from './Windows.jsx';
 import ErrorBoundary from './ErrorBoundary.jsx';
+import { t } from '../i18n.js';
 
 const REDUCED = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const FACTOR = REDUCED ? 1 : 0.55;
@@ -106,8 +107,8 @@ export default function SideColumn({ side }) {
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll);
     window.addEventListener('uc-refresh-windows', refresh);
-    const t = setInterval(onScroll, 1500);
-    return () => { window.removeEventListener('scroll', onScroll); window.removeEventListener('resize', onScroll); window.removeEventListener('uc-refresh-windows', refresh); clearInterval(t); cancelAnimationFrame(raf); };
+    const timer = setInterval(onScroll, 1500);
+    return () => { window.removeEventListener('scroll', onScroll); window.removeEventListener('resize', onScroll); window.removeEventListener('uc-refresh-windows', refresh); clearInterval(timer); cancelAnimationFrame(raf); };
   }, [load, refresh, side]);
 
   // In auto mode the balance moves with what you interact with; when it moves, the windows follow.
@@ -120,12 +121,12 @@ export default function SideColumn({ side }) {
       last = v;
     }).catch(() => {});
     check();
-    const t = setInterval(check, 120000);
-    return () => clearInterval(t);
+    const timer = setInterval(check, 120000);
+    return () => clearInterval(timer);
   }, [side]);
 
   return (
-    <aside ref={asideRef} className={`side ${side === 0 ? 'left' : 'right'}`} aria-label={side === 0 ? 'Windows' : 'More windows'}>
+    <aside ref={asideRef} className={`side ${side === 0 ? 'left' : 'right'}`} aria-label={side === 0 ? t('Windows') : t('More windows')}>
       <div className="track fadein" data-swap={swap} ref={trackRef}>
         {wins.map((w) => <ErrorBoundary key={w.uid} name="Window" quiet><Window w={w} /></ErrorBoundary>)}
       </div>

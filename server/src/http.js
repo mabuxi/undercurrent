@@ -1,5 +1,6 @@
 import { config } from './config.js';
 import { logNet } from './db.js';
+import { tr } from './i18n.js';
 
 export class HttpError extends Error {
   constructor(status, message, body) {
@@ -26,7 +27,7 @@ export async function request(url, { method = 'GET', headers = {}, body, purpose
   } catch (err) {
     clearTimeout(timer);
     logNet(u.host, purpose, bytesOut, 0, 0);
-    throw new HttpError(0, `Could not reach ${u.host}: ${err.name === 'AbortError' ? 'timed out' : err.message}`);
+    throw new HttpError(0, tr('Could not reach {host}: {why}', { host: u.host, why: err.name === 'AbortError' ? tr('timed out') : err.message }));
   }
   clearTimeout(timer);
   if (raw) {
@@ -37,6 +38,6 @@ export async function request(url, { method = 'GET', headers = {}, body, purpose
   logNet(u.host, purpose, bytesOut, Buffer.byteLength(text), res.status);
   let data = text;
   try { data = JSON.parse(text); } catch {}
-  if (!res.ok) throw new HttpError(res.status, `${u.host} answered ${res.status}`, data);
+  if (!res.ok) throw new HttpError(res.status, tr('{host} answered {status}', { host: u.host, status: res.status }), data);
   return data;
 }

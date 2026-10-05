@@ -1,5 +1,6 @@
 import { request, HttpError } from '../http.js';
 import { getSetting, setSetting } from '../db.js';
+import { tr } from '../i18n.js';
 
 const AUTH_URL = 'https://www.reddit.com/api/v1/access_token';
 const API = 'https://oauth.reddit.com';
@@ -23,7 +24,7 @@ export function resetRedditToken() {
 async function getToken() {
   if (token && Date.now() < tokenExp - 60000) return token;
   const c = redditCreds();
-  if (!c) throw new HttpError(400, 'Reddit is not connected yet. Add your app details in Settings.');
+  if (!c) throw new HttpError(400, tr('Reddit is not connected yet. Add your app details in Settings.'));
   const body = new URLSearchParams({ grant_type: 'password', username: c.username, password: c.password });
   const data = await request(AUTH_URL, {
     method: 'POST',
@@ -34,7 +35,7 @@ async function getToken() {
     body,
     purpose: 'reddit login'
   });
-  if (!data.access_token) throw new HttpError(401, `Reddit refused the login: ${data.error || 'unknown error'}`);
+  if (!data.access_token) throw new HttpError(401, tr('Reddit refused the login: {error}', { error: data.error || tr('unknown error') }));
   token = data.access_token;
   tokenExp = Date.now() + (data.expires_in || 3600) * 1000;
   return token;

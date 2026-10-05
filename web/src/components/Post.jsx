@@ -3,8 +3,10 @@ import { ago, api, fmtNum, formatMeta, LABELS, rgba, track, imgSrc } from '../ap
 import { useApp } from '../context.jsx';
 import { Icon } from '../icons.jsx';
 import { Media } from './Media.jsx';
-import { AskPanel, Avatar, CommentsPanel, ProfilePanel, PerformerPanel, PersonPanel, HeatSlider, WhyPanel } from './Panels.jsx';
+import { AskPanel, Avatar, CommentsPanel, ProfilePanel, PerformerPanel, PersonPanel, HeatSlider, WhyPanel, plain } from './Panels.jsx';
 import Linkify from './Linkify.jsx';
+import { t, tn } from '../i18n.js';
+import { useTranslate, TranslateButton, TranslatedNote } from './Translate.jsx';
 
 // A performer's photo from the Pornhub performer list, or their initials when there is none.
 function PerfAvatar({ p }) {
@@ -113,7 +115,7 @@ export default function Post({ item: initial, focus = false, onStrong }) {
     if (next > 0) strong('up');
     try {
       const r = await api(`/items/${item.id}/vote`, { method: 'POST', body: { dir: next } });
-      if (r.synced && next) toast(next > 0 ? 'Upvoted on Reddit too.' : 'Downvoted on Reddit too.');
+      if (r.synced && next) toast(next > 0 ? t('Upvoted on Reddit too.') : t('Downvoted on Reddit too.'));
     } catch (e) { toast(e.message); }
   }
 
@@ -123,7 +125,7 @@ export default function Post({ item: initial, focus = false, onStrong }) {
     if (on) strong('save');
     try {
       const r = await api(`/items/${item.id}/save`, { method: 'POST', body: { on } });
-      toast(on ? `Saved${r.synced ? ' here and on Reddit' : ''}.` : 'Removed from saved.');
+      toast(on ? (r.synced ? t('Saved here and on Reddit.') : t('Saved.')) : t('Removed from saved.'));
     } catch (e) { toast(e.message); }
   }
 
@@ -131,7 +133,7 @@ export default function Post({ item: initial, focus = false, onStrong }) {
     setGone(true);
     try {
       await api(`/items/${item.id}/less`, { method: 'POST', body: {} });
-      toast(`Less like this. ${item.tags?.slice(0, 2).join(' and ') || 'These tags'} count against it now.`);
+      toast(t('Less like this. {tags} count against it now.', { tags: item.tags?.slice(0, 2).join(` ${t('and')} `) || t('These tags') }));
     } catch (e) { toast(e.message); }
   }
 
@@ -143,7 +145,7 @@ export default function Post({ item: initial, focus = false, onStrong }) {
     try {
       await api(`/items/${item.id}/rate`, { method: 'POST', body: { value: n } });
       if (autoUp) await api(`/items/${item.id}/vote`, { method: 'POST', body: { dir: 1 } });
-      if (n) toast(n >= 4 ? `On fire${autoUp ? ' and upvoted' : ''}. Your feed goes deeper into this.` : `Noted how hot this was${autoUp ? ', and upvoted it' : ''}. It counts more than an upvote.`);
+      if (n) toast(n >= 4 ? (autoUp ? t('On fire and upvoted. Your feed goes deeper into this.') : t('On fire. Your feed goes deeper into this.')) : (autoUp ? t('Noted how hot this was, and upvoted it. It counts more than an upvote.') : t('Noted how hot this was. It counts more than an upvote.')));
     } catch (e) { toast(e.message); }
   }
 
@@ -153,7 +155,7 @@ export default function Post({ item: initial, focus = false, onStrong }) {
     try {
       const r = await api(`/items/${item.id}/kinks`, { method: 'POST', body: { kink: k.id, on } });
       setItem((cur) => ({ ...cur, kinks: r.item.kinks, tags: r.item.tags }));
-      toast(on ? `Added to ${k.name}.` : `Taken out of ${k.name}: the tags that put it there are removed from this post.`);
+      toast(on ? t('Added to {name}.', { name: k.name }) : t('Taken out of {name}: the tags that put it there are removed from this post.', { name: k.name }));
       refreshMeta?.();
     } catch (e) { toast(e.message); }
   }
@@ -169,37 +171,39 @@ export default function Post({ item: initial, focus = false, onStrong }) {
   // Opening a profile, a performer or any panel under the post scrolls it into view.
   useEffect(() => {
     if (!panel) return undefined;
-    const t = setTimeout(() => panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 60);
-    return () => clearTimeout(t);
+    const tm = setTimeout(() => panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 60);
+    return () => clearTimeout(tm);
   }, [panel]);
   const openPerson = (p) => setPanel(`person:${p.platform || 'any'}|${p.handle}`);
-  if (gone) return <div className="post gone">Hidden. The feed will show less like this.</div>;
+  const trTitle = useTranslate(item, 'title');
+  const trBody = useTranslate(item, 'body');
+  if (gone) return <div className="post gone">{t('Hidden. The feed will show less like this.')}</div>;
   const id = identity(item);
   const isText = item.media?.kind === 'text';
   const liked = item.media?.rating;
   const votes = item.media?.votes;
   const tagList = item.tags || [];
   const shownTags = allTags ? tagList : tagList.slice(0, 9);
-  const sub = [...id.sub, item.media?.repostedBy ? `reposted by @${item.media.repostedBy}` : null, item.media?.views ? `${fmtNum(item.media.views)} views` : null, ago(item.created)].filter(Boolean).join(' · ');
+  const sub = [...id.sub, item.media?.repostedBy ? t('reposted by @{name}', { name: item.media.repostedBy }) : null, item.media?.views ? tn(item.media.views, '{n} view', '{n} views', { n: fmtNum(item.media.views) }) : null, ago(item.created)].filter(Boolean).join(' · ');
 
   return (
     <article ref={ref} className={`post${focus ? ' focus' : ''}`} data-id={item.id}>
       <header className="ph">
-        <button type="button" className="who" onClick={() => (id.handle ? toggle('profile') : id.performer ? toggle(`performer:${id.performer}`) : null)} aria-label={`Show profile of ${id.name}`}>
+        <button type="button" className="who" onClick={() => (id.handle ? toggle('profile') : id.performer ? toggle(`performer:${id.performer}`) : null)} aria-label={t('Show profile of {name}', { name: id.name })}>
           {item.media?.avatar ? <img className="avatar av-m avimg" src={item.media.avatar} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.display = 'none'; }} /> : <Avatar name={id.name} />}
           <span className="names"><strong>{id.name}</strong><span>{sub}</span></span>
         </button>
         <div className="right">
-          {item.oc ? <span className="ocbadge" title="The poster marked this as their own original content">Original content</span> : null}
+          {item.oc ? <span className="ocbadge" title={t('The poster marked this as their own original content')}>{t('Original content')}</span> : null}
           <span className={`pill pill-${item.label}`}>{LABELS[item.label]}</span>
-          <span className="match" title="Match with you"><span className="meter" style={{ '--c': c }}><i style={{ width: `${item.match}%` }} /></span>{item.match}%</span>
+          <span className="match" title={t('Match with you')}><span className="meter" style={{ '--c': c }}><i style={{ width: `${item.match}%` }} /></span>{item.match}%</span>
         </div>
       </header>
       {item.performers?.length || item.people?.length ? (
         <div className="performers">
-          <span className="fb-label">In this video</span>
+          <span className="fb-label">{t('In this video')}</span>
           {(item.performerCards || (item.performers || []).map((name) => ({ name }))).slice(0, 8).map((p) => (
-            <button type="button" key={p.name} className={`perf${panel === `performer:${p.name}` ? ' on' : ''}`} onClick={() => { toggle(`performer:${p.name}`); strong('performer'); }} title={p.videos ? `${p.name}, ${p.videos} videos on Pornhub` : p.name}>
+            <button type="button" key={p.name} className={`perf${panel === `performer:${p.name}` ? ' on' : ''}`} onClick={() => { toggle(`performer:${p.name}`); strong('performer'); }} title={p.videos ? tn(p.videos, '{name}, {n} video on Pornhub', '{name}, {n} videos on Pornhub', { name: p.name }) : p.name}>
               <PerfAvatar p={p} />
               {String(p.name).replace(/^@+/, '')}{p.videos ? <small>{p.videos >= 1000 ? `${Math.round(p.videos / 100) / 10}k` : p.videos}</small> : null}
             </button>
@@ -209,13 +213,13 @@ export default function Post({ item: initial, focus = false, onStrong }) {
           ))}
         </div>
       ) : null}
-      {!isText ? <p className="ptitle"><Linkify text={item.title} source={item.source} onPerson={openPerson} /></p> : null}
+      {!isText ? <p className="ptitle"><Linkify text={trTitle.text || item.title} source={item.source} onPerson={openPerson} /><TranslateButton tr={trTitle} small /><TranslatedNote tr={trTitle} /></p> : null}
       <div ref={mediaRef}><Media item={item} active={active} near={near} height={lastH.current} onPlay={() => strong('play')} onReady={() => setReady(true)} onPerson={openPerson} /></div>
-      {!isText && item.body ? <p className="ptext caption"><Linkify text={item.body} source={item.source} onPerson={openPerson} /></p> : null}
+      {!isText && item.body ? <p className="ptext caption"><Linkify text={trBody.text || item.body} source={item.source} onPerson={openPerson} /><TranslateButton tr={trBody} small /><TranslatedNote tr={trBody} /></p> : null}
       {item.aiSummary && !isText ? <p className="aisum">{item.aiSummary}</p> : null}
       <div className="chiprow">
         {item.gender && (item.gender.women || item.gender.men || item.gender.trans) ? (
-          <span className="gicons" title={`${item.gender.women ? `${item.gender.women} ${item.gender.women > 1 ? 'women' : 'woman'}` : ''}${item.gender.women && item.gender.men ? ', ' : ''}${item.gender.men ? `${item.gender.men} ${item.gender.men > 1 ? 'men' : 'man'}` : ''}${item.gender.trans ? ', trans' : ''}${item.gender.sure ? '' : ' (guess until the AI looks closer)'}`}>
+          <span className="gicons" title={`${item.gender.women ? tn(item.gender.women, '{n} woman', '{n} women') : ''}${item.gender.women && item.gender.men ? ', ' : ''}${item.gender.men ? tn(item.gender.men, '{n} man', '{n} men') : ''}${item.gender.trans ? ', trans' : ''}${item.gender.sure ? '' : t(' (guess until the AI looks closer)')}`}>
             {item.gender.women ? <><span className="gf"><Icon name="female" /></span>{item.gender.women > 1 ? <em>{item.gender.women}</em> : null}</> : null}
             {item.gender.men ? <><span className="gm"><Icon name="male" /></span>{item.gender.men > 1 ? <em>{item.gender.men}</em> : null}</> : null}
             {item.gender.trans ? <span className="gt"><Icon name="trans" /></span> : null}
@@ -223,39 +227,39 @@ export default function Post({ item: initial, focus = false, onStrong }) {
         ) : null}
         {item.kinks?.map((k) => (
           <span key={k.id} className="chip link kchip" style={{ '--c': k.color, '--c2': rgba(k.color, 0.16) }}>
-            <button type="button" onClick={() => setFilters({ kink: k.id })} title={`Show only ${k.name}`}>{k.name}</button>
-            <button type="button" className="kx" onClick={() => setKink(k, false)} aria-label={`This post is not ${k.name}`} title={`Not ${k.name}: take it out`}><Icon name="x" /></button>
+            <button type="button" onClick={() => setFilters({ kink: k.id })} title={t('Show only {name}', { name: k.name })}>{k.name}</button>
+            <button type="button" className="kx" onClick={() => setKink(k, false)} aria-label={t('This post is not {name}', { name: k.name })} title={t('Not {name}: take it out', { name: k.name })}><Icon name="x" /></button>
           </span>
         ))}
         {kinkPick ? (
-          <select className="kinkpick" autoFocus defaultValue="" onChange={(e) => { const k = allKinks.find((x) => x.id === Number(e.target.value)); if (k) setKink(k, true); }} onBlur={() => setKinkPick(false)} aria-label="Add this post to a kink">
-            <option value="" disabled>Add to a kink…</option>
+          <select className="kinkpick" autoFocus defaultValue="" onChange={(e) => { const k = allKinks.find((x) => x.id === Number(e.target.value)); if (k) setKink(k, true); }} onBlur={() => setKinkPick(false)} aria-label={t('Add this post to a kink')}>
+            <option value="" disabled>{t('Add to a kink…')}</option>
             {allKinks.filter((k) => !k.isGroup && k.status !== 'hidden' && !item.kinks?.some((x) => x.id === k.id)).sort((a, b) => a.name.localeCompare(b.name)).map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
           </select>
-        ) : <button type="button" className="chip ghost more addkink" onClick={() => setKinkPick(true)} title="Add this post to one of your kinks">+ kink</button>}
-        {shownTags.map((t) => <button type="button" key={t} className={`chip ghost link${item.liked?.includes(t) ? ' mine' : ''}`} onClick={() => runSearch(t).catch(() => setFilters({ tags: [t] }))} title={`Search everything for ${t}`}>{t}</button>)}
-        {tagList.length > 9 ? <button type="button" className="chip ghost more" onClick={() => setAllTags((x) => !x)}>{allTags ? 'fewer' : `+${tagList.length - 9} tags`}</button> : null}
+        ) : <button type="button" className="chip ghost more addkink" onClick={() => setKinkPick(true)} title={t('Add this post to one of your kinks')}>{t('+ kink')}</button>}
+        {shownTags.map((tag) => <button type="button" key={tag} className={`chip ghost link${item.liked?.includes(tag) ? ' mine' : ''}`} onClick={() => runSearch(tag).catch(() => setFilters({ tags: [tag] }))} title={t('Search everything for {tag}', { tag })}>{tag}</button>)}
+        {tagList.length > 9 ? <button type="button" className="chip ghost more" onClick={() => setAllTags((x) => !x)}>{allTags ? t('fewer') : t('+{n} tags', { n: tagList.length - 9 })}</button> : null}
         <span className="chip ghost meta">{formatMeta(item)}</span>
       </div>
       <div className="pbar">
         <div className="grp">
-          <div className="votewrap" title={liked ? `${Math.round(liked)}% of ${votes ? fmtNum(votes) : 'the'} votes were likes` : undefined}>
+          <div className="votewrap" title={liked ? (votes ? t('{p}% of {n} votes were likes', { p: Math.round(liked), n: fmtNum(votes) }) : t('{p}% of the votes were likes', { p: Math.round(liked) })) : undefined}>
             <div className="vote">
-              <button type="button" className={item.vote > 0 ? 'on' : ''} onClick={() => vote(1)} aria-label="I like this"><Icon name="up" /></button>
+              <button type="button" className={item.vote > 0 ? 'on' : ''} onClick={() => vote(1)} aria-label={t('I like this')}><Icon name="up" /></button>
               {item.upvotes != null ? <span>{fmtNum(item.upvotes)}</span> : null}
-              <button type="button" className={item.vote < 0 ? 'on' : ''} onClick={() => vote(-1)} aria-label="I don't like this"><Icon name="down" /></button>
+              <button type="button" className={item.vote < 0 ? 'on' : ''} onClick={() => vote(-1)} aria-label={t("I don't like this")}><Icon name="down" /></button>
             </div>
-            {liked ? <div className="likebar" aria-label={`${Math.round(liked)}% liked`}><i style={{ width: `${Math.max(0, Math.min(100, liked))}%` }} /></div> : null}
+            {liked ? <div className="likebar" aria-label={t('{p}% liked', { p: Math.round(liked) })}><i style={{ width: `${Math.max(0, Math.min(100, liked))}%` }} /></div> : null}
           </div>
-          {HAS_COMMENTS.has(item.source) ? <button type="button" className={`pb${panel === 'comments' ? ' on' : ''}`} onClick={() => { toggle('comments'); strong('comments'); }} aria-label="Comments"><Icon name="comment" />{item.comments ? fmtNum(item.comments) : null}</button> : null}
+          {HAS_COMMENTS.has(item.source) ? <button type="button" className={`pb${panel === 'comments' ? ' on' : ''}`} onClick={() => { toggle('comments'); strong('comments'); }} aria-label={t('Comments')}><Icon name="comment" />{item.comments ? fmtNum(item.comments) : null}</button> : null}
         </div>
         <HeatSlider value={item.rating || 0} onChange={rate} />
         <div className="grp end">
-          <button type="button" className={`pb icon${panel === 'ask' ? ' on' : ''}`} onClick={() => toggle('ask')} aria-label="Ask or tell the assistant about this post" title="Ask or tell the assistant"><Icon name="ask" /></button>
-          <button type="button" className={`pb icon${panel === 'why' ? ' on' : ''}`} onClick={() => toggle('why')} aria-label="Why this" title="Why this"><Icon name="why" /></button>
-          <button type="button" className={`pb icon${item.saved ? ' on' : ''}`} onClick={save} aria-label={item.saved ? 'Unsave' : 'Save'} title={item.saved ? 'Saved' : 'Save'}><Icon name="save" filled={item.saved} /></button>
-          <button type="button" className="pb icon" onClick={less} aria-label="Less like this" title="Less like this"><Icon name="less" /></button>
-          {item.url ? <a className="pb icon" href={item.url} target="_blank" rel="noreferrer noopener" aria-label="Open on source" title="Open on the original site" onClick={() => track(item.id, 'open')}><Icon name="open" /></a> : null}
+          <button type="button" className={`pb icon${panel === 'ask' ? ' on' : ''}`} onClick={() => toggle('ask')} aria-label={t('Ask or tell the assistant about this post')} title={t('Ask or tell the assistant')}><Icon name="ask" /></button>
+          <button type="button" className={`pb icon${panel === 'why' ? ' on' : ''}`} onClick={() => toggle('why')} aria-label={t('Why this')} title={t('Why this')}><Icon name="why" /></button>
+          <button type="button" className={`pb icon${item.saved ? ' on' : ''}`} onClick={save} aria-label={item.saved ? t('Unsave') : t('Save')} title={item.saved ? plain(t('Saved [button state]')) : t('Save')}><Icon name="save" filled={item.saved} /></button>
+          <button type="button" className="pb icon" onClick={less} aria-label={t('Less like this')} title={t('Less like this')}><Icon name="less" /></button>
+          {item.url ? <a className="pb icon" href={item.url} target="_blank" rel="noreferrer noopener" aria-label={t('Open on source')} title={t('Open on the original site')} onClick={() => track(item.id, 'open')}><Icon name="open" /></a> : null}
         </div>
       </div>
       {panel ? (

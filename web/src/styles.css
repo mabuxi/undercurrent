@@ -1197,3 +1197,24 @@ button.kcard.dim{opacity:.62}
 .profdot input{opacity:0;width:100%;height:100%;cursor:pointer}
 .ghost-btn.danger{color:#F2B2B2;border-color:rgba(224,122,122,.5)}
 @media (max-width:640px){.profrow{grid-template-columns:auto minmax(0,1fr)}.profrow .profacts{grid-column:1/-1;justify-content:flex-start}}
+
+/* Translating a post's title or text */
+.trbtn{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;vertical-align:middle;color:var(--text-2);font-size:12px;font-weight:500;padding:4px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.12);transition:color .15s,border-color .15s,background .15s}
+.trbtn svg{width:14px;height:14px}
+.trbtn:hover{color:var(--text);border-color:rgba(255,255,255,.28)}
+.trbtn.on{color:#E39A83;border-color:rgba(227,154,131,.45);background:rgba(227,154,131,.08)}
+.trbtn.busy{opacity:.6;cursor:progress}
+.trbtn.small{padding:3px;margin-left:8px;border-color:transparent}
+.trbtn.small:hover{border-color:rgba(255,255,255,.18)}
+.trbtn.small svg{width:13px;height:13px}
+.trnote{margin-left:8px;font-size:11px;font-weight:400;font-style:italic;color:var(--text-2);vertical-align:middle}
+.trerr{margin-left:8px;font-size:12px;color:#E07A7A}
+
+/* Language switch (Settings and the welcome steps) */
+.langswitch{display:inline-flex;align-self:flex-start;width:max-content;gap:4px;padding:4px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);margin:6px 0}
+.langswitch button{all:unset;cursor:pointer;padding:7px 16px;border-radius:999px;font-size:13px;font-weight:500;color:var(--text-2);transition:background .15s,color .15s}
+.langswitch button:hover{color:var(--text)}
+.langswitch button.on{background:linear-gradient(100deg,#E39A83,#C98BC4);color:#1C0F14;font-weight:600}
+.langswitch.compact{position:absolute;top:18px;right:18px;margin:0}
+.langswitch.compact button{padding:5px 11px;font-size:12px;letter-spacing:.04em}
+.ob-welcome{position:relative}

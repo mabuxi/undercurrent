@@ -5,6 +5,65 @@ import WebKit
 // AI models), shows the app when it is ready, and when you quit, it stops the server, unloads the models and quits
 // Ollama. Your data lives in ~/Library/Application Support/Undercurrent, apart from the code, so updates never touch it.
 
+// The few words the app itself shows (starting, stopping, menus), in the language chosen in Undercurrent's settings.
+// The server writes that choice to ~/Library/Application Support/Undercurrent/language; until it exists, the Mac's own
+// language decides.
+let FRENCH: [String: String] = [
+    "Starting Undercurrent…": "Démarrage d’Undercurrent…",
+    "Parts of Undercurrent are missing.": "Des éléments d’Undercurrent manquent.",
+    "Download Undercurrent again from github.com/mabuxi/undercurrent and replace this copy. Your data is kept.": "Téléchargez de nouveau Undercurrent sur github.com/mabuxi/undercurrent et remplacez cette copie. Vos données sont conservées.",
+    "Node.js was not found.": "Node.js est introuvable.",
+    "Undercurrent needs Node.js 22 or newer. Install it from nodejs.org, then open Undercurrent again.": "Undercurrent a besoin de Node.js 22 ou plus récent. Installez-le depuis nodejs.org, puis rouvrez Undercurrent.",
+    "Preparing the app for the first time…": "Préparation de l’app pour la première fois…",
+    "Undercurrent could not start.": "Undercurrent n’a pas pu démarrer.",
+    "Finishing the update…": "Fin de la mise à jour…",
+    "Opening the new version…": "Ouverture de la nouvelle version…",
+    "Undercurrent stopped unexpectedly.": "Undercurrent s’est arrêté de façon inattendue.",
+    "Exit code {code}. The log is in ~/Library/Application Support/Undercurrent/app.log.": "Code de sortie {code}. Le journal se trouve dans ~/Library/Application Support/Undercurrent/app.log.",
+    "Still starting… the first start can take a minute.": "Démarrage en cours… le premier démarrage peut prendre une minute.",
+    "Undercurrent did not start.": "Undercurrent n’a pas démarré.",
+    "The log is in ~/Library/Application Support/Undercurrent/app.log.": "Le journal se trouve dans ~/Library/Application Support/Undercurrent/app.log.",
+    "Moving your data to its new place…": "Déplacement de vos données à leur nouvel emplacement…",
+    "Stopping the local AI…": "Arrêt de l’IA locale…",
+    "Reconnecting…": "Reconnexion…",
+    "Try again": "Réessayer",
+    "About Undercurrent {version}": "À propos d’Undercurrent {version}",
+    "Check for Updates…": "Rechercher les mises à jour…",
+    "Settings…": "Réglages…",
+    "Hide Undercurrent": "Masquer Undercurrent",
+    "Hide Others": "Masquer les autres",
+    "Quit Undercurrent": "Quitter Undercurrent",
+    "Edit": "Édition",
+    "Undo": "Annuler",
+    "Redo": "Rétablir",
+    "Cut": "Couper",
+    "Copy": "Copier",
+    "Paste": "Coller",
+    "Select All": "Tout sélectionner",
+    "View": "Présentation",
+    "Reload": "Recharger",
+    "Actual Size": "Taille réelle",
+    "Zoom In": "Zoom avant",
+    "Zoom Out": "Zoom arrière",
+    "Enter Full Screen": "Passer en plein écran",
+    "Window": "Fenêtre",
+    "Minimize": "Réduire",
+    "Zoom": "Zoom"
+]
+
+let APP_LANG: String = {
+    let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+    if let saved = try? String(contentsOf: base.appendingPathComponent("Undercurrent/language"), encoding: .utf8) {
+        let l = saved.trimmingCharacters(in: .whitespacesAndNewlines)
+        if l == "fr" || l == "en" { return l }
+    }
+    return (Locale.preferredLanguages.first ?? "en").hasPrefix("fr") ? "fr" : "en"
+}()
+
+func L(_ s: String) -> String {
+    return APP_LANG == "fr" ? (FRENCH[s] ?? s) : s
+}
+
 let PORT = 4317
 let BASE = "http://127.0.0.1:\(PORT)"
 
@@ -75,7 +134,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
-        showSplash("Starting Undercurrent…")
+        showSplash(L("Starting Undercurrent…"))
         DispatchQueue.global(qos: .userInitiated).async {
             self.moveOldData()
             if self.serverUp() {
@@ -103,15 +162,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     func startServer() {
         guard !installPath.isEmpty, FileManager.default.fileExists(atPath: installPath + "/server/src/index.js") else {
-            showError("Parts of Undercurrent are missing.", detail: "Download Undercurrent again from github.com/mabuxi/undercurrent and replace this copy. Your data is kept.")
+            showError(L("Parts of Undercurrent are missing."), detail: L("Download Undercurrent again from github.com/mabuxi/undercurrent and replace this copy. Your data is kept."))
             return
         }
         guard let node = nodePath() else {
-            showError("Node.js was not found.", detail: "Undercurrent needs Node.js 22 or newer. Install it from nodejs.org, then open Undercurrent again.")
+            showError(L("Node.js was not found."), detail: L("Undercurrent needs Node.js 22 or newer. Install it from nodejs.org, then open Undercurrent again."))
             return
         }
         if !FileManager.default.fileExists(atPath: installPath + "/web/dist/index.html") {
-            showSplash("Preparing the app for the first time…")
+            showSplash(L("Preparing the app for the first time…"))
         }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: node)
@@ -142,7 +201,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             ownServer = true
             waitAndLoad()
         } catch {
-            showError("Undercurrent could not start.", detail: error.localizedDescription)
+            showError(L("Undercurrent could not start."), detail: error.localizedDescription)
         }
     }
 
@@ -152,17 +211,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         if quitting { return }
         if code == 75 {
             loadedApp = false
-            showSplash("Finishing the update…")
+            showSplash(L("Finishing the update…"))
             startServer()
             return
         }
         // 76: the app itself was replaced by a new version. Quit and open the new one.
         if code == 76 {
-            showSplash("Opening the new version…")
+            showSplash(L("Opening the new version…"))
             relaunch()
             return
         }
-        showError("Undercurrent stopped unexpectedly.", detail: "Exit code \(code). The log is in ~/Library/Application Support/Undercurrent/app.log.")
+        showError(L("Undercurrent stopped unexpectedly."), detail: L("Exit code {code}. The log is in ~/Library/Application Support/Undercurrent/app.log.").replacingOccurrences(of: "{code}", with: String(code)))
     }
 
     func relaunch() {
@@ -198,10 +257,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
                     self.loadedApp = true
                     self.web.load(URLRequest(url: URL(string: BASE + "/")!))
                 } else if attempt < 240 && !self.quitting {
-                    if attempt == 20 { self.showSplash("Still starting… the first start can take a minute.") }
+                    if attempt == 20 { self.showSplash(L("Still starting… the first start can take a minute.")) }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.waitAndLoad(attempt: attempt + 1) }
                 } else if !self.quitting {
-                    self.showError("Undercurrent did not start.", detail: "The log is in ~/Library/Application Support/Undercurrent/app.log.")
+                    self.showError(L("Undercurrent did not start."), detail: L("The log is in ~/Library/Application Support/Undercurrent/app.log."))
                 }
             }
         }
@@ -214,7 +273,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         let target = dataDir.appendingPathComponent("undercurrent.db")
         let old = installPath + "/data/undercurrent.db"
         guard !packaged, !fm.fileExists(atPath: target.path), fm.fileExists(atPath: old) else { return }
-        DispatchQueue.main.async { self.showSplash("Moving your data to its new place…") }
+        DispatchQueue.main.async { self.showSplash(L("Moving your data to its new place…")) }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
         p.arguments = [old, ".backup '\(target.path)'"]
@@ -228,7 +287,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let p = server, p.isRunning, ownServer else { return .terminateNow }
         quitting = true
-        showSplash("Stopping the local AI…")
+        showSplash(L("Stopping the local AI…"))
         p.terminate()
         DispatchQueue.global().async {
             let deadline = Date().addingTimeInterval(15)
@@ -263,7 +322,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        if loadedApp && !quitting { loadedApp = false; showSplash("Reconnecting…"); waitAndLoad() }
+        if loadedApp && !quitting { loadedApp = false; showSplash(L("Reconnecting…")); waitAndLoad() }
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { webView.reload() }
@@ -289,7 +348,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 
     func showError(_ title: String, detail: String) {
-        web.loadHTMLString(page("<h1>Undercurrent</h1><p><b>\(title)</b></p><p>\(detail)</p><button onclick=\"location.href='undercurrent://retry'\">Try again</button>"), baseURL: nil)
+        web.loadHTMLString(page("<h1>Undercurrent</h1><p><b>\(title)</b></p><p>\(detail)</p><button onclick=\"location.href='undercurrent://retry'\">\(L("Try again"))</button>"), baseURL: nil)
         retryArmed = true
     }
 
@@ -297,7 +356,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction, preferences: WKWebpagePreferences, decisionHandler: @escaping (WKNavigationActionPolicy, WKWebpagePreferences) -> Void) {
         if action.request.url?.scheme == "undercurrent" {
             decisionHandler(.cancel, preferences)
-            if retryArmed { retryArmed = false; showSplash("Starting Undercurrent…"); if serverUp() { waitAndLoad() } else { startServer() } }
+            if retryArmed { retryArmed = false; showSplash(L("Starting Undercurrent…")); if serverUp() { waitAndLoad() } else { startServer() } }
             return
         }
         self.webView(webView, decidePolicyFor: action) { policy in decisionHandler(policy, preferences) }
@@ -311,49 +370,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         main.addItem(appItem)
         let app = NSMenu()
         let version = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? ""
-        app.addItem(withTitle: "About Undercurrent \(version)", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
-        app.addItem(withTitle: "Check for Updates…", action: #selector(checkUpdates), keyEquivalent: "")
+        app.addItem(withTitle: L("About Undercurrent {version}").replacingOccurrences(of: "{version}", with: version), action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        app.addItem(withTitle: L("Check for Updates…"), action: #selector(checkUpdates), keyEquivalent: "")
         app.addItem(.separator())
-        app.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+        app.addItem(withTitle: L("Settings…"), action: #selector(openSettings), keyEquivalent: ",")
         app.addItem(.separator())
-        app.addItem(withTitle: "Hide Undercurrent", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
-        let others = app.addItem(withTitle: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
+        app.addItem(withTitle: L("Hide Undercurrent"), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        let others = app.addItem(withTitle: L("Hide Others"), action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
         others.keyEquivalentModifierMask = [.command, .option]
         app.addItem(.separator())
-        app.addItem(withTitle: "Quit Undercurrent", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        app.addItem(withTitle: L("Quit Undercurrent"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = app
 
         let editItem = NSMenuItem()
         main.addItem(editItem)
-        let edit = NSMenu(title: "Edit")
-        edit.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
-        let redo = edit.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "z")
+        let edit = NSMenu(title: L("Edit"))
+        edit.addItem(withTitle: L("Undo"), action: Selector(("undo:")), keyEquivalent: "z")
+        let redo = edit.addItem(withTitle: L("Redo"), action: Selector(("redo:")), keyEquivalent: "z")
         redo.keyEquivalentModifierMask = [.command, .shift]
         edit.addItem(.separator())
-        edit.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
-        edit.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
-        edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
-        edit.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        edit.addItem(withTitle: L("Cut"), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        edit.addItem(withTitle: L("Copy"), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: L("Paste"), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        edit.addItem(withTitle: L("Select All"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         editItem.submenu = edit
 
         let viewItem = NSMenuItem()
         main.addItem(viewItem)
-        let view = NSMenu(title: "View")
-        view.addItem(withTitle: "Reload", action: #selector(reload), keyEquivalent: "r")
+        let view = NSMenu(title: L("View"))
+        view.addItem(withTitle: L("Reload"), action: #selector(reload), keyEquivalent: "r")
         view.addItem(.separator())
-        view.addItem(withTitle: "Actual Size", action: #selector(zoomReset), keyEquivalent: "0")
-        view.addItem(withTitle: "Zoom In", action: #selector(zoomIn), keyEquivalent: "+")
-        view.addItem(withTitle: "Zoom Out", action: #selector(zoomOut), keyEquivalent: "-")
+        view.addItem(withTitle: L("Actual Size"), action: #selector(zoomReset), keyEquivalent: "0")
+        view.addItem(withTitle: L("Zoom In"), action: #selector(zoomIn), keyEquivalent: "+")
+        view.addItem(withTitle: L("Zoom Out"), action: #selector(zoomOut), keyEquivalent: "-")
         view.addItem(.separator())
-        let fs = view.addItem(withTitle: "Enter Full Screen", action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")
+        let fs = view.addItem(withTitle: L("Enter Full Screen"), action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")
         fs.keyEquivalentModifierMask = [.command, .control]
         viewItem.submenu = view
 
         let winItem = NSMenuItem()
         main.addItem(winItem)
-        let win = NSMenu(title: "Window")
-        win.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
-        win.addItem(withTitle: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+        let win = NSMenu(title: L("Window"))
+        win.addItem(withTitle: L("Minimize"), action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        win.addItem(withTitle: L("Zoom"), action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
         winItem.submenu = win
         NSApp.windowsMenu = win
         NSApp.mainMenu = main

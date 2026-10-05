@@ -56,7 +56,7 @@ echo "- Copying the code"
 mkdir -p "$RES/app/server" "$RES/app/web"
 ditto "$ROOT/server/src" "$RES/app/server/src"
 ditto "$ROOT/web/dist" "$RES/app/web/dist"
-cp "$ROOT/CHANGELOG.md" "$RES/app/"
+cp "$ROOT/CHANGELOG.md" "$ROOT/CHANGELOG.fr.md" "$RES/app/"
 node -e "
 const root = require('$ROOT/package.json'); const server = require('$ROOT/server/package.json');
 const pkg = { name: 'undercurrent', private: true, version: root.version, type: 'module', repository: root.repository, dependencies: server.dependencies };

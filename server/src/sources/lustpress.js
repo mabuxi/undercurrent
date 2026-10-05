@@ -1,5 +1,6 @@
 import { request } from '../http.js';
 import { getSetting } from '../db.js';
+import { tr } from '../i18n.js';
 
 // Lustpress: an open-source service that reads search results from Pornhub, XNXX, RedTube, XVideos, xHamster,
 // YouPorn, Eporner and TXXX. It is not run on this computer: you point Undercurrent at a Lustpress server you host
@@ -71,7 +72,7 @@ export async function lustSearch(site, key, page = 1) {
 export async function lustTest(url) {
   const base = String(url || '').trim().replace(/\/+$/, '');
   const d = await request(`${base}/xvideos/search?${new URLSearchParams({ key: 'amateur' })}`, { purpose: 'Scraper server test', timeout: 30000 });
-  if (!Array.isArray(d?.data)) throw new Error('no list of videos came back');
+  if (!Array.isArray(d?.data)) throw new Error(tr('no list of videos came back'));
   return d.data.length;
 }
 

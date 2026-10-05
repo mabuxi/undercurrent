@@ -7,6 +7,7 @@ import { tagsForItems, tagSpecificity } from './store.js';
 import { userLimits, isBlocked } from './safety.js';
 import { listMemory } from './memory.js';
 import { log } from './log.js';
+import { replyIn } from './i18n.js';
 
 // Suggestions the AI writes in the background: fantasies and kink combinations.
 // Stored in the suggestions table so widgets can show them instantly and the user can save or dismiss them.
@@ -97,7 +98,8 @@ export async function suggestFantasies({ force = false } = {}) {
     if (config.mock) {
       out = { fantasies: [{ title: 'Sunset in the dunes', scenario: `Slow ${kinks[0].name.toLowerCase()} in the sand dunes at sunset, half hoping someone walks by.`, kinks: [kinks[0].name], tags: ['outdoor', 'sunset', 'public'], confidence: 82, why: 'You keep saving outdoor posts.' }] };
     } else {
-      out = await chat({ kind: 'suggest', system: FANTASY_RULES, user, schema: FANTASY_SCHEMA, temperature: 0.6, model: deepModel(), numPredict: 1100, numCtx: 8192 });
+      out = await chat({ kind: 'suggest', system: `${FANTASY_RULES}
+${replyIn()}`, user, schema: FANTASY_SCHEMA, temperature: 0.6, model: deepModel(), numPredict: 1100, numCtx: 8192 });
     }
     const names = new Map(kinks.map((k) => [k.name.toLowerCase(), k]));
     let n = 0;
@@ -155,7 +157,8 @@ export async function suggestCombos({ force = false } = {}) {
     ].filter(Boolean).join('\n\n');
     let out;
     if (config.mock) out = { combos: [{ a: kinks[0].name, b: kinks[1].name, distance: 'close', match: 78, why: 'Both are strong for you.' }, { a: kinks[0].name, b: kinks[2].name, distance: 'far', match: 64, why: 'Different moods that could meet.' }] };
-    else out = await chat({ kind: 'combos', system: COMBO_RULES, user, schema: COMBO_SCHEMA, temperature: 0.4, model: fastModel(), numPredict: 900 });
+    else out = await chat({ kind: 'combos', system: `${COMBO_RULES}
+${replyIn()}`, user, schema: COMBO_SCHEMA, temperature: 0.4, model: fastModel(), numPredict: 900 });
     const names = new Map(kinks.map((k) => [k.name.toLowerCase(), k]));
     let n = 0;
     for (const c of out?.combos || []) {
@@ -165,7 +168,7 @@ export async function suggestCombos({ force = false } = {}) {
       const [x, y] = a.id < b.id ? [a, b] : [b, a];
       const conf = Math.max(0, Math.min(97, Math.round(Number(c.match) || 0)));
       if (conf < 50) continue;
-      if (put('combo', `${x.name} + ${y.name}`, String(c.why || '').slice(0, 200), { a: { id: x.id, name: x.name, color: x.color }, b: { id: y.id, name: y.name, color: y.color }, distance: c.distance === 'far' ? 'far' : 'close' }, conf)) n++;
+      if (put('combo', `${x.label || x.name} + ${y.label || y.name}`, String(c.why || '').slice(0, 200), { a: { id: x.id, name: x.label || x.name, color: x.color }, b: { id: y.id, name: y.label || y.name, color: y.color }, distance: c.distance === 'far' ? 'far' : 'close' }, conf)) n++;
     }
     setSetting('suggestCombosAt', now());
     return n;

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { t } from '../i18n.js';
 
 const TWO_PI = Math.PI * 2;
 const BG = '#1A1420';
@@ -377,11 +378,11 @@ export default function BrainCanvas({ data, view, selected, onSelect, onHover, h
 
   return (
     <div className="brainbox">
-      <canvas ref={canvasRef} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={() => { sim.current.hover = null; onHover?.(null); }} role="img" aria-label="Live map of your kinks, tags and fantasies" />
+      <canvas ref={canvasRef} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={() => { sim.current.hover = null; onHover?.(null); }} role="img" aria-label={t('Live map of your kinks, tags and fantasies')} />
       <div className="brainzoom">
-        <button type="button" className="icon-btn" onClick={() => sim.current.api?.zoom(1.25)} aria-label="Zoom in">+</button>
-        <button type="button" className="icon-btn" onClick={() => sim.current.api?.zoom(0.8)} aria-label="Zoom out">−</button>
-        <button type="button" className="icon-btn" onClick={() => sim.current.api?.reset()} aria-label="Reset view">⟲</button>
+        <button type="button" className="icon-btn" onClick={() => sim.current.api?.zoom(1.25)} aria-label={t('Zoom in')}>+</button>
+        <button type="button" className="icon-btn" onClick={() => sim.current.api?.zoom(0.8)} aria-label={t('Zoom out')}>−</button>
+        <button type="button" className="icon-btn" onClick={() => sim.current.api?.reset()} aria-label={t('Reset view')}>⟲</button>
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import { config, readProfiles } from './config.js';
 import { getDb } from './db.js';
 import { restartServer } from './ai/lifecycle.js';
 import { log } from './log.js';
+import { tr } from './i18n.js';
 
 // Profiles: separate people or moods on one Mac, each with its own kinks, history, sources and settings.
 // Each profile is its own database file; the local AI models are shared. Switching restarts the server on the
@@ -54,9 +55,9 @@ export function listProfiles() {
 
 export function createProfile(name, { switchTo = true } = {}) {
   const clean = String(name || '').trim().slice(0, 40);
-  if (!clean) throw Object.assign(new Error('Give the profile a name.'), { status: 400 });
+  if (!clean) throw Object.assign(new Error(tr('Give the profile a name.')), { status: 400 });
   const p = readProfiles();
-  if (p.list.some((x) => x.name.toLowerCase() === clean.toLowerCase())) throw Object.assign(new Error(`There is already a profile called ${clean}.`), { status: 400 });
+  if (p.list.some((x) => x.name.toLowerCase() === clean.toLowerCase())) throw Object.assign(new Error(tr('There is already a profile called {name}.', { name: clean })), { status: 400 });
   let id = slug(clean);
   for (let i = 2; p.list.some((x) => x.id === id); i++) id = `${slug(clean)}-${i}`;
   fs.mkdirSync(path.join(config.dataDir, 'profiles'), { recursive: true });
@@ -72,7 +73,7 @@ export function renameProfile(id, name) {
   const p = readProfiles();
   const x = p.list.find((y) => y.id === id);
   const clean = String(name || '').trim().slice(0, 40);
-  if (!x || !clean) throw Object.assign(new Error('Pick a profile and a name.'), { status: 400 });
+  if (!x || !clean) throw Object.assign(new Error(tr('Pick a profile and a name.')), { status: 400 });
   x.name = clean;
   save(p);
   return x;
@@ -88,7 +89,7 @@ export function setProfileColor(id, color) {
 // Switching saves the choice and restarts the server on the other profile's database.
 export function switchProfile(id) {
   const p = readProfiles();
-  if (!p.list.some((x) => x.id === id)) throw Object.assign(new Error('That profile does not exist.'), { status: 404 });
+  if (!p.list.some((x) => x.id === id)) throw Object.assign(new Error(tr('That profile does not exist.')), { status: 404 });
   if (id === config.profile.id) return { switched: false };
   p.active = id;
   save(p);
@@ -100,9 +101,9 @@ export function switchProfile(id) {
 export function deleteProfile(id) {
   const p = readProfiles();
   const x = p.list.find((y) => y.id === id);
-  if (!x) throw Object.assign(new Error('That profile does not exist.'), { status: 404 });
-  if (id === config.profile.id) throw Object.assign(new Error('Switch to another profile before deleting this one.'), { status: 400 });
-  if (p.list.length < 2) throw Object.assign(new Error('There has to be at least one profile.'), { status: 400 });
+  if (!x) throw Object.assign(new Error(tr('That profile does not exist.')), { status: 404 });
+  if (id === config.profile.id) throw Object.assign(new Error(tr('Switch to another profile before deleting this one.')), { status: 400 });
+  if (p.list.length < 2) throw Object.assign(new Error(tr('There has to be at least one profile.')), { status: 400 });
   const f = path.join(config.dataDir, x.file);
   for (const s of ['', '-wal', '-shm']) fs.rmSync(f + s, { force: true });
   p.list = p.list.filter((y) => y.id !== id);
@@ -115,7 +116,7 @@ export function deleteProfile(id) {
 export async function backupProfile(id) {
   const p = readProfiles();
   const x = p.list.find((y) => y.id === id);
-  if (!x) throw Object.assign(new Error('That profile does not exist.'), { status: 404 });
+  if (!x) throw Object.assign(new Error(tr('That profile does not exist.')), { status: 404 });
   fs.mkdirSync(backupsDir(), { recursive: true });
   const d = new Date();
   const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`;
@@ -141,7 +142,7 @@ export function listBackups() {
 function backupPath(name) {
   const f = path.basename(String(name || ''));
   const full = path.join(backupsDir(), f);
-  if (!f.endsWith('.db') || !fs.existsSync(full)) throw Object.assign(new Error('That backup does not exist.'), { status: 404 });
+  if (!f.endsWith('.db') || !fs.existsSync(full)) throw Object.assign(new Error(tr('That backup does not exist.')), { status: 404 });
   return full;
 }
 
@@ -149,7 +150,7 @@ function backupPath(name) {
 export function restoreBackup(name, profileName) {
   const src = backupPath(name);
   const b = listBackups().find((x) => x.file === path.basename(src));
-  const entry = createProfile(profileName || `${b?.name || 'Restored'} (restored)`, { switchTo: false });
+  const entry = createProfile(profileName || tr('{name} (restored)', { name: b?.name || tr('Restored') }), { switchTo: false });
   fs.copyFileSync(src, path.join(config.dataDir, entry.file));
   return entry;
 }

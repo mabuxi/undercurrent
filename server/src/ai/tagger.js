@@ -58,7 +58,7 @@ function overused() {
 
 function rules() {
   return `Tags are lowercase, 1 to 4 words, specific, the words people use on porn sites.
-Only tag what this post's own title, site tags, text or images clearly say or show. Never guess: no place, outfit, act, position, body type or camera angle unless it is written or visible. A wrong tag is much worse than a missing one; when in doubt, leave it out.
+Only tag what this post's own title, site tags, text or images clearly say or show. Never guess: no place, outfit, act, position, body type or camera angle unless it is written or visible. A wrong tag is much worse than a missing one; when in doubt, leave it out. Tags are always plain English words, the way English porn sites tag, also when the post is written in French or another language ("pieds" is feet, "douche" is shower).
 When it is said or shown, cover: the people (how many, build, body hair, skin, hair, genitals and their details, tattoos), what they wear, what happens (acts and positions), fluids, where it is, how it is filmed, and the dynamic or scenario.
 The title is the strongest evidence: turn its meaningful words into tags. Never output words from these instructions.
 Never use: porn, sex, video, hd, xxx, hot, sexy, nsfw, nude, female, male, erotic, the format, the duration, the site or community name.
@@ -344,7 +344,7 @@ async function batchWorker(pace) {
     if (!err.yielded) {
       tagger.lastError = err.message;
       tagger.failed++;
-      if (/not running|isn't installed|took too long/i.test(err.message)) tagger.pausedUntil = Date.now() + 60000;
+      if (err.unavailable || /not running|isn't installed|took too long/i.test(err.message)) tagger.pausedUntil = Date.now() + 60000;
     }
   }
   return true;

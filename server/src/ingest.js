@@ -14,14 +14,18 @@ import { mockItems } from './sources/mock.js';
 import { genderTerm, genderMode } from './gender.js';
 import { log } from './log.js';
 import { invalidatePool } from './searchstate.js';
+import { tr } from './i18n.js';
 
 export const ingestState = { running: false, lastRun: 0, lastError: null, added: 0, blocked: 0, log: [], stats: {} };
 
-function note(msg) {
+function note(key, vars) {
+  const msg = tr(key, vars);
   ingestState.log.unshift({ ts: now(), msg });
   ingestState.log = ingestState.log.slice(0, 40);
-  log('info', `Ingest: ${msg}`);
+  log('info', `Ingest: ${tr(key, vars, 'en')}`);
 }
+
+const sortName = (s) => ({ hot: tr('hot'), week: tr('this week'), month: tr('this month'), new: tr('new') }[s] || s);
 
 function stat(provider, patch) {
   const all = getSetting('providerStats', {}) || {};
@@ -106,11 +110,11 @@ async function runTarget(t, label, page = 1, sort = 'hot', followId = null) {
     const r = store(list, followId);
     const cur = providerStats()[t.provider] || {};
     stat(t.provider, { lastFetch: now(), lastError: null, added: (cur.added || 0) + r.added, lastMs: now() - started });
-    if (r.added) note(`${label}: ${r.added} new${r.blocked ? `, ${r.blocked} filtered out` : ''}`);
+    if (r.added) note(r.blocked ? '{label}: {added} new, {blocked} filtered out' : '{label}: {added} new', { label, added: r.added, blocked: r.blocked });
     return r;
   } catch (err) {
     stat(t.provider, { lastError: err.message, lastErrorAt: now() });
-    note(`${label} failed: ${err.message}`);
+    note('{label} failed: {error}', { label, error: err.message });
     return { added: 0, blocked: 0, error: err.message };
   }
 }
@@ -209,12 +213,12 @@ export async function fetchMore(filters = {}, { budgetMs = 14000 } = {}) {
       for (const term of terms) {
         const sort = SORTS[(pages.get(`${id}|${term}|sortturn`) || 0) % SORTS.length];
         pages.set(`${id}|${term}|sortturn`, (pages.get(`${id}|${term}|sortturn`) || 0) + 1);
-        jobs.push({ t: { provider: id, mode: 'search', value: term }, label: `${p.label} more for "${term}"`, page: nextPage(`${id}|${term}|${sort}`), sort });
+        jobs.push({ t: { provider: id, mode: 'search', value: term }, label: tr('{source} more for "{term}"', { source: p.label, term }), page: nextPage(`${id}|${term}|${sort}`), sort });
       }
     } else if (p.can.trending) {
       const sort = SORTS[(pages.get(`${id}|sortturn`) || 0) % SORTS.length];
       pages.set(`${id}|sortturn`, (pages.get(`${id}|sortturn`) || 0) + 1);
-      jobs.push({ t: { provider: id, mode: 'trending', value: '' }, label: `${p.label} more (${sort})`, page: nextPage(`${id}|trending|${sort}`), sort });
+      jobs.push({ t: { provider: id, mode: 'trending', value: '' }, label: tr('{source} more ({sort})', { source: p.label, sort: sortName(sort) }), page: nextPage(`${id}|trending|${sort}`), sort });
     }
   }
   if (!terms.length) {
@@ -223,7 +227,7 @@ export async function fetchMore(filters = {}, { budgetMs = 14000 } = {}) {
         const p = PROVIDERS[id];
         if (!p.can.search || id === 'reddit') continue;
         if (wantFormats && !p.formats.some((x) => wantFormats.has(x))) continue;
-        jobs.push({ t: { provider: id, mode: 'search', value: tag }, label: `${p.label} for "${tag}"`, page: nextPage(`${id}|${tag}|week`), sort: 'week' });
+        jobs.push({ t: { provider: id, mode: 'search', value: tag }, label: tr('{source} for "{term}"', { source: p.label, term: tag }), page: nextPage(`${id}|${tag}|week`), sort: 'week' });
       }
     }
   }
@@ -272,14 +276,14 @@ export async function runIngest({ force = false, only = null } = {}) {
       const gm = genderMode();
       const gterm = gm === 'men' ? 'gay' : gm === 'women' ? 'lesbian' : null;
       const r = gterm && p.can.search && id !== 'reddit'
-        ? await runTarget({ provider: id, mode: 'search', value: gterm }, `${p.label} ${gterm} ${sort}`, 1 + (Math.floor(cycle / SORTS.length) % 3), sort)
-        : await runTarget({ provider: id, mode: 'trending', value: '' }, `${p.label} ${sort}`, 1 + (Math.floor(cycle / SORTS.length) % 2), sort);
+        ? await runTarget({ provider: id, mode: 'search', value: gterm }, `${p.label} ${gterm} ${sortName(sort)}`, 1 + (Math.floor(cycle / SORTS.length) % 3), sort)
+        : await runTarget({ provider: id, mode: 'trending', value: '' }, `${p.label} ${sortName(sort)}`, 1 + (Math.floor(cycle / SORTS.length) % 2), sort);
       stat(id, { lastTrending: now() });
       added += r.added; blocked += r.blocked;
       await pause();
       if (sort === 'hot' || sort === 'new') {
         const top = cycle % 2 ? 'week' : 'month';
-        const r2 = await runTarget({ provider: id, mode: 'trending', value: '' }, `${p.label} popular (${top})`, 1 + (Math.floor(cycle / 2) % 3), top);
+        const r2 = await runTarget({ provider: id, mode: 'trending', value: '' }, tr('{source} popular ({sort})', { source: p.label, sort: sortName(top) }), 1 + (Math.floor(cycle / 2) % 3), top);
         added += r2.added; blocked += r2.blocked;
         await pause();
       }
@@ -293,7 +297,7 @@ export async function runIngest({ force = false, only = null } = {}) {
           for (let k = 0; k < 2; k++) {
             const tag = tags[(cycle * 2 + k) % tags.length];
             const s2 = SORTS[(cycle + k) % SORTS.length];
-            const r = await runTarget({ provider: id, mode: 'search', value: tag }, `${p.label} for "${tag}" (${s2})`, 1, s2);
+            const r = await runTarget({ provider: id, mode: 'search', value: tag }, tr('{source} for "{term}" ({sort})', { source: p.label, term: tag, sort: sortName(s2) }), 1, s2);
             added += r.added; blocked += r.blocked;
             await pause();
           }
@@ -308,7 +312,7 @@ export async function runIngest({ force = false, only = null } = {}) {
       if (!config.mock && (!state[t.provider] || !state[t.provider].enabled)) continue;
       const label = f.label || `${PROVIDERS[t.provider]?.label || t.provider} ${t.value}`;
       const fsort = f.synced_from === 'auto' ? SORTS[(cycle + f.id) % SORTS.length] : 'new';
-      if (t.provider === 'reddit' && !config.mock) { queueReddit(t, `${label} (${fsort})`, f.id, fsort); continue; }
+      if (t.provider === 'reddit' && !config.mock) { queueReddit(t, `${label} (${sortName(fsort)})`, f.id, fsort); continue; }
       const r = await runTarget(t, label, 1, fsort, f.id);
       getDb().prepare('UPDATE follows SET last_fetch = ? WHERE id = ?').run(now(), f.id);
       added += r.added; blocked += r.blocked;
@@ -329,7 +333,7 @@ export async function runIngest({ force = false, only = null } = {}) {
 
 export async function testProvider(id) {
   const p = PROVIDERS[id];
-  if (!p) throw new Error('Unknown source');
+  if (!p) throw new Error(tr('Unknown source'));
   const started = now();
   const sample = { bluesky: 'bsky.app', reddit: 'gonewild' }[id] ?? '';
   const list = await fetchTarget({ provider: id, mode: p.can.trending ? 'trending' : id === 'reddit' ? 'community' : 'creator', value: sample });
@@ -355,7 +359,7 @@ export async function importRedditHistory() {
   const out = { upvoted: 0, saved: 0 };
   for (const kind of ['upvoted', 'saved']) {
     let posts = [];
-    try { posts = await reddit.userHistory(kind, 300); } catch (err) { note(`Reddit ${kind} import failed: ${err.message}`); continue; }
+    try { posts = await reddit.userHistory(kind, 300); } catch (err) { note(kind === 'saved' ? 'Reddit saved import failed: {error}' : 'Reddit upvoted import failed: {error}', { error: err.message }); continue; }
     const items = await enrichRedgifs(posts.map(reddit.normalizePost).filter(Boolean));
     for (const n of items) {
       const r = upsertItem(n);
@@ -365,7 +369,7 @@ export async function importRedditHistory() {
       out[kind]++;
     }
   }
-  note(`Imported ${out.upvoted} upvoted and ${out.saved} saved posts from Reddit`);
+  note('Imported {upvoted} upvoted and {saved} saved posts from Reddit', out);
   return out;
 }
 

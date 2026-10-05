@@ -1,4 +1,6 @@
 import { getDb, now, getSetting, setSetting, tagId } from './db.js';
+import { lang } from './i18n.js';
+import { conceptLabel } from './vocab.js';
 import { conceptsOf, isKinkConcept, familyOf, conceptName, knownVariants, knownConcept, FAMILIES } from './concepts.js';
 import { kinkableTag } from './tagquality.js';
 import { log } from './log.js';
@@ -409,7 +411,7 @@ export function risingConcepts(limit = 12) {
   const covered = new Set(getDb().prepare("SELECT concepts FROM kinks WHERE status != 'hidden'").all().flatMap((r) => conceptsOfRow(r)));
   return [...stats.values()].filter((x) => !covered.has(x.concept) && x.n >= 2 && x.lift >= 1.4 && x.prevalence <= RULES.create.prevalence && !qualifies(x))
     .sort((a, b) => (knownConcept(b.concept) ? 1 : 0) - (knownConcept(a.concept) ? 1 : 0) || b.s * Math.min(3, b.lift) - a.s * Math.min(3, a.lift)).slice(0, limit)
-    .map((x) => ({ concept: x.concept, name: conceptName(x.concept), n: x.n, s: Math.round(x.s * 10) / 10, lift: Math.round(x.lift * 10) / 10, need: Math.max(0, RULES.create.n - x.n) }));
+    .map((x) => ({ concept: x.concept, name: conceptLabel(x.concept, lang(), conceptName(x.concept)), n: x.n, s: Math.round(x.s * 10) / 10, lift: Math.round(x.lift * 10) / 10, need: Math.max(0, RULES.create.n - x.n) }));
 }
 
 // Which family unknown concepts belong to, asked once to the local model and remembered.

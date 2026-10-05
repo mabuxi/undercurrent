@@ -11,6 +11,7 @@ import { sessionStats } from './ai/assistant.js';
 import { listMemory } from './memory.js';
 import { userLimits } from './safety.js';
 import { displayTag } from './tagquality.js';
+import { tr, trn } from './i18n.js';
 
 const same = (a, b) => String(a || '').toLowerCase().replace(/[^a-z0-9]+/g, '') === String(b || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 
@@ -76,9 +77,9 @@ function turn(family, n) {
 function agoText(sec) {
   if (!sec) return '';
   const d = Date.now() / 1000 - sec;
-  if (d < 3600) return `${Math.max(1, Math.round(d / 60))} min ago`;
-  if (d < 86400) return `${Math.round(d / 3600)} h ago`;
-  return `${Math.round(d / 86400)} d ago`;
+  if (d < 3600) return tr('{n} min ago', { n: Math.max(1, Math.round(d / 60)) });
+  if (d < 86400) return tr('{n} h ago', { n: Math.round(d / 3600) });
+  return tr('{n} d ago', { n: Math.round(d / 86400) });
 }
 function savedRows(order, limit) {
   return getDb().prepare(`SELECT i.*, (SELECT MAX(ts) FROM events e WHERE e.item_id = i.id AND e.type = 'save') saved_at FROM item_state s JOIN items i ON i.id = s.item_id
@@ -113,12 +114,12 @@ function pickTag(r, ctx) {
 function build(type, r, ctx) {
   const off = Math.floor(r() * 6);
   const k = pickKink(r, ctx);
-  const kinkMeta = (kk) => ({ kink: { id: kk.id, name: kk.name, color: kk.color }, color: kk.color });
+  const kinkMeta = (kk) => ({ kink: { id: kk.id, name: kk.label || kk.name, color: kk.color }, color: kk.color });
   switch (type) {
     case 'kinkList': {
       if (!k) return null;
       const items = feed({ kink: k.id }, 8, off);
-      return items.length ? { type, layout: pickLayout(r), title: k.name, meta: `${k.status === 'proposed' ? 'suggested kink' : 'kink'} · ${Math.round((k.allTime + k.lately) / 2)}% match`, filter: { kink: k.id }, items, ...kinkMeta(k) } : null;
+      return items.length ? { type, layout: pickLayout(r), title: k.name, meta: tr(k.status === 'proposed' ? 'suggested kink · {n}% match' : 'kink · {n}% match', { n: Math.round((k.allTime + k.lately) / 2) }), filter: { kink: k.id }, items, ...kinkMeta(k) } : null;
     }
     case 'kinkDeep': {
       const groups = ctx.groups.filter((g) => ctx.children.get(g.id)?.length);
@@ -128,7 +129,7 @@ function build(type, r, ctx) {
         const kid = kids[Math.floor(r() * kids.length)];
         const items = feed({ kink: kid.id }, 8, off);
         if (!items.length) return null;
-        return { type: 'kinkDeep', layout: pickLayout(r), title: kid.name, meta: `inside ${g.name}`, filter: { kink: kid.id }, items, group: { id: g.id, name: g.name }, subs: kids.map((x) => ({ id: x.id, name: x.name, color: x.color })), activeSub: kid.id, color: kid.color || g.color, kink: { id: kid.id, name: kid.name, color: kid.color } };
+        return { type: 'kinkDeep', layout: pickLayout(r), title: kid.name, meta: tr('inside {group}', { group: g.name }), filter: { kink: kid.id }, items, group: { id: g.id, name: g.name }, subs: kids.map((x) => ({ id: x.id, name: x.name, color: x.color })), activeSub: kid.id, color: kid.color || g.color, kink: { id: kid.id, name: kid.name, color: kid.color } };
       }
       if (!k) return null;
       const niche = (k.tags || []).filter((x) => !same(x.name, k.name)).slice(0, 5);
@@ -136,18 +137,18 @@ function build(type, r, ctx) {
       const items = t ? feed({ kink: k.id, tags: [t.name] }, 8, off) : [];
       const use = items.length >= 2 ? items : feed({ kink: k.id }, 8, off);
       if (!use.length) return null;
-      return { type: 'kinkDeep', layout: pickLayout(r), title: items.length >= 2 ? `${k.name}: ${displayTag(t.name)}` : k.name, meta: 'go deeper', filter: items.length >= 2 ? { kink: k.id, tags: [t.name] } : { kink: k.id }, items: use, subs: niche.map((x) => ({ tag: x.name, name: displayTag(x.name) })), activeTag: items.length >= 2 ? t.name : null, color: k.color, kink: { id: k.id, name: k.name, color: k.color } };
+      return { type: 'kinkDeep', layout: pickLayout(r), title: items.length >= 2 ? `${k.name}: ${displayTag(t.name)}` : k.name, meta: tr('go deeper'), filter: items.length >= 2 ? { kink: k.id, tags: [t.name] } : { kink: k.id }, items: use, subs: niche.map((x) => ({ tag: x.name, name: displayTag(x.name) })), activeTag: items.length >= 2 ? t.name : null, color: k.color, kink: { id: k.id, name: k.label || k.name, color: k.color } };
     }
     case 'formatMix': {
       // A category from your map shown as one kind of content, or mixed.
-      const subj = r() < 0.7 && k ? { kind: 'kink', id: k.id, name: k.name, color: k.color } : pickTag(r, ctx);
+      const subj = r() < 0.7 && k ? { kind: 'kink', id: k.id, name: k.label || k.name, color: k.color } : pickTag(r, ctx);
       if (!subj) return null;
       const f = FORMAT_GROUPS[Math.floor(r() * FORMAT_GROUPS.length)];
       const base = subj.kind === 'kink' ? { kink: subj.id } : { tags: [subj.name] };
       const filter = f.formats ? { ...base, formats: f.formats } : base;
       const items = feed(filter, f.formats?.includes('story') || f.formats?.includes('discussion') ? 4 : 6, off);
       if (items.length < 2) return null;
-      return { type: f.formats?.includes('story') ? 'stories' : 'kinkList', layout: f.layout || pickLayout(r), title: `${subj.kind === 'kink' ? subj.name : displayTag(subj.name)} · ${f.label}`, meta: subj.kind === 'kink' ? 'from your map' : 'a tag you respond to', filter, items: items.map((it) => ({ ...it, readMin: it.media?.readMin || undefined })), color: subj.color || '#B6A8B0', ...(subj.kind === 'kink' ? { kink: { id: subj.id, name: subj.name, color: subj.color } } : {}) };
+      return { type: f.formats?.includes('story') ? 'stories' : 'kinkList', layout: f.layout || pickLayout(r), title: `${subj.kind === 'kink' ? subj.name : displayTag(subj.name)} · ${tr(f.label)}`, meta: subj.kind === 'kink' ? tr('from your map') : tr('a tag you respond to'), filter, items: items.map((it) => ({ ...it, readMin: it.media?.readMin || undefined })), color: subj.color || '#B6A8B0', ...(subj.kind === 'kink' ? { kink: { id: subj.id, name: subj.name, color: subj.color } } : {}) };
     }
     case 'kinkMix': {
       if (ctx.kinks.length < 3) return null;
@@ -157,7 +158,7 @@ function build(type, r, ctx) {
       if (!a || !b || a.id === b.id) return null;
       const items = feed({ anyKinks: [a.id, b.id] }, 6, off);
       if (items.length < 3) return null;
-      return { type: 'kinkList', layout: pickLayout(r), title: `${a.name} and ${b.name}`, meta: 'a mix from your map', filter: { anyKinks: [a.id, b.id] }, items, color: a.color };
+      return { type: 'kinkList', layout: pickLayout(r), title: tr('{a} and {b}', { a: a.name, b: b.name }), meta: tr('a mix from your map'), filter: { anyKinks: [a.id, b.id] }, items, color: a.color };
     }
     case 'nearby': {
       // Similar to what you watched lately, but not the same thing.
@@ -168,43 +169,43 @@ function build(type, r, ctx) {
       const t = near[Math.floor(r() * Math.min(near.length, 6))];
       const items = feed({ tags: [t] }, 6, off);
       if (items.length < 2) return null;
-      return { type: 'kinkList', layout: pickLayout(r), title: `Near what you just watched: ${displayTag(t)}`, meta: 'similar, not the same', filter: { tags: [t] }, items, color: '#E8C66B' };
+      return { type: 'kinkList', layout: pickLayout(r), title: tr('Near what you just watched: {tag}', { tag: displayTag(t) }), meta: tr('similar, not the same'), filter: { tags: [t] }, items, color: '#E8C66B' };
     }
     case 'tagNow': {
       const tags = ctx.nowTags;
       if (!tags.length) return null;
       const t = tags[Math.floor(r() * Math.min(tags.length, 5))];
       const items = feed({ tags: [t.name] }, 8, off);
-      return items.length ? { type: 'kinkList', layout: pickLayout(r), title: `Right now: ${displayTag(t.name)}`, meta: 'from what you just watched', filter: { tags: [t.name] }, items, color: '#E8C66B' } : null;
+      return items.length ? { type: 'kinkList', layout: pickLayout(r), title: tr('Right now: {tag}', { tag: displayTag(t.name) }), meta: tr('from what you just watched'), filter: { tags: [t.name] }, items, color: '#E8C66B' } : null;
     }
     case 'performer': {
       const ps = ctx.performers;
       if (!ps.length) return null;
       const p = ps[Math.floor(r() * Math.min(ps.length, 8))];
       const items = feed({ tags: [p.name] }, 6, 0);
-      return items.length ? { type: 'kinkList', layout: r() < 0.5 ? 'carousel' : 'hero', performerThumb: p.thumb || null, title: p.name.replace(/\b\w/g, (c) => c.toUpperCase()), meta: `performer · ${p.n} videos here`, filter: { tags: [p.name] }, performer: p.name, items, color: '#D6A0CF' } : null;
+      return items.length ? { type: 'kinkList', layout: r() < 0.5 ? 'carousel' : 'hero', performerThumb: p.thumb || null, title: p.name.replace(/\b\w/g, (c) => c.toUpperCase()), meta: trn(p.n, 'performer · {n} video here', 'performer · {n} videos here'), filter: { tags: [p.name] }, performer: p.name, items, color: '#D6A0CF' } : null;
     }
     case 'gallery': {
       const items = feed({ formats: ['set', 'image'] }, 4, off);
-      return items.length >= 2 ? { type: 'gifs', title: 'Photo posts', meta: 'image sets and pictures', filter: { formats: ['set', 'image'] }, items, color: '#93B4DF' } : null;
+      return items.length >= 2 ? { type: 'gifs', title: tr('Photo posts'), meta: tr('image sets and pictures'), filter: { formats: ['set', 'image'] }, items, color: '#93B4DF' } : null;
     }
     case 'kinkSpot': {
       if (!k) return null;
       const items = feed({ kink: k.id, formats: ['long', 'image', 'set', 'short'] }, 3, off);
       if (!items.length) return null;
-      if (items[0].match >= 90) return { type, title: k.name, meta: 'spotlight', filter: { kink: k.id }, items: items.slice(0, 1), ...kinkMeta(k) };
-      return { type: 'kinkList', layout: 'list', title: k.name, meta: 'kink', filter: { kink: k.id }, items, ...kinkMeta(k) };
+      if (items[0].match >= 90) return { type, title: k.name, meta: tr('spotlight'), filter: { kink: k.id }, items: items.slice(0, 1), ...kinkMeta(k) };
+      return { type: 'kinkList', layout: 'list', title: k.name, meta: tr('kink'), filter: { kink: k.id }, items, ...kinkMeta(k) };
     }
     case 'pair': {
       if (!ctx.pairs.length) return null;
       const p = ctx.pairs[Math.floor(r() * ctx.pairs.length)];
       const items = feed({ pair: [p.a.id, p.b.id] }, 4, off);
-      return items.length ? { type, title: `${p.a.name} × ${p.b.name}`, meta: `pairs well · ${p.score}%`, filter: { pair: [p.a.id, p.b.id] }, items, pair: [p.a, p.b], color: p.a.color } : null;
+      return items.length ? { type, title: `${p.a.name} × ${p.b.name}`, meta: tr('pairs well · {n}%', { n: p.score }), filter: { pair: [p.a.id, p.b.id] }, items, pair: [p.a, p.b], color: p.a.color } : null;
     }
     case 'fantasy': {
       if (!ctx.fantasies.length) return null;
       const f = ctx.fantasies[Math.floor(r() * ctx.fantasies.length)];
-      return { type, title: f.name, meta: `fantasy · ${f.match}%`, filter: { fantasy: f.id }, fantasy: f, color: '#F6C35B' };
+      return { type, title: f.name, meta: tr('fantasy · {n}%', { n: f.match }), filter: { fantasy: f.id }, fantasy: f, color: '#F6C35B' };
     }
     case 'following':
     case 'followLatest':
@@ -218,13 +219,13 @@ function build(type, r, ctx) {
         const items = feed(filter, 6, 0).sort((a, b) => (b.created || 0) - (a.created || 0));
         if (!items.length) return null;
         const fresh = items.filter((x) => (x.created || 0) * 1000 > (f.created || 0)).length;
-        return { type: 'kinkList', layout: r() < 0.5 ? 'carousel' : 'hero', title: f.label || f.name, meta: `following · newest ${agoText(items[0].created)}${fresh ? ` · ${fresh} new` : ''}`, newest: items[0].created, filter, items, color: '#8EA6C9' };
+        return { type: 'kinkList', layout: r() < 0.5 ? 'carousel' : 'hero', title: f.label || f.name, meta: `${tr('following · newest {ago}', { ago: agoText(items[0].created) })}${fresh ? ` · ${trn(fresh, '{n} new', '{n} new')}` : ''}`, newest: items[0].created, filter, items, color: '#8EA6C9' };
       }
       const items = buildFeed({ following: true, noCollections: true }, { limit: 16, mix: 0, exclude: EXCLUDE }).items
         .sort((a, b) => (b.created || 0) - (a.created || 0)).slice(0, type === 'followLatest' ? 8 : 5).map(slim);
       const newest = items[0]?.created || null;
-      if (type === 'followLatest') return items.length ? { type: 'followLatest', title: 'Latest from who you follow', meta: newest ? `newest post ${agoText(newest)}` : 'newest first', newest, filter: { following: true }, items, color: '#8EA6C9' } : null;
-      return { type, title: 'Following', meta: `${fol.length} followed${newest ? ` · newest ${agoText(newest)}` : ''}`, newest, filter: { following: true }, follows: fol.slice(0, 8).map((f) => ({ kind: f.kind, value: f.name, provider: f.provider })), items, color: '#8EA6C9' };
+      if (type === 'followLatest') return items.length ? { type: 'followLatest', title: tr('Latest from who you follow'), meta: newest ? tr('newest post {ago}', { ago: agoText(newest) }) : tr('newest first'), newest, filter: { following: true }, items, color: '#8EA6C9' } : null;
+      return { type, title: tr('Following'), meta: `${trn(fol.length, '{n} followed', '{n} followed')}${newest ? ` · ${tr('newest {ago}', { ago: agoText(newest) })}` : ''}`, newest, filter: { following: true }, follows: fol.slice(0, 8).map((f) => ({ kind: f.kind, value: f.name, provider: f.provider })), items, color: '#8EA6C9' };
     }
     case 'trending': {
       const kk = k;
@@ -237,15 +238,15 @@ function build(type, r, ctx) {
       }
       items = items.slice(0, 5).map(slim);
       for (const it of items) EXCLUDE.push(it.id);
-      return items.length ? { type, title: 'Popular this week', meta: kk && items.every((it) => it.kinks.some((x) => x.id === kk.id)) ? kk.name : 'across your sources', filter: kk ? { kink: kk.id } : {}, items, color: kk?.color || '#E39A83' } : null;
+      return items.length ? { type, title: tr('Popular this week'), meta: kk && items.every((it) => it.kinks.some((x) => x.id === kk.id)) ? kk.name : tr('across your sources'), filter: kk ? { kink: kk.id } : {}, items, color: kk?.color || '#E39A83' } : null;
     }
     case 'gifs': {
       const items = feed(k && r() < 0.5 ? { formats: ['gif'], kink: k.id } : { formats: ['gif'] }, 4, off);
-      return items.length ? { type, title: 'GIFs', meta: 'loops', filter: { formats: ['gif'] }, items, color: '#B79BF0' } : null;
+      return items.length ? { type, title: tr('GIFs'), meta: tr('loops'), filter: { formats: ['gif'] }, items, color: '#B79BF0' } : null;
     }
     case 'shortsRail': {
       const items = feed({ formats: ['short'] }, 3, off);
-      return items.length ? { type, title: 'Short form', meta: 'vertical clips', filter: { formats: ['short'] }, items, color: '#7FD0C2' } : null;
+      return items.length ? { type, title: tr('Short form'), meta: tr('vertical clips'), filter: { formats: ['short'] }, items, color: '#7FD0C2' } : null;
     }
     case 'creator': {
       const aff = ctx.aff;
@@ -260,65 +261,65 @@ function build(type, r, ctx) {
       const items = feed({ author: a.author }, 3);
       if (!items.length) return null;
       const match = Math.round(items.reduce((x, y) => x + (y.match || 0), 0) / items.length);
-      return { type, layout: items.length >= 3 && r() < 0.5 ? 'hero' : 'list', title: a.author, meta: `creator you might like · ${match}% match`, filter: { author: a.author }, creator: { name: a.author, source: a.source, posts: a.n, followed: false, match }, items, color: '#E3A58F' };
+      return { type, layout: items.length >= 3 && r() < 0.5 ? 'hero' : 'list', title: a.author, meta: tr('creator you might like · {n}% match', { n: match }), filter: { author: a.author }, creator: { name: a.author, source: a.source, posts: a.n, followed: false, match }, items, color: '#E3A58F' };
     }
     case 'discovery': {
       const items = feed({ onlyNew: true }, 3, off);
-      return items.length ? { type, big: items[0].match >= 90, title: 'New to you', meta: 'not opened yet', filter: { onlyNew: true }, items: items[0].match >= 90 ? items.slice(0, 1) : items, color: '#E8C66B' } : null;
+      return items.length ? { type, big: items[0].match >= 90, title: tr('New to you'), meta: tr('not opened yet'), filter: { onlyNew: true }, items: items[0].match >= 90 ? items.slice(0, 1) : items, color: '#E8C66B' } : null;
     }
     case 'savedPick': {
       const rows = getDb().prepare('SELECT i.* FROM item_state s JOIN items i ON i.id = s.item_id WHERE s.saved = 1 AND i.blocked = 0 ORDER BY RANDOM() LIMIT 6').all();
-      return rows.length >= 2 ? { type: 'recentSaved', title: 'From your saves', meta: `${rows.length} saved posts, picked at random`, filter: { saved: true }, items: rows.map((row) => slim(presentOne(hydrate(row)))), color: '#C98BC4' } : null;
+      return rows.length >= 2 ? { type: 'recentSaved', title: tr('From your saves'), meta: trn(rows.length, '{n} saved post, picked at random', '{n} saved posts, picked at random'), filter: { saved: true }, items: rows.map((row) => slim(presentOne(hydrate(row)))), color: '#C98BC4' } : null;
     }
     case 'stories': {
       let items = feed({ formats: ['story'], minFit: 55 }, 6, off);
       if (items.length < 2) items = feed({ formats: ['story'] }, 6, off);
       items = items.map((it) => ({ ...it, readMin: it.media?.readMin || 1 }));
-      return items.length ? { type, title: 'Keep reading', meta: `stories · ${items.reduce((a, b) => a + b.readMin, 0)} min of reading`, filter: { formats: ['story'] }, items, color: '#E39A83' } : null;
+      return items.length ? { type, title: tr('Keep reading'), meta: tr('stories · {n} min of reading', { n: items.reduce((a, b) => a + b.readMin, 0) }), filter: { formats: ['story'] }, items, color: '#E39A83' } : null;
     }
     case 'community': {
       const c = getDb().prepare("SELECT kind, value, synced_from FROM follows WHERE active = 1 AND kind IN ('subreddit', 'community') ORDER BY RANDOM() LIMIT 1").get();
       if (!c) return null;
       const name = c.kind === 'subreddit' ? `r/${c.value}` : c.value.split('|').slice(1).join('|');
       const items = feed({ community: name }, 8, off);
-      return items.length ? { type: 'kinkList', layout: pickLayout(r), title: name, meta: 'one of your sources', filter: { community: name }, items, color: '#8EA6C9' } : null;
+      return items.length ? { type: 'kinkList', layout: pickLayout(r), title: name, meta: tr('one of your sources'), filter: { community: name }, items, color: '#8EA6C9' } : null;
     }
-    case 'tonight': return { type, title: 'Tonight', meta: 'this session', stats: sessionStats(ctx.sessionId), color: '#B6A8B0' };
+    case 'tonight': return { type, title: tr('Tonight'), meta: tr('this session'), stats: sessionStats(ctx.sessionId), color: '#B6A8B0' };
     case 'analytics': return analytics(r, ctx);
-    case 'lately': return ctx.kinks.length ? { type, title: 'Lately vs all time', meta: 'last 7 days', kinks: ctx.kinks.slice(0, 6), color: '#7FC49B' } : null;
+    case 'lately': return ctx.kinks.length ? { type, title: tr('Lately vs all time'), meta: tr('last 7 days'), kinks: ctx.kinks.slice(0, 6), color: '#7FC49B' } : null;
     case 'map': {
       const v = turn('map', 3);
       if (v === 1 && ctx.groups.length) {
         const groups = ctx.groups.filter((g) => ctx.children.get(g.id)?.length).map((g) => {
           const kids = ctx.children.get(g.id);
-          return { id: g.id, name: g.name, color: g.color, score: Math.round(kids.reduce((a, b) => a + (b.allTime + b.lately) / 2, 0) / kids.length), kinks: kids.slice(0, 5).map((k) => ({ id: k.id, name: k.name, color: k.color })) };
+          return { id: g.id, name: g.label || g.name, color: g.color, score: Math.round(kids.reduce((a, b) => a + (b.allTime + b.lately) / 2, 0) / kids.length), kinks: kids.slice(0, 5).map((k) => ({ id: k.id, name: k.label || k.name, color: k.color })) };
         }).sort((a, b) => b.score - a.score).slice(0, 5);
-        if (groups.length) return { type: 'map', variant: 'groups', title: 'Your map: groups', meta: `${groups.length} families of kinks`, groups, color: '#B6A8B0' };
+        if (groups.length) return { type: 'map', variant: 'groups', title: tr('Your map: groups'), meta: trn(groups.length, '{n} family of kinks', '{n} families of kinks'), groups, color: '#B6A8B0' };
       }
       if (v === 2) {
         const b = brain();
         const name = new Map(b.nodes.map((n) => [n.key, n]));
         const links = b.edges.filter((e) => e.a[0] === 'k' && e.b[0] === 'k').sort((x, y) => y.w - x.w).slice(0, 5)
           .map((e) => ({ a: { id: name.get(e.a)?.id, name: name.get(e.a)?.name, color: name.get(e.a)?.color }, b: { id: name.get(e.b)?.id, name: name.get(e.b)?.name, color: name.get(e.b)?.color }, w: e.w }));
-        if (links.length) return { type: 'map', variant: 'links', title: 'Your map: strongest links', meta: 'kinks your brain ties together', links, color: '#B6A8B0' };
+        if (links.length) return { type: 'map', variant: 'links', title: tr('Your map: strongest links'), meta: tr('kinks your brain ties together'), links, color: '#B6A8B0' };
       }
-      return ctx.kinks.length ? { type, variant: 'brain', title: 'Your map', meta: `${ctx.kinks.length} kinks · ${ctx.fantasies.length} fantasies`, kinks: ctx.kinks.slice(0, 8), fantasies: ctx.fantasies.slice(0, 4), color: '#B6A8B0' } : null;
+      return ctx.kinks.length ? { type, variant: 'brain', title: tr('Your map'), meta: `${trn(ctx.kinks.length, '{n} kink', '{n} kinks')} · ${trn(ctx.fantasies.length, '{n} fantasy', '{n} fantasies')}`, kinks: ctx.kinks.slice(0, 8), fantasies: ctx.fantasies.slice(0, 4), color: '#B6A8B0' } : null;
     }
-    case 'limits': return { type, title: 'Hard limits', meta: 'never shown', limits: userLimits(), color: '#E07070' };
-    case 'savedFant': return { type, title: 'Your fantasies', meta: 'saved scenarios', fantasies: ctx.fantasies, color: '#F6C35B' };
+    case 'limits': return { type, title: tr('Hard limits'), meta: tr('never shown'), limits: userLimits(), color: '#E07070' };
+    case 'savedFant': return { type, title: tr('Your fantasies'), meta: tr('saved scenarios'), fantasies: ctx.fantasies, color: '#F6C35B' };
     case 'journey': {
       const mode = ['close', 'branch', 'genre'][turn('journey', 3)];
       const useF = ctx.fantasies.length && r() < 0.3;
       const f = useF ? ctx.fantasies[Math.floor(r() * ctx.fantasies.length)] : null;
       const kk = f ? null : k;
-      if (!f && !kk) return { type, title: 'Journeys', meta: 'a guided path, start to end', kinks: ctx.kinks.slice(0, 3), color: '#F6C35B' };
-      const subject = f ? { kind: 'fantasy', id: f.id, name: f.name, color: '#F6C35B' } : { kind: 'kink', id: kk.id, name: kk.name, color: kk.color };
-      const label = mode === 'close' ? `Dive deeper into ${subject.name}` : mode === 'branch' ? `Branch out from ${subject.name}` : `Surprise me near ${subject.name}`;
-      const blurb = mode === 'close' ? 'Your strongest matches for it, from quick visuals to a longer piece at the end.'
-        : mode === 'branch' ? 'Starts where you are comfortable, then crosses into the kink it pairs with best.'
-          : 'Things you have not seen yet from the same family, picked to still fit you.';
+      if (!f && !kk) return { type, title: tr('Journeys'), meta: tr('a guided path, start to end'), kinks: ctx.kinks.slice(0, 3), color: '#F6C35B' };
+      const subject = f ? { kind: 'fantasy', id: f.id, name: f.name, color: '#F6C35B' } : { kind: 'kink', id: kk.id, name: kk.label || kk.name, color: kk.color };
+      const label = tr(mode === 'close' ? 'Dive deeper into {name}' : mode === 'branch' ? 'Branch out from {name}' : 'Surprise me near {name}', { name: subject.name });
+      const blurb = mode === 'close' ? tr('Your strongest matches for it, from quick visuals to a longer piece at the end.')
+        : mode === 'branch' ? tr('Starts where you are comfortable, then crosses into the kink it pairs with best.')
+          : tr('Things you have not seen yet from the same family, picked to still fit you.');
       const preview = journey({ kink: kk?.id, fantasy: f?.id, mode, limit: 3 }).steps.map(slim);
-      return { type: 'journeyOne', title: label, meta: `journey · ${mode === 'close' ? 'deeper' : mode === 'branch' ? 'branch out' : 'same family'}`, subject, mode, blurb, items: preview, color: subject.color };
+      return { type: 'journeyOne', title: label, meta: mode === 'close' ? tr('journey · deeper') : mode === 'branch' ? tr('journey · branch out') : tr('journey · same family'), subject, mode, blurb, items: preview, color: subject.color };
     }
     case 'combo': {
       const list = listSuggestions('combo', { limit: 12 });
@@ -326,7 +327,7 @@ function build(type, r, ctx) {
       const c = list[Math.floor(r() * Math.min(list.length, 6))];
       const items = feed({ pair: [c.data.a.id, c.data.b.id] }, 4, off);
       if (!items.length) return null;
-      return { type: 'combo', title: c.title, meta: `${c.data.distance === 'far' ? 'far apart' : 'same family'} · ${c.confidence}% match`, why: c.body, suggestion: { id: c.id, ...c.data, match: c.confidence }, filter: { pair: [c.data.a.id, c.data.b.id] }, items, color: c.data.a.color };
+      return { type: 'combo', title: c.title, meta: tr(c.data.distance === 'far' ? 'far apart · {n}% match' : 'same family · {n}% match', { n: c.confidence }), why: c.body, suggestion: { id: c.id, ...c.data, match: c.confidence }, filter: { pair: [c.data.a.id, c.data.b.id] }, items, color: c.data.a.color };
     }
     case 'fantasySuggest': {
       const list = listSuggestions('fantasy', { limit: 10 });
@@ -334,7 +335,7 @@ function build(type, r, ctx) {
       const sg = list[Math.floor(r() * Math.min(list.length, 4))];
       const ids = (sg.data.kinks || []).map((x) => x.id);
       const items = ids.length ? feed({ anyKinks: ids, tags: sg.data.tags?.slice(0, 3), relaxed: true }, 3) : feed({ tags: sg.data.tags?.slice(0, 3), relaxed: true }, 3);
-      return { type: 'fantasySuggest', title: sg.title, meta: `fantasy for you · ${sg.confidence}% sure`, suggestion: { id: sg.id, title: sg.title, scenario: sg.body, kinks: sg.data.kinks || [], tags: sg.data.tags || [], why: sg.data.why, confidence: sg.confidence }, filter: ids.length ? { anyKinks: ids } : { tags: sg.data.tags?.slice(0, 3) }, items, color: '#F6C35B' };
+      return { type: 'fantasySuggest', title: sg.title, meta: tr('fantasy for you · {n}% sure', { n: sg.confidence }), suggestion: { id: sg.id, title: sg.title, scenario: sg.body, kinks: sg.data.kinks || [], tags: sg.data.tags || [], why: sg.data.why, confidence: sg.confidence }, filter: ids.length ? { anyKinks: ids } : { tags: sg.data.tags?.slice(0, 3) }, items, color: '#F6C35B' };
     }
     case 'newKink': {
       const list = newKinks();
@@ -342,12 +343,12 @@ function build(type, r, ctx) {
       const nk = list[Math.floor(r() * Math.min(list.length, 3))];
       const items = feed({ kink: nk.id }, 6, 0);
       if (!items.length) return null;
-      return { type: 'newKink', layout: r() < 0.5 ? 'carousel' : 'hero', title: nk.name, meta: `new kink you might like · ${Math.round((nk.lately + nk.now) / 2)}% lately`, kink: { id: nk.id, name: nk.name, color: nk.color, description: nk.description, status: nk.status, tags: nk.tags.slice(0, 5).map((t) => t.name) }, filter: { kink: nk.id }, items, color: nk.color };
+      return { type: 'newKink', layout: r() < 0.5 ? 'carousel' : 'hero', title: nk.name, meta: tr('new kink you might like · {n}% lately', { n: Math.round((nk.lately + nk.now) / 2) }), kink: { id: nk.id, name: nk.name, color: nk.color, description: nk.description, status: nk.status, tags: nk.tags.slice(0, 5).map((t) => t.name) }, filter: { kink: nk.id }, items, color: nk.color };
     }
-    case 'moodCheck': return { type, title: 'What’s the mood?', meta: 'one tap sets everything', color: '#E39A83' };
+    case 'moodCheck': return { type, title: tr('What’s the mood?'), meta: tr('one tap sets everything'), color: '#E39A83' };
     case 'tagcloud': {
       const tags = topTags({ by: 'long', limit: 18 }).filter((t) => t.long > 0.05 && t.name);
-      return tags.length >= 4 ? { type, title: 'Your tags', meta: 'size is weight', tags: tags.map((t) => ({ name: t.name, weight: t.long })), color: '#B6A8B0' } : null;
+      return tags.length >= 4 ? { type, title: tr('Your tags'), meta: tr('size is weight'), tags: tags.map((t) => ({ name: t.name, weight: t.long })), color: '#B6A8B0' } : null;
     }
     case 'rateRecent': {
       // Only posts you clearly spent time on: watched to the end, rewatched, liked, or stayed on for 20 seconds.
@@ -357,17 +358,17 @@ function build(type, r, ctx) {
       if (!row) return null;
       RATE_ASKED.add(row.id);
       const ev = getDb().prepare("SELECT type FROM events WHERE item_id = ? AND type IN ('complete', 'rewatch', 'up')").all(row.id).map((e) => e.type);
-      const why = ev.includes('rewatch') ? 'you rewatched this' : ev.includes('complete') ? 'you watched this to the end' : ev.includes('up') ? 'you liked this' : 'you stayed on this a while';
-      return { type, title: 'How was this?', meta: why, items: [slim(presentOne(hydrate(row)))], color: '#F2894E' };
+      const why = ev.includes('rewatch') ? tr('you rewatched this') : ev.includes('complete') ? tr('you watched this to the end') : ev.includes('up') ? tr('you liked this') : tr('you stayed on this a while');
+      return { type, title: tr('How was this?'), meta: why, items: [slim(presentOne(hydrate(row)))], color: '#F2894E' };
     }
     case 'recentSaved': {
       const rows = savedRows('saved_at DESC', 12).sort(() => r() - 0.5).slice(0, 4);
-      return rows.length ? { type, title: 'Recently saved', meta: 'your collection', filter: { saved: true }, items: rows.map((row) => slim(presentOne(hydrate(row)))), color: '#E39A83' } : null;
+      return rows.length ? { type, title: tr('Recently saved'), meta: tr('your collection'), filter: { saved: true }, items: rows.map((row) => slim(presentOne(hydrate(row)))), color: '#E39A83' } : null;
     }
     case 'oldSaves': {
       const rows = getDb().prepare(`SELECT i.* FROM item_state s JOIN items i ON i.id = s.item_id WHERE s.saved = 1 AND i.blocked = 0
         AND COALESCE((SELECT MAX(ts) FROM events e WHERE e.item_id = i.id AND e.type = 'save'), 0) < ? ORDER BY RANDOM() LIMIT 4`).all(now() - 7 * 86400000);
-      return rows.length >= 2 ? { type: 'recentSaved', title: 'From your saves', meta: 'older favorites, picked at random', filter: { saved: true }, items: rows.map((row) => slim(presentOne(hydrate(row)))), color: '#C98BC4' } : null;
+      return rows.length >= 2 ? { type: 'recentSaved', title: tr('From your saves'), meta: tr('older favorites, picked at random'), filter: { saved: true }, items: rows.map((row) => slim(presentOne(hydrate(row)))), color: '#C98BC4' } : null;
     }
     case 'hotThread':
     case 'discussion': {
@@ -380,11 +381,11 @@ function build(type, r, ctx) {
       if (!item) item = feed({ formats: ['discussion'] }, 1, off)[0];
       if (!item) return null;
       EXCLUDE.push(item.id);
-      return { type: 'hotThread', title: 'Hot thread', meta: `${item.community || item.source} · ${item.match}% match`, filter: { formats: ['discussion'] }, items: [item], color: '#81737B' };
+      return { type: 'hotThread', title: tr('Hot thread'), meta: `${item.community || item.source} · ${tr('{n}% match', { n: item.match })}`, filter: { formats: ['discussion'] }, items: [item], color: '#81737B' };
     }
     case 'memory': {
       const mem = listMemory();
-      return { type, title: 'Memory', meta: `${mem.filter((m) => m.status === 'active').length} remembered · ${mem.filter((m) => m.status === 'proposed').length} to review`, memories: mem.slice(0, 4), color: '#C9A7E8' };
+      return { type, title: tr('Memory'), meta: tr('{n} remembered · {m} to review', { n: mem.filter((m) => m.status === 'active').length, m: mem.filter((m) => m.status === 'proposed').length }), memories: mem.slice(0, 4), color: '#C9A7E8' };
     }
     default: return null;
   }
@@ -398,14 +399,14 @@ function analytics(r, ctx) {
   for (let i = 0; i < tries.length; i++) {
     const v = tries[(start + i) % tries.length];
     if (v === 'rising') {
-      const rising = ctx.kinks.map((k) => ({ id: k.id, name: k.name, color: k.color, delta: k.lately - k.allTime, lately: k.lately })).filter((k) => k.delta >= 2).sort((a, b) => b.delta - a.delta).slice(0, 4);
-      const falling = ctx.kinks.map((k) => ({ id: k.id, name: k.name, color: k.color, delta: k.lately - k.allTime })).filter((k) => k.delta <= -3).sort((a, b) => a.delta - b.delta).slice(0, 2);
-      if (rising.length) return { type: 'rising', title: 'On the rise', meta: 'this week compared with all time', rising, falling, color: '#7FC49B' };
+      const rising = ctx.kinks.map((k) => ({ id: k.id, name: k.label || k.name, color: k.color, delta: k.lately - k.allTime, lately: k.lately })).filter((k) => k.delta >= 2).sort((a, b) => b.delta - a.delta).slice(0, 4);
+      const falling = ctx.kinks.map((k) => ({ id: k.id, name: k.label || k.name, color: k.color, delta: k.lately - k.allTime })).filter((k) => k.delta <= -3).sort((a, b) => a.delta - b.delta).slice(0, 2);
+      if (rising.length) return { type: 'rising', title: tr('On the rise'), meta: tr('this week compared with all time'), rising, falling, color: '#7FC49B' };
     }
     if (v === 'topWatched') {
       const eng = engagement(week, { limit: 300, minPoints: 2 }).sort((a, b) => b.p - a.p).slice(0, 5);
       const items = eng.map((e) => { const row = db.prepare('SELECT * FROM items WHERE id = ? AND blocked = 0').get(e.item_id); return row ? { ...slim(presentOne(hydrate(row))), points: Math.round(e.p * 10) / 10 } : null; }).filter(Boolean);
-      if (items.length >= 3) return { type: 'topWatched', title: 'Your week, ranked', meta: 'what counted most for your taste', items, color: '#F2894E' };
+      if (items.length >= 3) return { type: 'topWatched', title: tr('Your week, ranked'), meta: tr('what counted most for your taste'), items, color: '#F2894E' };
     }
     if (v === 'scoreboard') {
       const c = (since, until) => Object.fromEntries(db.prepare('SELECT type, COUNT(*) n, COALESCE(SUM(value), 0) v FROM events WHERE ts > ? AND ts <= ? GROUP BY type').all(since, until).map((x) => [x.type, x]));
@@ -413,21 +414,21 @@ function analytics(r, ctx) {
       const b = c(week - 7 * 86400000, week);
       const row = (key, label, get) => ({ key, label, now: get(a), before: get(b) });
       const rows = [
-        row('up', 'Likes', (x) => x.up?.n || 0), row('rate', 'Heat given', (x) => x.rate?.n || 0), row('save', 'Saves', (x) => x.save?.n || 0),
-        row('complete', 'Watched to the end', (x) => x.complete?.n || 0), row('rewatch', 'Rewatches', (x) => x.rewatch?.n || 0),
-        row('minutes', 'Minutes watched', (x) => Math.round((x.dwell?.v || 0) / 60000))
+        row('up', tr('Likes'), (x) => x.up?.n || 0), row('rate', tr('Heat given'), (x) => x.rate?.n || 0), row('save', tr('Saves'), (x) => x.save?.n || 0),
+        row('complete', tr('Watched to the end'), (x) => x.complete?.n || 0), row('rewatch', tr('Rewatches'), (x) => x.rewatch?.n || 0),
+        row('minutes', tr('Minutes watched'), (x) => Math.round((x.dwell?.v || 0) / 60000))
       ];
-      if (rows.some((x) => x.now)) return { type: 'scoreboard', title: 'This week in numbers', meta: 'compared with the week before', rows, color: '#8EA6C9' };
+      if (rows.some((x) => x.now)) return { type: 'scoreboard', title: tr('This week in numbers'), meta: tr('compared with the week before'), rows, color: '#8EA6C9' };
     }
-    if (v === 'lately' && ctx.kinks.length) return { type: 'lately', title: 'Lately vs all time', meta: 'last 7 days', kinks: ctx.kinks.slice(0, 6), color: '#7FC49B' };
+    if (v === 'lately' && ctx.kinks.length) return { type: 'lately', title: tr('Lately vs all time'), meta: tr('last 7 days'), kinks: ctx.kinks.slice(0, 6), color: '#7FC49B' };
     if (v === 'formats') {
       const aff = ctx.aff;
       const formats = ['long', 'short', 'gif', 'image', 'set', 'story', 'discussion'].map((f) => { const x = aff.get(`f:${f}`); return { format: f, lately: Math.round(50 + 50 * Math.tanh((x?.lately || 0) / 2)), allTime: Math.round(50 + 50 * Math.tanh((x?.long || 0) / 2)) }; }).sort((x, y) => y.lately - x.lately);
-      return { type: 'formats', title: 'What you reach for', meta: 'formats this week', formats, color: '#B79BF0' };
+      return { type: 'formats', title: tr('What you reach for'), meta: tr('formats this week'), formats, color: '#B79BF0' };
     }
     if (v === 'tagcloud') {
       const tags = topTags({ by: 'long', limit: 18 }).filter((t) => t.long > 0.05 && t.name);
-      if (tags.length >= 4) return { type: 'tagcloud', title: 'Your tags', meta: 'size is weight', tags: tags.map((t) => ({ name: t.name, weight: t.long })), color: '#B6A8B0' };
+      if (tags.length >= 4) return { type: 'tagcloud', title: tr('Your tags'), meta: tr('size is weight'), tags: tags.map((t) => ({ name: t.name, weight: t.long })), color: '#B6A8B0' };
     }
   }
   return null;
@@ -449,7 +450,7 @@ function pickFrom(list, r) {
 const SHOWN = new Map();
 const REPEAT_MS = 12 * 3600000;
 const BY_ITEMS = new Set(['hotThread', 'trending', 'gifs', 'shortsRail', 'stories', 'recentSaved', 'followLatest', 'following', 'discovery', 'rateRecent', 'topWatched']);
-const sigOf = (w) => `${w.type}|${w.title}|${w.variant || ''}${BY_ITEMS.has(w.type) || /^(Photo posts|Keep reading|From your saves)$/.test(w.title) ? `|${(w.items || []).slice(0, 2).map((x) => x.id).join(',')}` : ''}`.toLowerCase();
+const sigOf = (w) => `${w.type}|${w.title}|${w.variant || ''}${BY_ITEMS.has(w.type) || [tr('Photo posts'), tr('Keep reading'), tr('From your saves')].includes(w.title) ? `|${(w.items || []).slice(0, 2).map((x) => x.id).join(',')}` : ''}`.toLowerCase();
 
 export function windows({ cursor = 0, count = 4, side = 0, sessionId = null, seed = 0, exclude = [] } = {}) {
   const allKinks = listKinks();
@@ -525,8 +526,8 @@ const ARC = { image: 0, gif: 1, short: 2, set: 3, long: 4, story: 5, discussion:
 export function journey({ kink, fantasy, mode = 'close', limit = 8 }) {
   const kinks = listKinks();
   let steps = [];
-  let title = 'Surprise';
-  let desc = 'Eight things you haven’t opened yet, picked because they sit next to what you like.';
+  let title = tr('Surprise');
+  let desc = tr('Eight things you haven’t opened yet, picked because they sit next to what you like.');
   const family = (k) => {
     const ids = new Set();
     if (k.parentId) for (const x of kinks) if (x.parentId === k.parentId && !x.isGroup) ids.add(x.id);
@@ -547,41 +548,41 @@ export function journey({ kink, fantasy, mode = 'close', limit = 8 }) {
         const a = buildFeed({ fantasy: f.id }, { limit: Math.ceil(limit / 2), mix: 0 }).items;
         const b = other ? buildFeed({ kink: other.id }, { limit: Math.floor(limit / 2), mix: 0, exclude: a.map((x) => x.id) }).items : [];
         steps = [...a, ...b];
-        title = `Branching out from ${f.name}`;
-        desc = other ? `Starts inside your fantasy, then moves toward ${other.name}.` : 'Starts inside your fantasy and widens from there.';
+        title = tr('Branching out from {name}', { name: f.name });
+        desc = other ? tr('Starts inside your fantasy, then moves toward {name}.', { name: other.name }) : tr('Starts inside your fantasy and widens from there.');
       } else if (mode === 'genre' && fk.length) {
         const ids = [...new Set(fk.flatMap(family))];
         steps = buildFeed({ anyKinks: ids, onlyNew: true }, { limit, mix: 0 }).items;
         if (steps.length < 3) steps = buildFeed({ anyKinks: ids }, { limit, mix: 0 }).items;
-        title = `Surprise me near ${f.name}`;
-        desc = 'New things from the same family as this fantasy.';
+        title = tr('Surprise me near {name}', { name: f.name });
+        desc = tr('New things from the same family as this fantasy.');
       } else {
         steps = buildFeed({ fantasy: f.id }, { limit, mix: 0 }).items.sort((x, y) => ARC[x.format] - ARC[y.format]);
         title = f.name;
-        desc = `Steps through ${f.kinks.map((x) => x.name).join(', ')}, from quick visuals to a longer piece at the end.`;
+        desc = tr('Steps through {kinks}, from quick visuals to a longer piece at the end.', { kinks: f.kinks.map((x) => x.name).join(', ') });
       }
     }
   } else if (kink) {
-    const k = kinks.find((x) => x.id === Number(kink) || x.name.toLowerCase() === String(kink).toLowerCase());
+    const k = kinks.find((x) => x.id === Number(kink) || x.name.toLowerCase() === String(kink).toLowerCase() || String(x.label || '').toLowerCase() === String(kink).toLowerCase());
     if (k && mode === 'branch') {
       const other = bestPartner(k);
       const a = buildFeed({ kink: k.id }, { limit: 3, mix: 0 }).items;
       const both = other ? buildFeed({ pair: [k.id, other.id] }, { limit: 2, mix: 0, exclude: a.map((x) => x.id) }).items : [];
       const b = other ? buildFeed({ kink: other.id }, { limit: 3, mix: 0, exclude: [...a, ...both].map((x) => x.id) }).items : [];
       steps = [...a, ...both, ...b].slice(0, limit);
-      title = `Branching out from ${k.name}`;
-      desc = other ? `Starts where you're comfortable, then crosses into ${other.name} through posts that carry both.` : 'Starts where you’re comfortable and widens from there.';
+      title = tr('Branching out from {name}', { name: k.label || k.name });
+      desc = other ? tr("Starts where you're comfortable, then crosses into {name} through posts that carry both.", { name: other.name }) : tr('Starts where you’re comfortable and widens from there.');
     } else if (k && (mode === 'genre' || mode === 'surprise')) {
       const ids = family(k).filter((id) => id !== k.id);
       const use = ids.length ? ids : [k.id];
       steps = buildFeed({ anyKinks: use, onlyNew: true }, { limit, mix: 0 }).items;
       if (steps.length < 3) steps = buildFeed({ anyKinks: use }, { limit, mix: 0 }).items;
-      title = `Surprise me near ${k.name}`;
-      desc = `New things from the same family as ${k.name}, still picked to fit you.`;
+      title = tr('Surprise me near {name}', { name: k.label || k.name });
+      desc = tr('New things from the same family as {name}, still picked to fit you.', { name: k.label || k.name });
     } else if (k) {
       steps = buildFeed({ kink: k.id }, { limit, mix: 0 }).items.sort((x, y) => ARC[x.format] - ARC[y.format]);
-      title = `Deep into ${k.name}`;
-      desc = `Your best matches in ${k.name} across every format.`;
+      title = tr('Deep into {name}', { name: k.label || k.name });
+      desc = tr('Your best matches in {name} across every format.', { name: k.label || k.name });
     }
   }
   if (!steps.length) steps = buildFeed({ onlyNew: true }, { limit, mix: 0 }).items;

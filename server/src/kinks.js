@@ -1,8 +1,10 @@
+import { kinkLabel } from './translate.js';
 import { getDb, now, tagId, normalizeTag, getSetting, setSetting } from './db.js';
 import { affinityMap, engagement } from './profile.js';
 import { tagsForItems } from './store.js';
 import { conceptsOf, isKinkConcept } from './concepts.js';
 import { ensureKinkSchema, locksOf, conceptsOfRow, rememberRemoved, removedConcepts, dropKink, moveReferences, recolor } from './kinkengine.js';
+import { tr } from './i18n.js';
 
 export const PALETTE = ['#D98A99', '#A58FE0', '#66B5A6', '#D2A15E', '#7FA7D9', '#C98BC4', '#E3A58F', '#93C47D', '#E07A7A', '#7FD0C2', '#B7A4E8', '#E8C66B'];
 
@@ -36,7 +38,7 @@ export function listKinks({ includeHidden = false } = {}) {
     const lately = score01(aff, tags, 'lately');
     const nowv = score01(aff, tags, 'short');
     return {
-      id: k.id, name: k.name, color: k.color, description: k.description, origin: k.origin, status: k.status, parentId: k.parent_id || null, isGroup: !!k.is_group,
+      id: k.id, name: k.name, label: kinkLabel({ name: k.name, locks: locksOf(k), isGroup: !!k.is_group, concepts: conceptsOfRow(k) }), color: k.color, description: k.description, origin: k.origin, status: k.status, parentId: k.parent_id || null, isGroup: !!k.is_group,
       concepts: conceptsOfRow(k), locks: locksOf(k), evidence: k.evidence ? JSON.parse(k.evidence) : null, created: k.created, fadedAt: k.faded_at || null,
       tags: tags.map((t) => ({ id: t.tag_id, name: t.name, weight: t.weight })),
       allTime: Math.round(50 + 50 * all), lately: Math.round(50 + 50 * lately), now: Math.round(50 + 50 * nowv)
@@ -137,7 +139,7 @@ export function updateKink(id, patch, { byUser = true } = {}) {
   }
   const parent = 'parentId' in patch ? (patch.parentId && Number(patch.parentId) !== id ? Number(patch.parentId) : null) : cur.parent_id;
   let name = patch.name != null ? String(patch.name).trim().slice(0, 60) || cur.name : cur.name;
-  if (name !== cur.name && db.prepare('SELECT id FROM kinks WHERE name = ? COLLATE NOCASE AND id != ?').get(name, id)) throw Object.assign(new Error(`There is already a kink or group called ${name}.`), { status: 400 });
+  if (name !== cur.name && db.prepare('SELECT id FROM kinks WHERE name = ? COLLATE NOCASE AND id != ?').get(name, id)) throw Object.assign(new Error(tr('There is already a kink or group called {name}.', { name })), { status: 400 });
   db.prepare('UPDATE kinks SET name = ?, color = ?, description = ?, status = ?, parent_id = ?, is_group = ?, locks = ?, updated = ? WHERE id = ?')
     .run(name, patch.color ?? cur.color, patch.description ?? cur.description, patch.status ?? cur.status, parent, 'isGroup' in patch ? (patch.isGroup ? 1 : 0) : cur.is_group, JSON.stringify(locks), now(), id);
   if (patch.tags) {
@@ -179,7 +181,7 @@ export function mergeKinks(fromId, intoId) {
   const db = getDb();
   const a = db.prepare('SELECT * FROM kinks WHERE id = ?').get(fromId);
   const b = db.prepare('SELECT * FROM kinks WHERE id = ?').get(intoId);
-  if (!a || !b || a.id === b.id || a.is_group || b.is_group) throw Object.assign(new Error('Pick two kinks to combine.'), { status: 400 });
+  if (!a || !b || a.id === b.id || a.is_group || b.is_group) throw Object.assign(new Error(tr('Pick two kinks to combine.')), { status: 400 });
   const tags = new Map();
   for (const r of db.prepare('SELECT t.name, kt.weight FROM kink_tags kt JOIN tags t ON t.id = kt.tag_id WHERE kt.kink_id IN (?, ?)').all(a.id, b.id)) tags.set(r.name, Math.max(tags.get(r.name) || 0, r.weight));
   db.transaction(() => {

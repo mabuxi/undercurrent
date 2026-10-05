@@ -2,6 +2,7 @@ import { listKinks, kinkPairs, listFantasies } from './kinks.js';
 import { affinityMap, topTags } from './profile.js';
 import { kinkableTag, displayTag } from './tagquality.js';
 import { getDb } from './db.js';
+import { tr } from './i18n.js';
 
 // "Right now": what you are into at the moment, as quick picks. Never tied to a kind of post (that is what the
 // format chips are for), and each pick says what it is: a kink, a tag, a pair, a person, a creator or a fantasy.
@@ -10,7 +11,7 @@ export function presets() {
   const aff = affinityMap();
   const out = [];
   const byNow = kinks.slice().sort((a, b) => b.now + b.lately * 0.5 - a.now - a.lately * 0.5);
-  for (const k of byNow.slice(0, 3)) out.push({ kind: 'kink', label: k.name, match: Math.round((k.now * 2 + k.lately) / 3), filters: { kink: k.id } });
+  for (const k of byNow.slice(0, 3)) out.push({ kind: 'kink', label: k.label || k.name, match: Math.round((k.now * 2 + k.lately) / 3), filters: { kink: k.id } });
   const inKinks = new Set(kinks.flatMap((k) => k.tags.map((t) => t.name)));
   const now = topTags({ by: 'short', limit: 20 }).filter((t) => t.name && t.short > 0.05 && kinkableTag(t.name) && !inKinks.has(t.name));
   for (const t of now.filter((x) => x.kind !== 'performer').slice(0, 3)) out.push({ kind: 'tag', label: displayTag(t.name), match: Math.round(50 + 49 * Math.tanh(t.short / 2)), filters: { tags: [t.name] } });
@@ -35,6 +36,6 @@ export function presets() {
   if (fan) out.push({ kind: 'fantasy', label: fan.name, match: fan.match, filters: { fantasy: fan.id } });
   out.sort((a, b) => b.match - a.match);
   const list = out.slice(0, 9);
-  list.push({ kind: 'new', label: 'New to you', match: null, filters: { onlyNew: true } });
+  list.push({ kind: 'new', label: tr('New to you'), match: null, filters: { onlyNew: true } });
   return list;
 }
