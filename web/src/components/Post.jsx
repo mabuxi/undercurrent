@@ -55,7 +55,9 @@ export function DislikeNote({ id, compact = false }) {
   );
 }
 
-// On a phone the whole post fits on the screen, with the picture or video as big as it can be.
+// On a phone the picture or video is as big as it can be while it stays fully on the screen, with the post's top
+// at the top. What comes after it (tags, buttons) may run below the screen: a little more scrolling shows it, and
+// scrolling past the end of the post snaps to the next one.
 function useFit(ref, mediaRef, on) {
   useEffect(() => {
     const el = ref.current;
@@ -67,8 +69,8 @@ function useFit(ref, mediaRef, on) {
       const head = parseInt(cs.getPropertyValue('--toph'), 10) || 60;
       const tab = document.querySelector('.tabbar')?.offsetHeight || 0;
       const vh = window.visualViewport?.height || window.innerHeight;
-      const chrome = el.offsetHeight - m.offsetHeight;
-      el.style.setProperty('--fit', `${Math.max(200, Math.round(vh - head - tab - chrome - 16))}px`);
+      const above = m.getBoundingClientRect().top - el.getBoundingClientRect().top;
+      el.style.setProperty('--fit', `${Math.max(220, Math.round(vh - head - tab - above - 18))}px`);
     };
     fit();
     const ro = new ResizeObserver(() => requestAnimationFrame(fit));

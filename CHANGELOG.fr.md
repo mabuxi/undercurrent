@@ -2,6 +2,12 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.18.1 · 5 octobre 2026
+
+### iPhone
+- Le nom Undercurrent reste en haut sur un téléphone, en petit, sur la même ligne que la recherche. Le bouton de recherche devient une flèche pour faire de la place.
+- Les images et les vidéos sont aussi grandes que possible tout en restant entièrement à l’écran. Le reste de la publication (tags, boutons) peut dépasser en bas : faites défiler un peu pour le voir, et en dépassant la fin de la publication, le fil s’aimante sur la suivante.
+
 ## 0.18.0 · 5 octobre 2026
 
 ### Sur votre iPhone

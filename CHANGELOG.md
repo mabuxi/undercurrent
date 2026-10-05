@@ -3,6 +3,12 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.18.1 · 5 October 2026
+
+### iPhone
+- The Undercurrent name stays at the top on a phone, small, on the same line as the search. The search button becomes an arrow to make room.
+- Pictures and videos are as big as they can be while staying fully on the screen. The rest of the post (tags, buttons) may run below the screen: scroll a little to see it, and scrolling past the end of the post snaps to the next one.
+
 ## 0.18.0 · 5 October 2026
 
 ### On your iPhone

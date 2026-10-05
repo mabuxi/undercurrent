@@ -177,7 +177,7 @@ export default function TopBar() {
           {activeNow && q.trim() === (search.q || '').trim() ? (
             <button className="btn-clear" type="button" onClick={clearAll} aria-label={t('Clear the search and go back to the feed')} title={t('Clear the search and go back to the feed')}><Icon name="x" /></button>
           ) : (
-            <button className="btn-accent" type="submit" disabled={running}>{running ? t('Working') : t('Search')}</button>
+            <button className="btn-accent" type="submit" disabled={running} aria-label={t('Search')}><span className="btn-l">{running ? t('Working') : t('Search')}</span><span className="btn-ic" aria-hidden="true">{running ? <span className="spin" /> : <Icon name="go" />}</span></button>
           )}
         </form>
         {shownSteps.length || others.length ? (
