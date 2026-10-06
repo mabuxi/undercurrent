@@ -25,6 +25,13 @@ process.on('uncaughtException', (err) => log('error', 'Uncaught exception', err?
 
 openDb();
 ensureDefaults();
+// Test mode from the Mac app (Option held while opening it): fake posts and a fake model in a data folder of its own.
+// It opens straight on the feed, in the app's language, like a quick look around; the welcome steps stay in Settings.
+if (config.mock && process.env.UC_TEST_MODE === '1') {
+  if (getSetting('onboarded', null) == null) setSetting('onboarded', true);
+  const l = process.env.UC_LANGUAGE;
+  if ((l === 'en' || l === 'fr') && !getSetting('language', null)) setSetting('language', l);
+}
 { const { resetLanguageCache } = await import('./i18n.js'); resetLanguageCache(); }
 try { if ((getSetting('titleClean', 0) || 0) < 1) { const c = cleanupTitles(); setSetting('titleClean', 1); log('info', `Cleaned titles: ${c.oc} original content markers, ${c.blocked} moderator posts hidden`); } } catch (e) { log('warn', 'Title cleanup failed', e.message); }
 try { if (!getSetting('memClean', 0)) { const n = getDb().prepare("UPDATE memory SET status = 'archived' WHERE origin = 'user' AND content LIKE 'Liked \"%\" for:%' AND status != 'archived'").run().changes; setSetting('memClean', 1); if (n) log('info', `Moved ${n} post feedback notes out of memory`); } } catch (e) { log('warn', 'Memory cleanup failed', e.message); }

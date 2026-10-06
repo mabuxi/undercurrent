@@ -2,6 +2,15 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.19.2 · 6 octobre 2026
+
+### Mode test
+- Maintenez Option en ouvrant Undercurrent pour l’ouvrir en mode test : de fausses publications avec des images de remplacement et des extraits d’exemple, un faux modèle, rien d’explicite. C’est le même mode que celui utilisé pour développer et tester Undercurrent.
+- Le mode test a son propre dossier de données et son propre port : vos vraies données, votre fil, vos goûts et l’IA locale ne sont jamais touchés, et il peut tourner à côté de l’app normale.
+- Il s’ouvre directement sur le fil, dans votre langue. L’icône du Dock affiche « Test », le titre de la fenêtre et l’écran de démarrage l’indiquent, et la page affiche une ligne jaune de mode test.
+- Le menu Undercurrent propose « Redémarrer en mode test », et en mode test « Redémarrer normalement » et « Réinitialiser les données de test ».
+- L’app téléchargée contient maintenant les deux courts extraits d’exemple que lit le mode test.
+
 ## 0.19.1 · 6 octobre 2026
 
 ### Retour au style d’origine

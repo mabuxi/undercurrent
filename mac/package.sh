@@ -55,6 +55,7 @@ sed -e "s|__VERSION__|$VERSION|g" -e "s|__ROOT__||g" -e "s|__NODE__||g" "$HERE/I
 echo "- Copying the code"
 mkdir -p "$RES/app/server" "$RES/app/web"
 ditto "$ROOT/server/src" "$RES/app/server/src"
+ditto "$ROOT/server/mock-media" "$RES/app/server/mock-media"
 ditto "$ROOT/web/dist" "$RES/app/web/dist"
 cp "$ROOT/CHANGELOG.md" "$ROOT/CHANGELOG.fr.md" "$RES/app/"
 node -e "

@@ -3,6 +3,15 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.19.2 · 6 October 2026
+
+### Test mode
+- Hold Option while opening Undercurrent to open it in test mode: fake posts with placeholder pictures and sample clips and a fake model, nothing explicit. It is the same mode used to develop and test Undercurrent.
+- Test mode has its own data folder and its own port: your real data, feed, taste and the local AI are never touched, and it can run next to the normal app.
+- It opens straight on the feed, in your language. The Dock icon shows "Test", the window title and the start screen say it, and the page shows a yellow test mode line.
+- The Undercurrent menu has "Restart in Test Mode", and in test mode "Restart Normally" and "Reset Test Data".
+- The downloaded app now carries the two short sample clips test mode plays.
+
 ## 0.19.1 · 6 October 2026
 
 ### Back to the original look

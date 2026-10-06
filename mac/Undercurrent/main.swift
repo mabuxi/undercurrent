@@ -28,6 +28,13 @@ let FRENCH: [String: String] = [
     "Reconnecting…": "Reconnexion…",
     "Try again": "Réessayer",
     "About Undercurrent {version}": "À propos d’Undercurrent {version}",
+    "Starting Undercurrent in test mode…": "Démarrage d’Undercurrent en mode test…",
+    "Test mode": "Mode test",
+    "Fake posts and a fake model, nothing explicit, your real data untouched.": "Fausses publications et faux modèle, rien d’explicite, vos vraies données ne sont pas touchées.",
+    "Restart in Test Mode": "Redémarrer en mode test",
+    "Restart Normally": "Redémarrer normalement",
+    "Reset Test Data": "Réinitialiser les données de test",
+    "Test": "Test",
     "Check for Updates…": "Rechercher les mises à jour…",
     "Settings…": "Réglages…",
     "Hide Undercurrent": "Masquer Undercurrent",
@@ -64,7 +71,14 @@ func L(_ s: String) -> String {
     return APP_LANG == "fr" ? (FRENCH[s] ?? s) : s
 }
 
-let PORT = 4317
+// Test mode: hold Option while opening Undercurrent (or open it with --test). It runs with fake posts and a fake
+// model, nothing explicit, in its own data folder and on its own port, so your real data, feed and Ollama are untouched.
+// It is read at the very start, while the key is still held.
+let TEST_MODE: Bool = NSEvent.modifierFlags.contains(.option)
+    || CommandLine.arguments.contains("--test")
+    || ProcessInfo.processInfo.environment["UC_TEST_MODE"] == "1"
+
+let PORT = TEST_MODE ? 4318 : 4317
 let BASE = "http://127.0.0.1:\(PORT)"
 
 final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
@@ -76,9 +90,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     var loadedApp = false
     var logHandle: FileHandle?
 
-    lazy var dataDir: URL = {
+    lazy var mainDir: URL = {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let dir = base.appendingPathComponent("Undercurrent", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }()
+
+    // Test mode keeps everything in a folder of its own inside the data folder.
+    lazy var dataDir: URL = {
+        guard TEST_MODE else { return mainDir }
+        let dir = mainDir.appendingPathComponent("Test mode", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }()
@@ -93,7 +115,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     // A code folder set by hand in ~/Library/Application Support/Undercurrent/install-path wins (for development).
     lazy var installPathOverride: String? = {
-        guard let custom = try? String(contentsOf: dataDir.appendingPathComponent("install-path"), encoding: .utf8) else { return nil }
+        guard let custom = try? String(contentsOf: mainDir.appendingPathComponent("install-path"), encoding: .utf8) else { return nil }
         let p = custom.trimmingCharacters(in: .whitespacesAndNewlines)
         return FileManager.default.fileExists(atPath: p + "/server/src/index.js") ? p : nil
     }()
@@ -145,12 +167,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         window.minSize = NSSize(width: 760, height: 560)
         window.contentView = web
         window.center()
-        window.setFrameAutosaveName("UndercurrentMain")
+        window.setFrameAutosaveName(TEST_MODE ? "UndercurrentTest" : "UndercurrentMain")
+        if TEST_MODE {
+            window.title = "Undercurrent (" + L("Test mode") + ")"
+            NSApp.dockTile.badgeLabel = L("Test")
+        }
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
-        showSplash(L("Starting Undercurrent…"))
-        keepOllamaHidden()
+        showSplash(TEST_MODE ? L("Starting Undercurrent in test mode…") : L("Starting Undercurrent…"))
+        if !TEST_MODE { keepOllamaHidden() }
         DispatchQueue.global(qos: .userInitiated).async {
             self.moveOldData()
             if self.serverUp() {
@@ -248,6 +274,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         env["UC_APP"] = "1"
         env["UC_DATA_DIR"] = dataDir.path
         env["PORT"] = String(PORT)
+        if TEST_MODE {
+            env["MOCK"] = "1"
+            env["UC_TEST_MODE"] = "1"
+            env["UC_LANGUAGE"] = APP_LANG
+        }
         if packaged {
             env["UC_PACKAGED"] = "1"
             env["UC_APP_BUNDLE"] = Bundle.main.bundlePath
@@ -291,12 +322,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         showError(L("Undercurrent stopped unexpectedly."), detail: L("Exit code {code}. The log is in ~/Library/Application Support/Undercurrent/app.log.").replacingOccurrences(of: "{code}", with: String(code)))
     }
 
-    func relaunch() {
+    // Opens the app again once this one has quit: as it was, in test mode, or normally. A reset also clears the
+    // test data folder in between.
+    func relaunch(test: Bool = TEST_MODE, resetTest: Bool = false) {
         let path = Bundle.main.bundlePath
         let pid = ProcessInfo.processInfo.processIdentifier
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/sh")
-        p.arguments = ["-c", "while kill -0 \(pid) 2>/dev/null; do sleep 0.2; done; sleep 0.5; /usr/bin/open \"$0\"", path]
+        let wipe = resetTest ? "rm -rf \"$1\"; " : ""
+        let open = test ? "/usr/bin/open -n \"$0\" --args --test" : "/usr/bin/open \"$0\""
+        p.arguments = ["-c", "while kill -0 \(pid) 2>/dev/null; do sleep 0.2; done; sleep 0.5; \(wipe)\(open)", path, mainDir.appendingPathComponent("Test mode").path]
         try? p.run()
         quitting = true
         NSApp.terminate(nil)
@@ -339,7 +374,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         let fm = FileManager.default
         let target = dataDir.appendingPathComponent("undercurrent.db")
         let old = installPath + "/data/undercurrent.db"
-        guard !packaged, !fm.fileExists(atPath: target.path), fm.fileExists(atPath: old) else { return }
+        guard !packaged, !TEST_MODE, !fm.fileExists(atPath: target.path), fm.fileExists(atPath: old) else { return }
         DispatchQueue.main.async { self.showSplash(L("Moving your data to its new place…")) }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
@@ -401,6 +436,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         <html><head><meta charset="utf-8"><style>
         html,body{margin:0;height:100%;background:#110D12;color:#EFE6EA;font:14px -apple-system,system-ui,sans-serif;-webkit-user-select:none}
         .c{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;padding:0 40px}
+        .t{font:600 11px -apple-system,system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#E8C66B;border:1px solid rgba(232,198,107,.45);border-radius:999px;padding:4px 10px}
         h1{font:italic 64px 'Instrument Serif',Georgia,serif;margin:0;background:linear-gradient(100deg,#F6D5C9,#E39A83 40%,#C98BC4 75%,#A58FE0);-webkit-background-clip:text;color:transparent}
         p{color:#B6A8B0;margin:0;max-width:520px;line-height:1.5}
         .s{width:28px;height:28px;border-radius:50%;border:3px solid rgba(227,154,131,.25);border-top-color:#E39A83;animation:r 0.9s linear infinite}
@@ -410,8 +446,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         """
     }
 
+    var testTag: String { TEST_MODE ? "<span class=\"t\">\(L("Test mode"))</span>" : "" }
+
     func showSplash(_ text: String) {
-        web.loadHTMLString(page("<h1>Undercurrent</h1><div class=\"s\"></div><p>\(text)</p>"), baseURL: nil)
+        let note = TEST_MODE ? "<p>\(L("Fake posts and a fake model, nothing explicit, your real data untouched."))</p>" : ""
+        web.loadHTMLString(page("<h1>Undercurrent</h1>\(testTag)<div class=\"s\"></div><p>\(text)</p>\(note)"), baseURL: nil)
     }
 
     func showError(_ title: String, detail: String) {
@@ -441,6 +480,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         app.addItem(withTitle: L("Check for Updates…"), action: #selector(checkUpdates), keyEquivalent: "")
         app.addItem(.separator())
         app.addItem(withTitle: L("Settings…"), action: #selector(openSettings), keyEquivalent: ",")
+        app.addItem(.separator())
+        if TEST_MODE {
+            app.addItem(withTitle: L("Restart Normally"), action: #selector(restartNormal), keyEquivalent: "")
+            app.addItem(withTitle: L("Reset Test Data"), action: #selector(resetTestData), keyEquivalent: "")
+        } else {
+            app.addItem(withTitle: L("Restart in Test Mode"), action: #selector(restartTest), keyEquivalent: "")
+        }
         app.addItem(.separator())
         app.addItem(withTitle: L("Hide Undercurrent"), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         let others = app.addItem(withTitle: L("Hide Others"), action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
@@ -491,6 +537,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     @objc func zoomReset() { web.pageZoom = 1 }
     @objc func openSettings() { web.evaluateJavaScript("window.ucOpen && window.ucOpen('settings')", completionHandler: nil) }
     @objc func checkUpdates() { web.evaluateJavaScript("window.ucOpen && window.ucOpen('updates')", completionHandler: nil) }
+    @objc func restartTest() { relaunch(test: true) }
+    @objc func restartNormal() { relaunch(test: false) }
+    @objc func resetTestData() { relaunch(test: true, resetTest: true) }
 }
 
 let app = NSApplication.shared

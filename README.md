@@ -36,6 +36,15 @@ Texts live in the code in English and are looked up in `web/src/i18n/fr/` and `s
 
 Settings, Profiles: each profile has its own kinks, history, sources and settings (the AI models are shared). Add one and it opens with the welcome steps; switch, rename, back up, restore a backup as a new profile, or delete. Backups are in `~/Library/Application Support/Undercurrent/backups`.
 
+## Test mode
+
+Hold **Option** while opening Undercurrent (click it in the Dock, Launchpad or Applications and keep Option down until the window shows). It opens in test mode: fake posts with placeholder pictures and two short sample clips, a fake model, nothing explicit. It is the same mock mode used for development and testing (`npm run dev:mock`).
+
+- It has its own data folder (`~/Library/Application Support/Undercurrent/Test mode`) and its own port (4318), so your real database, feed, taste and Ollama are never touched, and it can run next to the normal app.
+- It opens straight on the feed, in the app's language. The welcome steps can still be run from Settings.
+- The Dock icon says "Test" and a yellow line at the top of the page says it is test mode.
+- The Undercurrent menu has **Restart Normally** and **Reset Test Data**; the normal app has **Restart in Test Mode**. `open -a Undercurrent --args --test` works too.
+
 ## Your data
 
 - Your database, settings, history and logs live in `~/Library/Application Support/Undercurrent`, never in this folder, so they are never committed or pushed and updates never touch them.
