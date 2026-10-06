@@ -3,6 +3,23 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.19.1 · 6 October 2026
+
+### Back to the original look
+- Like and dislike keep their original colour again, with no gradient: when on they are a little brighter, on a soft flat background of the same colour.
+- The reactions in the middle of a post use the same line icons as the buttons below it, only bigger and bolder, on a small frosted glass disc like the tab bar. The arrow draws itself in, bounces and rises (or sinks for a dislike); the bookmark fills in; the eye is crossed out; taking something back fades a smaller outline.
+- The heat flame in the middle is the slider's own flame, in the same colours, on the same disc: it grows and glows with the heat, flares up when you let go and goes out at zero.
+- Reactions show in the middle of the part of the post you can see.
+- Memory keeps its new layout, but in the app's usual flat cards: no colour washes, the colours only on the small icons.
+
+### iPhone
+- Double-tap a picture or video to like it, like on Instagram. A single tap on an image still opens it, a moment later.
+- A post taller than the screen can be scrolled through freely: while it is at the top, the feed only snaps near its end or near the next post.
+- The "more tags" button is now a clean "+N" chip in the same style as "+ kink", after the line of tags, which fades out softly instead of hiding chips under a button.
+
+### Fixes
+- Image collections with a big picture and small ones no longer spill over the tags below them on a phone.
+
 ## 0.19.0 · 5 October 2026
 
 ### Reacting to a post

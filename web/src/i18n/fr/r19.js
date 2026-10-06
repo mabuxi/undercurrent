@@ -25,5 +25,6 @@ export default {
   '{n} memories': '{n} souvenirs',
   'Show all kinks and tags': 'Afficher tous les kinks et tags',
   'More actions': 'Plus d’actions',
-  'Ask the assistant': 'Demander à l’assistant'
+  'Ask the assistant': 'Demander à l’assistant',
+  '+{n}': '+{n}'
 };

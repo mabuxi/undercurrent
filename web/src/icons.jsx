@@ -70,3 +70,4 @@ export function Icon({ name, filled = false, size }) {
 }
 
 export const FLAME_PATH = PATHS.flame;
+export const ICON_PATHS = PATHS;

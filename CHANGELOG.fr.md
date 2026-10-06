@@ -2,6 +2,23 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.19.1 · 6 octobre 2026
+
+### Retour au style d’origine
+- « J’aime » et « je n’aime pas » retrouvent leur couleur d’origine, sans dégradé : actifs, ils sont un peu plus lumineux, sur un fond doux et uni de la même couleur.
+- Les réactions au milieu d’une publication utilisent les mêmes icônes au trait que les boutons en dessous, juste plus grandes et plus épaisses, sur un petit disque en verre dépoli comme la barre d’onglets. La flèche se dessine, rebondit et monte (ou descend pour « je n’aime pas ») ; le marque-page se remplit ; l’œil se barre ; annuler fait disparaître un contour plus petit.
+- La flamme de chaleur au milieu est la flamme du curseur, dans les mêmes couleurs, sur le même disque : elle grandit et brille avec la chaleur, s’embrase quand vous relâchez et s’éteint à zéro.
+- Les réactions s’affichent au milieu de la partie visible de la publication.
+- La mémoire garde sa nouvelle organisation, mais avec les cartes unies habituelles de l’app : plus de voiles colorés, la couleur seulement sur les petites icônes.
+
+### iPhone
+- Touchez deux fois une image ou une vidéo pour l’aimer, comme sur Instagram. Un seul toucher sur une image l’ouvre toujours, un instant plus tard.
+- Une publication plus haute que l’écran se parcourt librement : tant qu’elle est en haut, le fil ne s’aimante que près de sa fin ou de la publication suivante.
+- Le bouton « plus de tags » est maintenant une pastille « +N » propre, dans le même style que « + kink », après la ligne de tags, qui s’estompe doucement au lieu de cacher des pastilles sous un bouton.
+
+### Corrections
+- Les collections d’images avec une grande image et des petites ne débordent plus sur les tags en dessous sur un téléphone.
+
 ## 0.19.0 · 5 octobre 2026
 
 ### Réagir à une publication

@@ -161,11 +161,31 @@ export default function Post({ item: initial, focus = false, onStrong }) {
   const [heat, setHeat] = useState(null);
   const [leaving, setLeaving] = useState(false);
   const [menu, setMenu] = useState(false);
-  const [over, setOver] = useState(false);
+  const [over, setOver] = useState(0);
   const chipsRef = useRef(null);
   const menuRef = useRef(null);
-  const play = (kind) => setFx({ kind, key: Date.now() + Math.random() });
-  const onHeat = (v, phase) => setHeat((cur) => ({ v, phase, key: cur && cur.phase === 'live' ? cur.key : Date.now() }));
+  // The reaction shows in the middle of the part of the picture you can see, or of the post when the picture is off screen.
+  const fxY = () => {
+    const m = mediaRef.current;
+    if (!m) return null;
+    const top = (parseInt(getComputedStyle(document.documentElement).getPropertyValue('--toph'), 10) || 0);
+    const low = (window.visualViewport?.height || window.innerHeight) - (document.querySelector('.tabbar')?.offsetHeight || 0);
+    const mr = m.getBoundingClientRect();
+    const seen = (r) => [Math.max(r.top, top), Math.min(r.bottom, low)];
+    let [a, b] = seen(mr);
+    if (b - a < 140 && ref.current) [a, b] = seen(ref.current.getBoundingClientRect());
+    if (b - a < 60) return null;
+    return Math.round((a + b) / 2 - mr.top);
+  };
+  const fxX = () => {
+    const m = mediaRef.current;
+    const box = m?.querySelector('.media, .galwrap, .gallery, .imgbtn');
+    if (!box) return null;
+    const r = box.getBoundingClientRect();
+    return Math.round(r.left + r.width / 2 - m.getBoundingClientRect().left);
+  };
+  const play = (kind) => setFx({ kind, key: Date.now() + Math.random(), y: fxY(), x: fxX() });
+  const onHeat = (v, phase) => setHeat((cur) => (cur && cur.phase === 'live' ? { ...cur, v, phase } : { v, phase, key: Date.now(), y: fxY(), x: fxX() }));
   const fired = useRef(false);
   const strong = (why) => {
     if (fired.current) return;
@@ -182,6 +202,35 @@ export default function Post({ item: initial, focus = false, onStrong }) {
   useFit(ref, mediaRef, narrowNow && item.media?.kind !== 'text');
   if (near && mediaRef.current) lastH.current = mediaRef.current.offsetHeight || lastH.current;
   const c = item.kinks?.[0]?.color || '#E39A83';
+
+  // Double-tapping the picture or video likes the post, like on Instagram. A single tap on an image waits a moment
+  // so a double tap does not also open it.
+  const tap = useRef({ t: 0, x: 0, y: 0, timer: null, pass: false });
+  function onMediaClick(e) {
+    const r = tap.current;
+    if (r.pass) { r.pass = false; return; }
+    if (e.target.closest('a, input, select, textarea, .mutebtn, .linkbtn, .ghost-btn, .icon-btn, .play, .tbtn')) return;
+    const at = Date.now();
+    if (at - r.t < 330 && Math.abs(e.clientX - r.x) < 40 && Math.abs(e.clientY - r.y) < 40) {
+      clearTimeout(r.timer);
+      r.t = 0;
+      e.preventDefault();
+      e.stopPropagation();
+      if (item.vote > 0) play('up'); else vote(1);
+      return;
+    }
+    r.t = at;
+    r.x = e.clientX;
+    r.y = e.clientY;
+    const btn = e.target.closest('.imgbtn, .gtile');
+    if (btn) {
+      e.preventDefault();
+      e.stopPropagation();
+      clearTimeout(r.timer);
+      r.timer = setTimeout(() => { r.pass = true; btn.click(); }, 300);
+    }
+  }
+  useEffect(() => () => clearTimeout(tap.current.timer), []);
 
   async function vote(dir) {
     const next = item.vote === dir ? 0 : dir;
@@ -266,7 +315,11 @@ export default function Post({ item: initial, focus = false, onStrong }) {
   useEffect(() => {
     const el = chipsRef.current;
     if (!el) return undefined;
-    const check = () => setOver(el.scrollWidth > el.clientWidth + 2);
+    const check = () => {
+      if (el.scrollWidth <= el.clientWidth + 2) { setOver(0); return; }
+      const cut = [...el.children].filter((c) => c.offsetWidth && c.offsetLeft + c.offsetWidth > el.clientWidth - 4).length;
+      setOver(cut + Math.max(0, (item.tags || []).length - 9));
+    };
     check();
     const ro = new ResizeObserver(check);
     ro.observe(el);
@@ -316,9 +369,10 @@ export default function Post({ item: initial, focus = false, onStrong }) {
         </div>
       ) : null}
       {!isText ? <p className="ptitle"><Linkify text={trTitle.text || item.title} source={item.source} onPerson={openPerson} /><TranslateButton tr={trTitle} small /><TranslatedNote tr={trTitle} /></p> : null}
-      <div ref={mediaRef} className="pmedia"><PostFx fx={fx} /><HeatFx heat={heat} /><Media item={item} active={active} near={near} height={lastH.current} onPlay={() => strong('play')} onReady={() => setReady(true)} onPerson={openPerson} /></div>
+      <div ref={mediaRef} className="pmedia" onClickCapture={onMediaClick}><PostFx fx={fx} /><HeatFx heat={heat} /><Media item={item} active={active} near={near} height={lastH.current} onPlay={() => strong('play')} onReady={() => setReady(true)} onPerson={openPerson} /></div>
       {!isText && item.body ? <p className="ptext caption"><Linkify text={trBody.text || item.body} source={item.source} onPerson={openPerson} /><TranslateButton tr={trBody} small /><TranslatedNote tr={trBody} /></p> : null}
       {item.aiSummary && !isText ? <p className="aisum">{item.aiSummary}</p> : null}
+      <div className={`chipwrap${over && !allTags ? ' over' : ''}`}>
       <div ref={chipsRef} className={`chiprow${allTags ? ' all' : ' one'}${over && !allTags ? ' over' : ''}`}>
         {item.gender && (item.gender.women || item.gender.men || item.gender.trans) ? (
           <span className="gicons" title={`${item.gender.women ? tn(item.gender.women, '{n} woman', '{n} women') : ''}${item.gender.women && item.gender.men ? ', ' : ''}${item.gender.men ? tn(item.gender.men, '{n} man', '{n} men') : ''}${item.gender.trans ? ', trans' : ''}${item.gender.sure ? '' : t(' (guess until the AI looks closer)')}`}>
@@ -342,7 +396,8 @@ export default function Post({ item: initial, focus = false, onStrong }) {
         {shownTags.map((tag) => <button type="button" key={tag} className={`chip ghost link${item.liked?.includes(tag) ? ' mine' : ''}`} onClick={() => runSearch(tag).catch(() => setFilters({ tags: [tag] }))} title={t('Search everything for {tag}', { tag })}>{tag}</button>)}
         {tagList.length > 9 || allTags ? <button type="button" className="chip ghost more" onClick={() => setAllTags((x) => !x)}>{allTags ? t('fewer') : t('+{n} tags', { n: tagList.length - 9 })}</button> : null}
         <span className="chip ghost meta">{formatMeta(item)}</span>
-        {over && !allTags ? <button type="button" className="chipmore" onClick={() => setAllTags(true)} aria-label={t('Show all kinks and tags')} title={t('Show all kinks and tags')}><Icon name="chevD" /></button> : null}
+      </div>
+        {over && !allTags ? <button type="button" className="chip ghost more chipmore" onClick={() => setAllTags(true)} aria-label={t('Show all kinks and tags')} title={t('Show all kinks and tags')}>{t('+{n}', { n: over })}</button> : null}
       </div>
       <div className="pbar">
         <div className="grp">
@@ -379,6 +434,7 @@ export default function Post({ item: initial, focus = false, onStrong }) {
           {panel.startsWith('person:') ? <PersonPanel key={panel} item={item} person={{ platform: panel.slice(7).split('|')[0], handle: panel.slice(7).split('|').slice(1).join('|') }} /> : null}
         </div>
       ) : null}
+      <i className="snapend" aria-hidden="true" />
     </article>
   );
 }

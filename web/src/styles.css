@@ -1362,92 +1362,62 @@ html.narrow .ask{gap:6px}
 /* ===== 0.19.0: reactions and motion ===== */
 :root{--spring:cubic-bezier(.34,1.56,.64,1);--ease-out:cubic-bezier(.2,.8,.2,1)}
 
-/* Like and dislike get a coloured background when they are on */
-.vote button{transition:background .22s var(--ease-out),color .2s,transform .15s}
-.vote button:active{transform:scale(.86)}
-.vote button.vup.on{background:linear-gradient(180deg,#8FDDB0,#4FB47F);color:#0E2A1B;box-shadow:0 0 0 3px rgba(111,201,151,.18),0 4px 12px rgba(79,180,127,.35)}
-.vote button.vdown.on{background:linear-gradient(180deg,#F59A90,#DE5248);color:#2E0D0A;box-shadow:0 0 0 3px rgba(222,82,72,.18),0 4px 12px rgba(222,82,72,.35)}
+/* Like and dislike: the original colour, a little brighter with a soft flat background when on */
+.vote button{transition:background .2s var(--ease-out),color .2s,transform .15s}
+.vote button:active{transform:scale(.86);background:rgba(227,154,131,.28)}
+.vote button.on{color:#F4B5A1;background:rgba(227,154,131,.18)}
+.vote button.on:hover{color:#F8C6B6;background:rgba(227,154,131,.24)}
 .vote button.on svg{animation:votepop .42s var(--spring)}
-.vote button.vup.on:hover{color:#0E2A1B}
-.vote button.vdown.on:hover{color:#2E0D0A}
 @keyframes votepop{0%{transform:scale(.5)}60%{transform:scale(1.25)}100%{transform:scale(1)}}
 .pb.icon.on svg{animation:votepop .42s var(--spring)}
 
-/* The reaction layer in the middle of a post */
-.pmedia{position:relative}
-.postfx,.heatfx{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;z-index:6;overflow:visible}
-.postfx>*,.heatfx>*{grid-area:1/1}
-.fxshape{display:grid;place-items:center;width:clamp(96px,28%,150px);aspect-ratio:1;filter:drop-shadow(0 10px 28px rgba(0,0,0,.45))}
-.fxshape svg{width:100%;height:100%;overflow:visible}
-.fxring{width:clamp(96px,28%,150px);aspect-ratio:1;border-radius:50%;opacity:0}
-.fx-up .fxshape{animation:fxup 1.05s var(--ease-out) both}
-.fx-down .fxshape{animation:fxdown 1.05s var(--ease-out) both}
-.fx-down .fxshape svg{transform:rotate(180deg)}
-.fx-up .fxring{border:3px solid rgba(143,221,176,.75);animation:fxring .8s var(--ease-out) .08s both}
-.fx-down .fxring{border:3px solid rgba(245,154,144,.75);animation:fxring .8s var(--ease-out) .08s both}
-.fx-unup .fxshape,.fx-undown .fxshape,.fx-unsave .fxshape{color:rgba(255,255,255,.75);width:clamp(72px,20%,110px);animation:fxfade .8s ease both}
-.fx-undown .fxshape svg{transform:rotate(180deg)}
-.fx-save .fxshape{animation:fxsave 1.05s var(--ease-out) both}
-.fx-save .fxring{border:3px solid rgba(255,227,163,.7);animation:fxring .8s var(--ease-out) .1s both}
-.fx-hide .fxshape{color:#F6D5C9;width:clamp(96px,26%,140px);padding:24px;border-radius:50%;background:rgba(17,13,18,.62);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);box-shadow:0 0 0 1px rgba(255,255,255,.08);animation:fxhide .75s var(--ease-out) both}
-@keyframes fxup{
-  0%{opacity:0;transform:translateY(24px) scale(.3)}
-  22%{opacity:1;transform:translateY(0) scale(1.18)}
-  34%{transform:scale(.92)}
-  46%{transform:scale(1.04)}
-  62%{opacity:1;transform:translateY(-6px) scale(1)}
-  100%{opacity:0;transform:translateY(-90px) scale(.86)}}
-@keyframes fxdown{
-  0%{opacity:0;transform:translateY(-24px) scale(.3)}
-  22%{opacity:1;transform:translateY(0) scale(1.18)}
-  34%{transform:scale(.92)}
-  46%{transform:scale(1.04)}
-  62%{opacity:1;transform:translateY(6px) scale(1)}
-  100%{opacity:0;transform:translateY(90px) scale(.86)}}
-@keyframes fxsave{
-  0%{opacity:0;transform:translateY(-40px) scale(.5) rotate(-8deg)}
-  28%{opacity:1;transform:translateY(0) scale(1.12) rotate(3deg)}
-  42%{transform:scale(.94,1.06) rotate(0)}
-  56%{transform:scale(1.03)}
-  72%{opacity:1;transform:scale(1)}
-  100%{opacity:0;transform:translateY(16px) scale(.6)}}
-@keyframes fxfade{0%{opacity:0;transform:scale(1.15)}25%{opacity:.9;transform:scale(1)}100%{opacity:0;transform:scale(.55) translateY(14px)}}
-@keyframes fxhide{0%{opacity:0;transform:scale(.6)}30%{opacity:1;transform:scale(1.08)}50%{transform:scale(1)}100%{opacity:0;transform:scale(.9)}}
-@keyframes fxring{0%{opacity:.9;transform:scale(.4)}100%{opacity:0;transform:scale(2.1)}}
-.fxsparks{width:clamp(96px,28%,150px);aspect-ratio:1;position:relative}
-.fxsparks i{position:absolute;left:50%;top:50%;width:7px;height:7px;margin:-3.5px;border-radius:50%;background:#FFF1C9;box-shadow:0 0 8px #F6C35B;opacity:0;animation:fxspark .7s var(--ease-out) .12s both}
-.fx-up .fxsparks i{background:#D6FBE5;box-shadow:0 0 8px #6FC997}
-@keyframes fxspark{0%{opacity:1;transform:rotate(var(--a)) translateY(0) scale(1)}100%{opacity:0;transform:rotate(var(--a)) translateY(-95px) scale(.3)}}
+/* The reaction layer in the middle of a post: the button's own icon, bigger and bolder, on a frosted disc */
+.pmedia{position:relative;touch-action:manipulation}
+.postfx{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;z-index:6}
+.postfx>*{grid-area:1/1}
+.fxdisc{width:clamp(92px,26vw,120px);aspect-ratio:1;border-radius:50%;display:grid;place-items:center;color:#F4B5A1;
+  background:linear-gradient(180deg,rgba(52,40,50,.5),rgba(30,22,30,.6));
+  -webkit-backdrop-filter:blur(18px) saturate(170%);backdrop-filter:blur(18px) saturate(170%);
+  border:1px solid rgba(255,255,255,.14);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.16),inset 0 -1px 0 rgba(0,0,0,.28),0 16px 40px rgba(0,0,0,.42);
+  animation:fxdisc 1.1s var(--ease-out) both}
+.fxglyph{width:48%;height:48%;overflow:visible;filter:drop-shadow(0 0 10px rgba(227,154,131,.35))}
+.fxline{stroke-dasharray:1;stroke-dashoffset:1;animation:fxdraw .34s var(--ease-out) .06s forwards}
+.fxfill{fill:currentColor;opacity:0;animation:fxfillin .3s ease .3s forwards}
+.fxring{width:clamp(92px,26vw,120px);aspect-ratio:1;border-radius:50%;border:2px solid rgba(227,154,131,.55);opacity:0;animation:fxring .75s var(--ease-out) .12s both}
+.fx-up .fxglyph{animation:fxrise 1.1s var(--ease-out) both}
+.fx-down .fxglyph{animation:fxsink 1.1s var(--ease-out) both}
+.fx-save .fxglyph{animation:fxsquash 1.1s var(--ease-out) both}
+.fx-hide .fxdisc{color:var(--text-2)}
+.fx-hide .fxglyph{filter:none}
+.fx-hide .fxring{border-color:rgba(239,230,234,.25)}
+.fx-undo .fxdisc{width:clamp(70px,19vw,88px);color:var(--text-3);animation:fxundo .8s ease both}
+.fx-undo .fxglyph{filter:none}
+.fx-undo .fxline{stroke-dashoffset:0;animation:fxerase .5s ease .15s forwards}
+@keyframes fxdisc{0%{opacity:0;transform:scale(.55)}18%{opacity:1;transform:scale(1.08)}30%{transform:scale(.96)}42%{transform:scale(1.02)}55%{transform:scale(1)}78%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.05)}}
+@keyframes fxdraw{to{stroke-dashoffset:0}}
+@keyframes fxerase{to{stroke-dashoffset:-1}}
+@keyframes fxfillin{to{opacity:1}}
+@keyframes fxring{0%{opacity:.9;transform:scale(1)}100%{opacity:0;transform:scale(1.9)}}
+@keyframes fxrise{0%{transform:translateY(12px)}30%{transform:translateY(-7px)}45%{transform:translateY(2px)}58%{transform:translateY(0)}78%{transform:translateY(0)}100%{transform:translateY(-16px)}}
+@keyframes fxsink{0%{transform:translateY(-12px)}30%{transform:translateY(7px)}45%{transform:translateY(-2px)}58%{transform:translateY(0)}78%{transform:translateY(0)}100%{transform:translateY(16px)}}
+@keyframes fxsquash{0%{transform:translateY(-14px)}28%{transform:translateY(0) scale(1.12,.88)}42%{transform:scale(.94,1.06)}56%{transform:scale(1)}100%{transform:scale(1)}}
+@keyframes fxundo{0%{opacity:0;transform:scale(.8)}25%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(.85)}}
 
-/* The heat flame, live while sliding */
-.hfflame{width:clamp(90px,30%,170px);aspect-ratio:1;display:grid;place-items:center;transform-origin:50% 85%;
-  transform:scale(calc(.55 + var(--h) * .75));transition:transform .28s var(--spring),opacity .2s;
-  filter:drop-shadow(0 0 calc(10px + var(--h) * 30px) rgba(246,140,70,calc(.35 + var(--h) * .5))) saturate(calc(.85 + var(--h) * .5))}
-.hfflame svg{width:100%;height:100%;overflow:visible}
-.heatfx.live .hfflame svg{animation:hflick calc(1.1s - var(--h) * .6s) ease-in-out infinite;transform-origin:50% 90%}
-.heatfx.live{animation:fadein .18s ease both}
-.hfglow{width:clamp(160px,55%,320px);aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,rgba(246,170,80,calc(.12 + var(--h) * .3)),transparent 65%);transition:background .3s}
-.heatfx.burst .hfflame{animation:hfburst 1.15s var(--ease-out) both}
-.heatfx.burst .hfglow{animation:hfglow 1.1s ease both}
-.heatfx.out .hfflame{animation:hfout .7s ease both}
-@keyframes hflick{0%,100%{transform:scale(1,1) rotate(0)}25%{transform:scale(.96,1.06) rotate(-2.5deg)}50%{transform:scale(1.04,.97) rotate(1.5deg)}75%{transform:scale(.98,1.04) rotate(2.5deg)}}
-@keyframes hfburst{
-  0%{transform:scale(calc(.55 + var(--h) * .75));opacity:1}
-  22%{transform:scale(calc(.75 + var(--h) * 1.05)) translateY(-4%);opacity:1}
-  40%{transform:scale(calc(.62 + var(--h) * .8))}
-  70%{opacity:1}
-  100%{transform:scale(calc(.5 + var(--h) * .7)) translateY(-26%);opacity:0}}
-@keyframes hfglow{0%{opacity:1;transform:scale(1)}30%{opacity:1;transform:scale(1.35)}100%{opacity:0;transform:scale(1.6)}}
-@keyframes hfout{0%{opacity:1;transform:scale(.6)}100%{opacity:0;transform:scale(.2,.05) translateY(40%)}}
-.hfembers{width:clamp(90px,30%,170px);aspect-ratio:1;position:relative}
-.hfembers i{position:absolute;left:50%;top:60%;width:6px;height:6px;margin:-3px;border-radius:50%;background:#FFD27A;box-shadow:0 0 10px #F2894E;opacity:0;
-  animation:hfember calc(.75s + var(--h) * .35s) var(--ease-out) var(--d) both}
-@keyframes hfember{0%{opacity:1;transform:rotate(var(--a)) translateX(0) scale(1)}100%{opacity:0;transform:rotate(var(--a)) translateX(calc(60px + var(--h) * 90px)) scale(.2)}}
-.hfsmoke{position:relative;width:80px;height:80px}
-.hfsmoke i{position:absolute;left:50%;bottom:30%;width:26px;height:26px;margin-left:-13px;border-radius:50%;background:rgba(200,190,195,.35);filter:blur(4px);animation:hfsmoke .9s ease-out both}
-.hfsmoke i:nth-child(2){animation-delay:.1s;margin-left:-22px}
-.hfsmoke i:nth-child(3){animation-delay:.2s;margin-left:-4px}
-@keyframes hfsmoke{0%{opacity:0;transform:translateY(0) scale(.4)}30%{opacity:.8}100%{opacity:0;transform:translateY(-60px) scale(1.4)}}
+/* The heat flame: the slider's flame, same colours, growing and glowing with the heat */
+.heatfx .fxdisc{color:color-mix(in oklab,var(--flame) calc((1 - var(--h)) * 100%),var(--flame-2));animation:fxdiscin .25s var(--spring) both}
+.heatfx .hfflame{width:54%;height:54%;transform-origin:50% 80%;transform:scale(calc(.62 + var(--h) * .5));transition:transform .28s var(--spring);
+  filter:drop-shadow(0 0 calc(4px + var(--h) * 16px) rgba(246,195,91,calc(.25 + var(--h) * .65)))}
+.heatfx.live .hfflame path{transform-origin:50% 90%;animation:flicker calc(1.6s - var(--h) * .9s) ease-in-out infinite}
+.heatfx.burst .fxdisc{animation:fxdiscin .2s var(--spring) both,fxfade .4s ease .65s forwards}
+.heatfx.burst .hfflame{animation:hfburst .7s var(--spring) both}
+.heatfx.burst .fxring{border-color:color-mix(in srgb,var(--flame-2) 70%,transparent)}
+.heatfx.out .fxdisc{color:var(--text-3);animation:fxfade .45s ease .35s both}
+.heatfx.out .hfflame{animation:hfout .6s ease both;filter:none}
+@keyframes fxdiscin{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:none}}
+@keyframes fxfade{to{opacity:0;transform:scale(.96)}}
+@keyframes hfburst{0%{transform:scale(calc(.62 + var(--h) * .5))}40%{transform:scale(calc(.8 + var(--h) * .65)) rotate(-4deg)}70%{transform:scale(calc(.6 + var(--h) * .5)) rotate(2deg)}100%{transform:scale(calc(.62 + var(--h) * .5))}}
+@keyframes hfout{0%{opacity:1;transform:scale(.62)}100%{opacity:0;transform:scale(.3,.1) translateY(30%)}}
 
 /* Hiding a post: it dims, sinks and folds away */
 .post{transition:opacity .3s,transform .3s,filter .3s}
@@ -1517,19 +1487,20 @@ html.narrow .pmenu .grp.end .pb.icon:active{background:rgba(255,255,255,.08)}
 html.narrow .heat{flex:1;min-width:0}
 html.narrow .heat input[type=range]{flex:1;width:auto;min-width:60px}
 
-/* Phone: kinks and tags on one line, a button opens them all */
-html.narrow .chiprow.one{flex-wrap:nowrap;overflow:hidden;position:relative}
-html.narrow .chiprow.one.over{padding-right:34px}
+/* Phone: kinks and tags on one line, softly faded at the end, with a "+N" chip after it that opens them all */
+.chipwrap{display:flex;align-items:center;gap:6px;min-width:0}
+.chipwrap>.chiprow{flex:1;min-width:0}
+button.chip.more.chipmore{display:none}
+html.narrow .chiprow.one{flex-wrap:nowrap;overflow:hidden}
 html.narrow .chiprow.one>*{flex:none}
 html.narrow .chiprow.one>.chip.more:not(.addkink){display:none}
-.chipmore{display:none}
-html.narrow .chipmore{all:unset;cursor:pointer;display:grid;place-items:center;position:absolute;right:0;top:50%;margin-top:-12px;width:24px;height:24px;border-radius:50%;background:var(--surface-3);color:var(--text-2);border:1px solid var(--line-2);box-shadow:-14px 0 12px 6px var(--surface)}
-html.narrow .chipmore svg{width:14px;height:14px}
+html.narrow .chiprow.one.over{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent)}
+html.narrow button.chip.more.chipmore{display:inline-flex;flex:none;font-family:var(--mono)}
 html.narrow .chiprow.all{animation:chipsopen .3s var(--ease-out)}
 @keyframes chipsopen{from{max-height:28px;opacity:.6}to{max-height:400px;opacity:1}}
 
 @media (prefers-reduced-motion:reduce){
-  .postfx,.heatfx,.fxsparks,.hfembers{display:none}
+  .postfx{display:none}
   .feed>article.post,.center>*,.card2,.panel-in,.toast,.upmodal,.upmodal .upcard,.statuspop,.sb-steps,.schip,.dchip,.chip.kchip,.statusdot.ok i,.dislike,.post.leaving,.post.gone.fxin,.vote button.on svg,.pb.icon.on svg,.tab.on .tab-ic svg,html.narrow .pmenu.open .grp.end,html.narrow .chiprow.all{animation:none}
   .tabpill{transition:none}
 }
@@ -1538,13 +1509,13 @@ html.narrow .chiprow.all{animation:chipsopen .3s var(--ease-out)}
 .memview{gap:14px}
 .memsec{scroll-margin-top:calc(var(--toph,60px) + 60px);display:flex;flex-direction:column;gap:12px}
 .memtiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
-.memtile{all:unset;cursor:pointer;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:10px;align-items:center;padding:12px 14px;border-radius:16px;background:linear-gradient(140deg,color-mix(in srgb,var(--c) 14%,var(--surface)),var(--surface));border:1px solid color-mix(in srgb,var(--c) 22%,transparent);transition:transform .15s,border-color .2s,box-shadow .2s}
-.memtile:hover{border-color:color-mix(in srgb,var(--c) 50%,transparent);box-shadow:0 6px 20px rgba(0,0,0,.2)}
+.memtile{all:unset;cursor:pointer;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:10px;align-items:center;padding:12px 14px;border-radius:16px;background:var(--surface);border:1px solid var(--line);transition:transform .15s,border-color .2s,box-shadow .2s}
+.memtile:hover{border-color:var(--line-2);background:var(--surface-2)}
 .memtile:active{transform:scale(.96)}
 .memtile svg{grid-row:1/3;width:22px;height:22px;color:var(--c)}
 .memtile b{font-family:var(--display);font-size:28px;font-weight:400;line-height:1}
 .memtile span{font-size:11.5px;color:var(--text-2)}
-.memtile.hot{border-color:color-mix(in srgb,var(--c) 60%,transparent)}
+.memtile.hot{border-color:rgba(232,198,107,.45)}
 .memtile.hot b{color:var(--c)}
 .memnav{position:sticky;top:calc(var(--toph,60px) + 4px);z-index:5;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:6px;border-radius:999px;background:rgba(26,20,32,.82);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border:1px solid var(--line)}
 .memnav::-webkit-scrollbar{display:none}
@@ -1555,30 +1526,31 @@ html.narrow .chiprow.all{animation:chipsopen .3s var(--ease-out)}
 .memnav-b em{font-style:normal;font-family:var(--mono);font-size:11px;color:var(--text-3)}
 .memnav-b.hot{color:#F6C35B}
 .memnav-b.hot em{color:#231A05;background:#F6C35B;border-radius:999px;padding:0 6px}
-.secic{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:8px;margin-right:8px;vertical-align:middle;background:color-mix(in srgb,var(--c) 18%,transparent);color:var(--c)}
+.secic{display:inline-grid;place-items:center;width:22px;height:22px;margin-right:6px;vertical-align:middle;color:var(--c)}
 .secic svg{width:15px;height:15px}
 .sechead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 2px 0}
 .sechead h3{font-size:16px;font-weight:600;display:flex;align-items:center}
 .card2 h3{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .card2 h3 .secic{margin-right:2px}
-.card2.review{border-color:rgba(246,195,91,.35);background:linear-gradient(180deg,rgba(246,195,91,.06),var(--surface) 40%)}
+.card2.review{border-color:rgba(232,198,107,.4)}
 .memlist{display:flex;flex-direction:column}
 .memlist .memitem:first-child{border-top-color:transparent}
-.memcat{display:inline-flex;align-items:center;gap:5px;align-self:flex-start;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent);padding:2px 8px 2px 6px;border-radius:999px}
+.memcat{display:inline-flex;align-items:center;gap:5px;align-self:flex-start;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-2);border:1px solid var(--line-2);padding:2px 8px 2px 6px;border-radius:999px}
+.memcat svg{color:var(--c)}
 .memcat svg{width:12px;height:12px}
 .catpick{display:flex;flex-wrap:wrap;gap:6px}
 .catchip{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:5px 11px 5px 9px;border-radius:999px;font-size:12px;color:var(--text-2);border:1px solid var(--line-2);transition:background .2s,color .2s,border-color .2s,transform .14s}
 .catchip svg{width:14px;height:14px;color:var(--c)}
 .catchip:hover{border-color:color-mix(in srgb,var(--c) 55%,transparent);color:var(--text)}
 .catchip:active{transform:scale(.95)}
-.catchip.on{background:color-mix(in srgb,var(--c) 20%,transparent);border-color:var(--c);color:var(--text)}
+.catchip.on{background:var(--text);border-color:transparent;color:var(--bg)}
+.catchip.on svg{color:var(--bg)}
 .catgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;align-items:start}
-.catcard{gap:6px;box-shadow:inset 0 3px 0 color-mix(in srgb,var(--c) 75%,transparent);background:linear-gradient(180deg,color-mix(in srgb,var(--c) 6%,var(--surface)),var(--surface) 90px)}
-.catcard-h .mini-meta{font-family:var(--ui);font-size:11.5px;color:var(--text-3)}
+.catcard{gap:6px}
 .catcard-h{display:flex;align-items:center;gap:10px}
 .catcard-h>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
 .catcard-h h3{font-size:14.5px}
-.catic{display:grid;place-items:center;width:34px;height:34px;flex:none;border-radius:11px;background:color-mix(in srgb,var(--c) 18%,transparent);color:var(--c)}
+.catic{display:grid;place-items:center;width:34px;height:34px;flex:none;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);color:var(--c)}
 .catic svg{width:18px;height:18px}
 .catn{font-family:var(--display);font-size:24px;line-height:1;color:var(--c)}
 .catcard .memitem{padding:9px 0}
@@ -1590,8 +1562,8 @@ html.narrow .chiprow.all{animation:chipsopen .3s var(--ease-out)}
 .kinkslink>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
 .fantgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
 .fantcard{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:14px;background:var(--surface-2);border:1px solid var(--line);transition:border-color .2s,transform .2s}
-.fantcard:hover{border-color:rgba(246,195,91,.35)}
-.fantcard.saved{border-color:rgba(246,195,91,.28);background:linear-gradient(160deg,rgba(246,195,91,.08),var(--surface-2) 55%)}
+.fantcard:hover{border-color:var(--line-2)}
+.fantcard.saved{border-color:rgba(232,198,107,.35)}
 .fantcard.idea{border-style:dashed}
 .fc-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
 .fc-head strong{font-family:var(--display);font-size:19px;font-weight:400;line-height:1.15}
@@ -1609,3 +1581,15 @@ html.narrow .chiprow.all{animation:chipsopen .3s var(--ease-out)}
   .kinkslink{flex-wrap:wrap}
 }
 @media (prefers-reduced-motion:reduce){.memtile,.memnav-b,.catchip{transition:none}}
+
+/* 0.19.1: posts taller than the screen scroll freely, with a stop at their end */
+.snapend{display:none}
+html.snap .post{position:relative}
+html.snap .post .snapend{display:block;position:absolute;left:0;right:0;bottom:0;height:1px;pointer-events:none}
+html.snap .post[data-tall] .snapend{scroll-snap-align:end}
+html.snap.snapfree{scroll-snap-type:y proximity}
+.gallery.g3{grid-template-rows:repeat(2,minmax(0,1fr))}
+.gallery.g4{grid-template-rows:repeat(3,minmax(0,1fr))}
+.gallery.g2 .gtile,.gallery.g3 .gtile,.gallery.g4 .gtile{min-height:0}
+.postfx.at{inset:auto 0;top:var(--fy);height:0}
+.postfx>*{position:relative;left:calc(var(--fx,50%) - 50%)}

@@ -52,6 +52,35 @@ export default function App() {
     el.classList.toggle('snap', narrow && mode === 'feed');
     el.classList.toggle('standalone', !!window.navigator.standalone || window.matchMedia?.('(display-mode: standalone)').matches);
   }, [narrow, mode]);
+  // A post taller than the screen can be scrolled through freely: while it is at the top, snapping only kicks in
+  // close to a snap point (its end, or the next post), so you can read it all before moving on.
+  useEffect(() => {
+    if (!narrow || mode !== 'feed') return undefined;
+    const el = document.documentElement;
+    let raf = 0;
+    const check = () => {
+      raf = 0;
+      const cs = getComputedStyle(el);
+      const top = parseInt(cs.getPropertyValue('--toph'), 10) || 60;
+      const tab = document.querySelector('.tabbar')?.offsetHeight || 0;
+      const room = (window.visualViewport?.height || window.innerHeight) - top - tab;
+      let free = false;
+      for (const p of document.querySelectorAll('.feed > article.post')) {
+        const r = p.getBoundingClientRect();
+        if (r.bottom < -200 || r.top > window.innerHeight + 200) { continue; }
+        const tall = r.height > room + 6;
+        if (tall) p.dataset.tall = '1'; else delete p.dataset.tall;
+        if (tall && r.top <= top + 12 && r.bottom > top + 12) free = true;
+      }
+      el.classList.toggle('snapfree', free);
+    };
+    const later = () => { if (!raf) raf = requestAnimationFrame(check); };
+    window.addEventListener('scroll', later, { passive: true });
+    window.addEventListener('resize', later);
+    const iv = setInterval(later, 800);
+    check();
+    return () => { window.removeEventListener('scroll', later); window.removeEventListener('resize', later); clearInterval(iv); cancelAnimationFrame(raf); el.classList.remove('snapfree'); };
+  }, [narrow, mode]);
   const toastTimer = useRef(null);
   const centerRef = useRef(null);
 
