@@ -181,11 +181,12 @@ test('original content markers become a badge and moderator posts are caught', (
 
 import { allowance, guessGender } from '../src/gender.js';
 
-test('the balance: 45 to 65% is hetero only, Everyone lets all through, and it narrows toward one side', () => {
+test('the balance: 45 to 55% (centred) is hetero only, and it narrows toward one side', () => {
   assert.equal(allowance(50, 'mixed', false, true, 1), 1);
   assert.equal(allowance(50, 'men', false, true, 1), 0, 'hetero only: no men-only posts');
-  assert.equal(allowance(60, 'women', false, true, 1), 0, 'hetero only: no women-only posts');
-  for (const k of ['men', 'women', 'mixed', 'unknown']) assert.equal(allowance(50, k, false, true, 1, true), 1, 'Everyone lets everything through');
+  assert.equal(allowance(55, 'women', false, true, 1), 0, 'hetero only: no women-only posts');
+  assert.equal(allowance(45, 'men', false, true, 1), 0, 'the hetero zone is centred: 45% is hetero too');
+  assert.ok(allowance(60, 'men', false, true, 1) > 0, 'outside the zone the balance leans again');
   assert.ok(allowance(40, 'women', false, true) === 1 && allowance(40, 'men', false, true) < 1);
   assert.equal(allowance(100, 'women', false, true), 0);
   assert.equal(allowance(100, 'mixed', false, true), 0, 'at 100% men only men');

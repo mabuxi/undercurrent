@@ -70,7 +70,7 @@ const kindCount = (k, n) => (k === 'down' ? tn(n, '{n} thumbs down', '{n} thumbs
 
 // What you probably did not like: only from the closer looks after you hid, disliked or blocked something, and only
 // what still counts against posts (not what you like or feel neutral about now).
-function DislikedSection() {
+function DislikedBlock() {
   const { toast } = useApp();
   const [d, setD] = useState(null);
   const load = () => api('/memory/disliked').then(setD).catch(() => setD({ tags: [], blocked: [] }));
@@ -88,9 +88,9 @@ function DislikedSection() {
     try { await api(`/creators/blocked/${b.id}`, { method: 'DELETE' }); toast(t('{name} is unblocked.', { name: b.name })); } catch (e) { toast(e.message); }
   }
   return (
-    <div className="memsec" id="mem-disliked">
-      <div className="sechead"><h3><span className="secic" style={{ '--c': '#E07070' }}><Icon name="less" /></span>{t('Did not like')}</h3><span className="count">{(d?.tags?.length || 0) + (d?.verify?.length ? ` · ${tn(d.verify.length, '{n} to verify', '{n} to verify [many]')}` : '')}</span></div>
-      <div className="card2">
+    <div className="disblock">
+      <div className="disblock-h"><span className="fb-label"><Icon name="less" />{t('Did not like')}</span><span className="count">{(d?.tags?.length || 0) + (d?.verify?.length ? ` · ${tn(d.verify.length, '{n} to verify', '{n} to verify [many]')}` : '')}</span></div>
+      <div className="disblock-b">
         <p className="wnote">{t('What you said you did not like when you hid, disliked or blocked something. Only what still counts against posts shows here; tap × to take it back.')}</p>
         {d === null ? <p className="wnote">{t('Loading…')}</p> : d.tags.length ? (
           <div className="dislist">
@@ -207,7 +207,6 @@ export default function MemoryView() {
   const [cat, setCat] = useState('Kinks and interests');
   const [busy, setBusy] = useState(false);
   const [newFant, setNewFant] = useState({ name: '', description: '', kinks: [] });
-  const [openCats, setOpenCats] = useState({});
   const formRef = useRef(null);
 
   const load = () => api('/memory').then(setMem).catch((e) => toast(e.message));
@@ -233,8 +232,9 @@ export default function MemoryView() {
   const groups = mem?.groups || [];
   const proposed = groups.flatMap((g) => g.items.filter((m) => m.status === 'proposed' || m.status === 'recheck'));
   const kept = groups.map((g) => ({ ...g, items: g.items.filter((m) => m.status !== 'proposed' && m.status !== 'recheck').sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)) }));
-  const filled = kept.filter((g) => g.items.length);
-  const empty = kept.filter((g) => !g.items.length);
+  // Turn-offs and limits always shows: what you did not like lives in it too.
+  const filled = kept.filter((g) => g.items.length || g.category === 'Turn-offs and limits');
+  const empty = kept.filter((g) => !g.items.length && g.category !== 'Turn-offs and limits');
   const total = kept.reduce((a, g) => a + g.items.length, 0);
   const pinned = kept.reduce((a, g) => a + g.items.filter((m) => m.pinned).length, 0);
   const go = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -243,7 +243,7 @@ export default function MemoryView() {
     proposed.length ? { id: 'mem-review', icon: 'check', label: t('To review'), n: proposed.length, hot: true } : null,
     { id: 'mem-about', icon: 'brain', label: t('About you'), n: total },
     { id: 'mem-fant', icon: 'spark', label: t('Fantasies'), n: fantasies.length },
-    { id: 'mem-disliked', icon: 'less', label: t('Did not like') },
+    { id: 'mem-disliked', icon: 'less', label: t('Turn-offs and limits') },
     { id: 'mem-history', icon: 'clock', label: t('Everything you did') },
     { id: 'mem-log', icon: 'thread', label: t('Prompt log') }
   ].filter(Boolean);
@@ -294,18 +294,17 @@ export default function MemoryView() {
         <div className="catgrid">
           {filled.map((g) => {
             const meta = metaOf(g.category);
-            const open = openCats[g.category];
-            const shown = open ? g.items : g.items.slice(0, 6);
+            const lim = g.category === 'Turn-offs and limits';
             return (
-              <div className="card2 catcard" key={g.category} style={{ '--c': meta.color }}>
+              <div className={`card2 catcard${lim ? ' limits' : ''}`} key={g.category} id={lim ? 'mem-disliked' : undefined} style={{ '--c': meta.color }}>
                 <div className="catcard-h">
                   <span className="catic"><Icon name={meta.icon} /></span>
                   <div><h3>{t(g.category)}</h3><span className="mini-meta">{meta.hint}</span></div>
                   <span className="catn">{g.items.length}</span>
                   <button type="button" className="icon-btn" onClick={() => addTo(g.category)} aria-label={t('Add to {name}', { name: t(g.category) })} title={t('Add to {name}', { name: t(g.category) })}><Icon name="plus" /></button>
                 </div>
-                <div className="memlist">{shown.map((m) => <MemoryItem key={m.id} m={m} categories={mem.categories} onChange={load} />)}</div>
-                {g.items.length > 6 ? <button type="button" className="linkbtn" onClick={() => setOpenCats((c) => ({ ...c, [g.category]: !open }))}>{open ? t('Show fewer') : t('Show all {n}', { n: g.items.length })}</button> : null}
+                {g.items.length ? <div className="memlist scrolly">{g.items.map((m) => <MemoryItem key={m.id} m={m} categories={mem.categories} onChange={load} />)}</div> : null}
+                {lim ? <DislikedBlock /> : null}
               </div>
             );
           })}
@@ -357,7 +356,6 @@ export default function MemoryView() {
         </div>
       </div>
 
-      <DislikedSection />
 
       <div className="memsec" id="mem-history">
         <HistoryDb />

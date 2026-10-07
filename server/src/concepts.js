@@ -36,8 +36,14 @@ const SYN = {
   bareback: ['bareback', 'raw', 'barebacking', 'bareback gay', 'gay bareback', 'no condom'],
   breeding: ['breeding', 'breed', 'bred'],
   doggystyle: ['doggystyle', 'doggy style', 'doggy'],
-  missionary: ['missionary'],
-  riding: ['riding', 'cowgirl', 'reverse cowgirl', 'cowboy', 'riding cock'],
+  missionary: ['missionary', 'missionary position'],
+  riding: ['riding', 'cowgirl', 'cowboy', 'riding cock', 'riding dick'],
+  'reverse cowgirl': ['reverse cowgirl', 'reverse riding', 'reverse cowboy'],
+  'standing sex': ['standing sex', 'standing fuck', 'stand and carry', 'standing doggy', 'standing position', 'standing missionary'],
+  'sixty nine': ['sixty nine', '69', '69 position', 'sixtynine'],
+  spooning: ['spooning', 'spoon', 'spoon position', 'side fuck'],
+  'prone bone': ['prone bone', 'pronebone', 'flat doggy', 'lying doggy'],
+  'mating press': ['mating press', 'legs up', 'legs on shoulders'],
   muscle: ['muscle', 'muscles', 'muscular', 'muscular men', 'muscular male', 'muscle gay', 'gay muscle', 'muscle hunk', 'hunk', 'hunks', 'hunks gay', 'bodybuilder', 'athletic', 'flexing', 'biceps', 'pecs', 'manly', 'muscle men', 'muscle man'],
   abs: ['abs', 'six pack', 'sixpack', 'defined abs'],
   hairy: ['hairy', 'body hair', 'hairy body', 'hairy man', 'hairy men', 'hairy guy', 'pubic hair', 'hairy gay'],
@@ -161,11 +167,12 @@ const PERSON = new Set(['man', 'men', 'guy', 'guys', 'gay', 'male', 'boy', 'boys
 const FAMILY_OF = {
   latino: 'ethnicity', asian: 'ethnicity', black: 'ethnicity', arab: 'ethnicity', indian: 'ethnicity', interracial: 'ethnicity',
   muscle: 'body', abs: 'body', hairy: 'body', 'hairy chest': 'body', beard: 'body', smooth: 'body', chubby: 'body', thighs: 'body', feet: 'body', armpits: 'body', tattoo: 'body', piercing: 'body', 'bubble butt': 'body', 'big ass': 'body', 'big tits': 'body', 'small tits': 'body', blonde: 'body', redhead: 'body', brunette: 'body', petite: 'body', curvy: 'body', bbw: 'body',
-  uncut: 'cock', cut: 'cock', veiny: 'cock', bwc: 'cock', bbc: 'cock', 'big balls': 'cock',
+  uncut: 'body', cut: 'body', veiny: 'body', bwc: 'body', bbc: 'body', 'big balls': 'body',
   twink: 'types', daddy: 'types', jock: 'types', bear: 'types', femboy: 'types', '18 25': 'types', mature: 'types', milf: 'types', trans: 'types', 'straight guy': 'types',
   lesbian: 'types', 'gay for pay': 'types', college: 'types', 'natural tits': 'body', heels: 'clothing', 'yoga pants': 'clothing', titfuck: 'sex', scissoring: 'sex', 'strap on': 'sex', facesitting: 'oral', casting: 'scenarios', 'first time': 'scenarios',
   blowjob: 'oral', sloppy: 'oral', deepthroat: 'oral', 'face fucking': 'oral', 'cock worship': 'oral', rimming: 'oral', 'pussy licking': 'oral', kissing: 'oral',
-  anal: 'sex', handjob: 'sex', fingering: 'sex', toys: 'sex', bareback: 'sex', breeding: 'sex', doggystyle: 'sex', missionary: 'sex', riding: 'sex', squirting: 'sex',
+  anal: 'sex', handjob: 'sex', fingering: 'sex', toys: 'sex', bareback: 'sex', breeding: 'sex', squirting: 'sex',
+  doggystyle: 'positions', missionary: 'positions', riding: 'positions', 'reverse cowgirl': 'positions', 'standing sex': 'positions', 'sixty nine': 'positions', spooning: 'positions', 'prone bone': 'positions', 'mating press': 'positions',
   solo: 'solo', masturbation: 'solo', gooning: 'solo', edging: 'solo', 'ruined orgasm': 'solo', prostate: 'solo',
   'huge load': 'cum', precum: 'cum', dripping: 'cum', creampie: 'cum', facial: 'cum', swallow: 'cum', bukkake: 'cum',
   rough: 'dynamic', dominant: 'dynamic', submissive: 'dynamic', sensual: 'dynamic', 'dirty talk': 'dynamic', moaning: 'dynamic', bondage: 'dynamic', femdom: 'dynamic', 'size difference': 'dynamic', teasing: 'dynamic', 'size queen': 'dynamic',
@@ -182,10 +189,10 @@ const FAMILY_OF = {
 export const FAMILIES = {
   ethnicity: { name: 'Ethnicity', color: '#D2A15E' },
   body: { name: 'Body', color: '#7FA7D9' },
-  cock: { name: 'Cock', color: '#E07A7A' },
   types: { name: 'Types', color: '#A58FE0' },
   oral: { name: 'Oral', color: '#D98A99' },
   sex: { name: 'Sex', color: '#C98BC4' },
+  positions: { name: 'Positions', color: '#E07A7A' },
   solo: { name: 'Solo play', color: '#66B5A6' },
   cum: { name: 'Cum', color: '#E8C66B' },
   dynamic: { name: 'Dynamic', color: '#E3A58F' },
@@ -198,7 +205,7 @@ export const FAMILIES = {
   drawn: { name: 'Drawn and animated', color: '#B6A8B0' }
 };
 
-const DISPLAY = { '18 25': 'Young adults 18+', bwc: 'BWC', bbc: 'BBC', bbw: 'BBW', milf: 'MILF', pov: 'POV', 'close up': 'Close-up', 'step family': 'Step family', 'ai generated': 'AI generated', 'huge load': 'Huge load', 'big balls': 'Big balls', 'hairy chest': 'Hairy chest', 'dirty talk': 'Dirty talk', 'size difference': 'Size difference', 'group sex': 'Group sex', 'double penetration': 'Double penetration', 'face fucking': 'Face fucking', 'cock worship': 'Cock worship', 'ruined orgasm': 'Ruined orgasm', 'bubble butt': 'Bubble butt', 'straight guy': 'Straight guys', 'gay for pay': 'Gay for pay', 'natural tits': 'Natural tits', 'yoga pants': 'Yoga pants', 'strap on': 'Strap-on', 'first time': 'First time', 'pussy licking': 'Pussy licking', 'big ass': 'Big ass', 'big tits': 'Big tits', 'small tits': 'Small tits', 'size queen': 'Size queen', sloppy: 'Sloppy blowjob', uncut: 'Uncut', cut: 'Cut' };
+const DISPLAY = { '18 25': 'Young adults 18+', bwc: 'BWC', bbc: 'BBC', bbw: 'BBW', milf: 'MILF', pov: 'POV', 'close up': 'Close-up', 'step family': 'Step family', 'ai generated': 'AI generated', 'huge load': 'Huge load', 'big balls': 'Big balls', 'hairy chest': 'Hairy chest', 'dirty talk': 'Dirty talk', 'size difference': 'Size difference', 'group sex': 'Group sex', 'double penetration': 'Double penetration', 'face fucking': 'Face fucking', 'cock worship': 'Cock worship', 'ruined orgasm': 'Ruined orgasm', 'bubble butt': 'Bubble butt', 'straight guy': 'Straight guys', 'gay for pay': 'Gay for pay', 'natural tits': 'Natural tits', 'yoga pants': 'Yoga pants', 'strap on': 'Strap-on', 'first time': 'First time', 'pussy licking': 'Pussy licking', 'big ass': 'Big ass', 'big tits': 'Big tits', 'small tits': 'Small tits', 'size queen': 'Size queen', sloppy: 'Sloppy blowjob', uncut: 'Uncut', cut: 'Cut', 'reverse cowgirl': 'Reverse cowgirl', 'standing sex': 'Standing', 'sixty nine': '69', spooning: 'Spooning', 'prone bone': 'Prone bone', 'mating press': 'Mating press' };
 
 const VARIANT = new Map();
 for (const [concept, list] of Object.entries(SYN)) {

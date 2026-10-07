@@ -88,6 +88,7 @@ export function sureOf(it) {
 
 export function genderPrefs() {
   const p = getSetting('genderPrefs', null) || {};
+  // "Everyone" is no longer an option in the app (0.20.2); it is only kept for tests that are not about the balance.
   const out = { male: Number.isFinite(p.male) ? p.male : 50, auto: !!p.auto, trans: p.trans !== false, everyone: !!p.everyone };
   if (out.auto) out.male = autoMale();
   return out;
@@ -133,8 +134,8 @@ export function autoMale() {
 // How much of each kind of post is let through at a given balance. At 50/50 everything is.
 // Toward one side, posts with only the other gender become rare, and that gender mostly appears together with the favoured one.
 // From 90% on it is a mode of its own: only posts clearly with just men (or just women) are shown, plus very rarely something else.
-// Between 45% and 65% men the slider means hetero only: posts with a man and a woman together.
-export const HETERO = [45, 65];
+// Between 45% and 55% men (centred on the middle) the slider means hetero only: posts with a man and a woman together.
+export const HETERO = [45, 55];
 export const isHetero = (male) => male >= HETERO[0] && male <= HETERO[1];
 
 export function allowance(male, kind, trans, allowTrans, sure = 0.5, everyone = false) {

@@ -9,7 +9,7 @@ export const KINK_FR = {
   bukkake: 'Bukkake', masturbation: 'Masturbation', gooning: 'Gooning', edging: 'Edging', 'ruined orgasm': 'Orgasme ruiné', solo: 'Solo',
   blowjob: 'Fellation', sloppy: 'Fellation baveuse', deepthroat: 'Gorge profonde', 'face fucking': 'Baise de bouche', 'cock worship': 'Culte de la bite',
   anal: 'Anal', rimming: 'Anulingus', fingering: 'Doigtage', toys: 'Jouets', handjob: 'Branlette', kissing: 'Bisous', bareback: 'Sans capote',
-  breeding: 'Breeding', doggystyle: 'Levrette', missionary: 'Missionnaire', riding: 'Chevauchée', muscle: 'Musclés', abs: 'Abdos', hairy: 'Poilus',
+  breeding: 'Breeding', doggystyle: 'Levrette', missionary: 'Missionnaire', riding: 'Chevauchée', 'reverse cowgirl': 'Chevauchée inversée', 'standing sex': 'Debout', 'sixty nine': '69', spooning: 'En cuillère', 'prone bone': 'À plat ventre', 'mating press': 'Jambes relevées', muscle: 'Musclés', abs: 'Abdos', hairy: 'Poilus',
   'hairy chest': 'Torse poilu', beard: 'Barbe', smooth: 'Imberbes', chubby: 'Enrobés', thighs: 'Cuisses', feet: 'Pieds', armpits: 'Aisselles',
   tattoo: 'Tatouages', piercing: 'Piercings', 'bubble butt': 'Fesses rebondies', 'big balls': 'Grosses couilles', uncut: 'Non circoncis',
   cut: 'Circoncis', twink: 'Minets', daddy: 'Daddy', jock: 'Sportifs', bear: 'Bears', femboy: 'Femboy', '18 25': 'Jeunes adultes 18+',
@@ -31,7 +31,7 @@ export const KINK_FR = {
 };
 
 export const FAMILY_FR = {
-  Ethnicity: 'Origines', Body: 'Corps', Cock: 'Bite', Types: 'Types', Oral: 'Oral', Sex: 'Sexe', 'Solo play': 'En solo', Cum: 'Sperme',
+  Ethnicity: 'Origines', Body: 'Corps', Positions: 'Positions', Types: 'Types', Oral: 'Oral', Sex: 'Sexe', 'Solo play': 'En solo', Cum: 'Sperme',
   Dynamic: 'Dynamique', Clothing: 'Vêtements', Places: 'Lieux', Scenarios: 'Scénarios', Groups: 'Groupes', Camera: 'Caméra',
   Fluids: 'Fluides', 'Drawn and animated': 'Dessin et animation'
 };

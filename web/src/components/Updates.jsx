@@ -1,7 +1,22 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { api } from '../api.js';
 import { Icon } from '../icons.jsx';
 import { t } from '../i18n.js';
+
+// Modals go straight into the page body, so a card they were opened from (Settings) can never box them in:
+// they always cover everything, close with Esc or a click outside.
+function Overlay({ label, onClose, children }) {
+  useEffect(() => {
+    const key = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, [onClose]);
+  return createPortal(
+    <div className="upmodal" role="dialog" aria-modal="true" aria-label={label} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>{children}</div>,
+    document.body
+  );
+}
 
 // Change notes are short markdown: "### Heading" and "- item" lines.
 export function Notes({ notes }) {
@@ -55,7 +70,7 @@ export function UpdateModal({ info, onClose }) {
     } catch (e) { setErr(e.message); }
   }
   return (
-    <div className="upmodal" role="dialog" aria-modal="true" aria-label={t('Update Undercurrent')}>
+    <Overlay label={t('Update Undercurrent')} onClose={onClose}>
       <div className="upcard">
         <div className="uphead">
           <div><span className="upkicker">{t('Update available')}</span><h3>Undercurrent {info.latest}</h3><span className="upsub">{t('You have {v}', { v: info.current })}</span></div>
@@ -72,13 +87,13 @@ export function UpdateModal({ info, onClose }) {
         </div>
         <p className="wnote">{t('Your kinks, history and settings are not touched by an update.')}</p>
       </div>
-    </div>
+    </Overlay>
   );
 }
 
 export function WhatsNew({ info, onClose }) {
   return (
-    <div className="upmodal" role="dialog" aria-modal="true" aria-label={t("What's new")}>
+    <Overlay label={t("What's new")} onClose={onClose}>
       <div className="upcard">
         <div className="uphead">
           <div><span className="upkicker">{t("What's new")}</span><h3>Undercurrent {info.version}</h3>{info.from ? <span className="upsub">{t('Updated from {v}', { v: info.from })}</span> : null}</div>
@@ -87,7 +102,7 @@ export function WhatsNew({ info, onClose }) {
         <Notes notes={info.notes || []} />
         <div className="wbtns"><button type="button" className="ghost-btn accent" onClick={onClose}>{t('Nice')}</button></div>
       </div>
-    </div>
+    </Overlay>
   );
 }
 

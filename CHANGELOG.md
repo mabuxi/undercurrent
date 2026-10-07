@@ -3,6 +3,32 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.20.2 · 8 October 2026
+
+### Feed
+- Mix windows ("Abs and Shower", "Abs × Shower") only show posts that have both, never just one of them. A post also counts when its title or text says it, before the closer look has tagged it. A mix only shows up when there are enough posts with both.
+- The hetero zone on the women and men sliders is centred: 45% to 55%, so from 55% women to 55% men. It is marked on the feed slider too.
+- "Everyone, any mix" is gone, from the feed filters and the welcome steps. If you had it on, your balance applies again.
+- After hiding or blocking a post, the page scrolls back to the question about what you did not like, instead of jumping to the next post.
+
+### Search
+- What a search is doing shows only its latest line. Point at it (or tap it) and the earlier steps fold out above it.
+
+### Welcome steps
+- The Cock family is replaced by Positions: missionary, doggystyle, riding, reverse cowgirl, standing, 69, spooning, prone bone and mating press. The cock kinks moved to Body.
+- Suggestions show up inside their own family, first, with a dashed outline, instead of in a separate row.
+- Every family has an icon instead of a dot, and every step has a big icon above its title.
+- Subtle motion throughout: the parts of each step come in one after another, picks pop, the icon breathes. Nothing moves when the Mac asks for reduced motion.
+- Fantasy ideas are real scenes now (a place, someone, what happens), like "In a steamy shower, a muscular stranger goes down on you", never the picks in a row. The local model is told the same.
+
+### Memory
+- What you did not like now lives inside Turn-offs and limits, which always shows and spans the full width.
+- Long cards scroll inside themselves instead of growing the page.
+
+### Settings
+- The What's new and update window always covers everything, also when opened from Settings. Esc or a click outside closes it.
+- A source's searches, creators and communities: the name has the room it needs, with its labels and when it was fetched under it. Names no longer break letter by letter.
+
 ## 0.20.1 · 8 October 2026
 
 ### What you did not like

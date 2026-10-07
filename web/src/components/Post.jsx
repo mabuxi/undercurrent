@@ -359,6 +359,18 @@ export default function Post({ item: initial, focus = false, onStrong }) {
   }
 
   const toggle = (p) => setPanel((cur) => (cur === p ? null : p));
+  const goneRef = useRef(null);
+  useEffect(() => {
+    if (!gone) return;
+    const tm = setTimeout(() => {
+      const el = goneRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const top = document.querySelector('header.top')?.getBoundingClientRect().bottom || 70;
+      if (r.top < top + 8 || r.top > window.innerHeight * 0.55) window.scrollTo({ top: window.scrollY + r.top - top - 16, behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    }, 60);
+    return () => clearTimeout(tm);
+  }, [gone]);
   const blocked = () => { play('hide'); setLeaving(true); setTimeout(() => setGone('block'), 720); };
   const panelRef = useRef(null);
   // Opening a profile, a performer or any panel under the post scrolls it into view.
@@ -392,7 +404,9 @@ export default function Post({ item: initial, focus = false, onStrong }) {
     document.addEventListener('pointerdown', off, true);
     return () => document.removeEventListener('pointerdown', off, true);
   }, [menu]);
-  if (gone) return <div className="post gone fxin"><span>{gone === 'block' ? t('Blocked. Nothing from them shows up again; you can unblock them in Memory.') : t('Hidden. The feed will show less like this.')}</span><DislikeNote id={item.id} /></div>;
+  // The post shrinks to its question when hidden, so the feed would jump to the next post: scroll back up a little,
+  // so the question about what you did not like is right there.
+  if (gone) return <div ref={goneRef} className="post gone fxin"><span>{gone === 'block' ? t('Blocked. Nothing from them shows up again; you can unblock them in Memory.') : t('Hidden. The feed will show less like this.')}</span><DislikeNote id={item.id} /></div>;
   const id = identity(item);
   const isText = item.media?.kind === 'text';
   const liked = item.media?.rating;

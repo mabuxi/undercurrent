@@ -266,7 +266,7 @@ const ALL_CONCEPTS = ['latino', 'asian', 'black', 'interracial', 'arab', 'indian
   'bbc', 'bwc', 'uncut', 'veiny', 'big balls', 'cut',
   'milf', '18 25', 'college', 'lesbian', 'mature', 'twink', 'daddy', 'jock', 'straight guy', 'gay for pay', 'bear', 'trans', 'femboy',
   'blowjob', 'deepthroat', 'pussy licking', 'facesitting', 'sloppy', 'kissing', 'face fucking', 'rimming', 'cock worship',
-  'missionary', 'doggystyle', 'riding', 'anal', 'squirting', 'titfuck', 'handjob', 'fingering', 'toys', 'scissoring', 'strap on', 'bareback', 'breeding',
+  'missionary', 'doggystyle', 'riding', 'reverse cowgirl', 'standing sex', 'sixty nine', 'spooning', 'prone bone', 'mating press', 'anal', 'squirting', 'titfuck', 'handjob', 'fingering', 'toys', 'scissoring', 'strap on', 'bareback', 'breeding',
   'masturbation', 'solo', 'edging', 'gooning', 'ruined orgasm', 'prostate',
   'creampie', 'facial', 'swallow', 'huge load', 'dripping', 'precum', 'bukkake',
   'sensual', 'rough', 'dominant', 'submissive', 'teasing', 'dirty talk', 'moaning', 'femdom', 'bondage', 'size difference',
@@ -285,7 +285,7 @@ const RELATED = {
   'big tits': ['natural tits', 'titfuck', 'milf', 'curvy'], milf: ['mature', 'step family', 'big tits', 'cheating'], lesbian: ['scissoring', 'strap on', 'pussy licking', 'kissing', 'facesitting'],
   'pussy licking': ['facesitting', 'squirting', 'lesbian'], 'straight guy': ['gay for pay', 'first time', 'jock'], 'gay for pay': ['straight guy', 'first time', 'casting'],
   college: ['18 25', 'petite', 'first time'], petite: ['small tits', 'size difference', '18 25'], lingerie: ['heels', 'teasing', 'big tits'], heels: ['lingerie', 'femdom', 'teasing'],
-  'yoga pants': ['big ass', 'gym', 'teasing'], riding: ['big ass', 'missionary', 'creampie'], doggystyle: ['big ass', 'anal', 'rough'], casting: ['first time', 'pov', 'interracial'],
+  'yoga pants': ['big ass', 'gym', 'teasing'], riding: ['reverse cowgirl', 'big ass', 'missionary', 'creampie'], doggystyle: ['prone bone', 'big ass', 'anal', 'rough'], missionary: ['mating press', 'kissing', 'sensual', 'spooning'], 'reverse cowgirl': ['riding', 'big ass', 'pov'], 'standing sex': ['size difference', 'shower', 'rough'], 'sixty nine': ['blowjob', 'pussy licking', 'rimming'], spooning: ['sensual', 'kissing', 'missionary'], 'prone bone': ['doggystyle', 'rough', 'breeding'], 'mating press': ['missionary', 'breeding', 'creampie'], casting: ['first time', 'pov', 'interracial'],
   squirting: ['pussy licking', 'toys', 'fingering'], scissoring: ['strap on', 'kissing', 'fingering', 'toys'], 'strap on': ['femdom', 'toys', 'scissoring'], facesitting: ['pussy licking', 'femdom', 'rimming'], titfuck: ['big tits', 'facial', 'natural tits'], 'big ass': ['bubble butt', 'doggystyle', 'riding', 'yoga pants'], anal: ['creampie', 'doggystyle', 'toys'], massage: ['oiled', 'sensual', 'happy ending']
 };
 // Suggestions for what goes with your picks. With `focus` (the one you just picked), what goes with that one comes

@@ -109,12 +109,20 @@ function ProviderCard({ p, reload }) {
           {p.follows.length ? (
             <div className="follist">
               {p.follows.map((f) => (
-                <div key={f.id} className={`folrow${f.active ? '' : ' dim'}`}>
+                <div key={f.id} className={`folrow srcfol${f.active ? '' : ' dim'}`}>
                   <span className="chip ghost">{f.target?.mode === 'creator' ? t('creator') : f.target?.mode === 'subreddit' ? t('subreddit') : f.target?.mode === 'search' ? t('search') : f.target?.mode === 'community' ? t('community') : f.target?.mode}</span>
-                  <span className="folname">{f.target?.value || f.value}{f.synced_from === 'auto' ? <em className="autotag">{f.active ? t('auto') : t('resting')}{f.topic ? `: ${f.topic.split(',')[0]}` : /(?:matches|correspond à) (.+)$/.test(f.label || '') ? `: ${f.label.match(/(?:matches|correspond à) (.+)$/)[1]}` : ''}</em> : null}{f.why ? <em className="autotag why">{f.why}</em> : null}</span>
-                  <span className="count">{since(f.last_fetch)}</span>
-                  <button type="button" className="icon-btn" onClick={async () => { await api('/follow', { method: 'POST', body: { kind: f.kind, value: f.value, on: !f.active } }); reload(); }} aria-label={f.active ? t('Pause') : t('Resume')} title={f.active ? t('Pause') : t('Resume')}><Icon name={f.active ? 'min' : 'plus'} /></button>
-                  <button type="button" className="icon-btn" onClick={async () => { await api(`/follows/${f.id}`, { method: 'DELETE' }); reload(); }} aria-label={t('Remove')} title={t('Remove')}><Icon name="trash" /></button>
+                  <div className="folmain">
+                    <span className="folname">{f.target?.value || f.value}</span>
+                    <div className="folmeta">
+                      {f.synced_from === 'auto' ? <em className="autotag">{f.active ? t('auto') : t('resting')}{f.topic ? `: ${f.topic.split(',')[0]}` : /(?:matches|correspond à) (.+)$/.test(f.label || '') ? `: ${f.label.match(/(?:matches|correspond à) (.+)$/)[1]}` : ''}</em> : null}
+                      {f.why ? <em className="autotag why">{f.why}</em> : null}
+                      <span className="count">{since(f.last_fetch)}</span>
+                    </div>
+                  </div>
+                  <div className="folbtns">
+                    <button type="button" className="icon-btn" onClick={async () => { await api('/follow', { method: 'POST', body: { kind: f.kind, value: f.value, on: !f.active } }); reload(); }} aria-label={f.active ? t('Pause') : t('Resume')} title={f.active ? t('Pause') : t('Resume')}><Icon name={f.active ? 'min' : 'plus'} /></button>
+                    <button type="button" className="icon-btn" onClick={async () => { await api(`/follows/${f.id}`, { method: 'DELETE' }); reload(); }} aria-label={t('Remove')} title={t('Remove')}><Icon name="trash" /></button>
+                  </div>
                 </div>
               ))}
             </div>

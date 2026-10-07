@@ -2,6 +2,32 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.20.2 · 8 octobre 2026
+
+### Fil
+- Les fenêtres de mélange (« Abdos et Douche », « Abdos × Douche ») ne montrent que des publications qui ont les deux, jamais une seule. Une publication compte aussi quand son titre ou son texte le dit, avant que le regard approfondi l’ait taguée. Un mélange n’apparaît que s’il y a assez de publications avec les deux.
+- La zone hétéro des curseurs femmes et hommes est centrée : de 45 % à 55 %, donc de 55 % de femmes à 55 % d’hommes. Elle est aussi marquée sur le curseur du fil.
+- « Tout le monde, n’importe quel mélange » disparaît, des filtres du fil et des premiers pas. Si vous l’aviez activé, votre équilibre s’applique à nouveau.
+- Après avoir masqué ou bloqué une publication, la page remonte vers la question sur ce que vous n’avez pas aimé, au lieu de sauter à la publication suivante.
+
+### Recherche
+- Ce que fait une recherche n’affiche que sa dernière ligne. Survolez-la (ou touchez-la) et les étapes précédentes se déplient au-dessus.
+
+### Premiers pas
+- La famille Bite est remplacée par Positions : missionnaire, levrette, chevauchée, chevauchée inversée, debout, 69, en cuillère, à plat ventre et jambes relevées. Les kinks de bite passent dans Corps.
+- Les suggestions apparaissent dans leur propre famille, en premier, avec un contour en pointillés, au lieu d’une ligne à part.
+- Chaque famille a une icône au lieu d’un point, et chaque étape a une grande icône au-dessus de son titre.
+- Des animations discrètes partout : les éléments de chaque étape arrivent l’un après l’autre, les choix rebondissent, l’icône respire. Rien ne bouge quand le Mac demande moins d’animations.
+- Les idées de fantasmes sont de vraies scènes (un lieu, quelqu’un, ce qui se passe), comme « Sous une douche brûlante, un inconnu musclé vous prend dans sa bouche », jamais les choix à la suite. Le modèle local reçoit la même consigne.
+
+### Mémoire
+- Ce que vous n’avez pas aimé se trouve maintenant dans Rédhibitoires et limites, toujours affiché et sur toute la largeur.
+- Les cartes longues défilent à l’intérieur au lieu d’allonger la page.
+
+### Réglages
+- La fenêtre Nouveautés et mise à jour couvre toujours tout, aussi depuis les Réglages. Échap ou un clic à côté la ferme.
+- Les recherches, créateurs et communautés d’une source : le nom a la place qu’il lui faut, avec ses étiquettes et la date de récupération en dessous. Les noms ne se coupent plus lettre par lettre.
+
 ## 0.20.1 · 8 octobre 2026
 
 ### Ce que vous n’avez pas aimé

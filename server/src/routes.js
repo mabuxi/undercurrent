@@ -44,13 +44,14 @@ import { tagsForItems, tagSpecificity } from './store.js';
 import { lustUrl, lustTest, TUBE_CDNS, tubeReferer } from './sources/lustpress.js';
 import { invalidatePool } from './searchstate.js';
 import { setupStatus, pullModels, installOllama, conceptCatalog, suggestFor, SOURCE_ORDER, modelOptions, chooseModels } from './setup.js';
+import { fantasyIdeas } from './fantasyideas.js';
 import { listProfiles, createProfile, renameProfile, setProfileColor, switchProfile, deleteProfile, backupProfile, restoreBackup, deleteBackup, revealInFinder } from './profiles.js';
 import { updateStatus, applyUpdate, job as updateJob, whatsNew, markSeen, changelog } from './update.js';
 import { lang, languageSet, setLanguage, LANGS, tr, trn, replyIn } from './i18n.js';
 import { kinkLabel, translateItem } from './translate.js';
 import { queueDislike, queueBlock, dislikeOf, dropReason, dislikedTags, forgiveTag, confirmDislike, skipDislike, dropGuess, guessesToVerify, verifyGuess } from './dislike.js';
 import { conceptLabel } from './vocab.js';
-import { conceptName as cName, knownVariants, familyOf } from './concepts.js';
+import { conceptName as cName, knownVariants } from './concepts.js';
 import { boostTags } from './profile.js';
 import { syncGroups } from './kinkengine.js';
 import { startSearch, jobView, editChip, searchMore, keepSearchSource, webKey, webSearch, openProfile } from './search.js';
@@ -475,7 +476,6 @@ api.put('/settings/gender', wrap((req, res) => {
   if (b.male !== undefined) patch.male = Number(b.male);
   if (b.auto !== undefined) patch.auto = !!b.auto;
   if (b.trans !== undefined) patch.trans = !!b.trans;
-  if (b.everyone !== undefined) patch.everyone = !!b.everyone;
   res.json({ ...setGenderPrefs(patch), autoValue: autoMale() });
 }));
 
@@ -984,7 +984,7 @@ api.post('/setup/fantasies', wrap(async (req, res) => {
       const out = await Promise.race([chat({
         kind: 'summary', model: fastModel(), temperature: 0.8, numPredict: 700,
         schema: { type: 'object', properties: { fantasies: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, description: { type: 'string' }, kinks: { type: 'array', items: { type: 'string' } } }, required: ['name', 'description', 'kinks'] } } }, required: ['fantasies'] },
-        system: `You suggest fantasies for one adult using a private adult-content browser. A fantasy is a short scenario that ties two or three of his picked kinks together. Give 5. name: 2 to 4 plain words. description: one sentence, second person, explicit is fine, all adults. kinks: the exact picked kink names it uses, unchanged. ${replyIn()}`,
+        system: `You suggest fantasies for one adult using a private adult-content browser. A fantasy is a concrete scenario that ties two or three of the picked kinks together: a place, who is there and what happens, specific enough to picture, like "In the empty gym after closing, the jock who spots you pins you against the mirror". Never a list of the kinks, never "scenes where X and Y come together". Give 5, each in a different setting. name: 2 to 4 plain words, the scene, not the kinks. description: one sentence, second person, explicit is fine, all adults, nothing about family, age or non-consent. kinks: the exact picked kink names it uses, unchanged. ${replyIn()}`,
         user: `Picked kinks: ${names.join(', ')}`
       }), new Promise((_, rej) => setTimeout(() => rej(new Error('slow')), 30000))]);
       list = (out?.fantasies || []).map((f) => ({ name: String(f.name || '').slice(0, 50), description: String(f.description || '').slice(0, 240), concepts: (f.kinks || []).map((k) => picked[names.findIndex((n) => n.toLowerCase() === String(k).toLowerCase())]).filter(Boolean) }))
@@ -992,11 +992,11 @@ api.post('/setup/fantasies', wrap(async (req, res) => {
     } catch {}
   }
   const byAi = list.length > 0;
+  // Without the model (or too few from it): scenarios written from your picks, never just the picks in a row.
   if (list.length < 3) {
-    for (let i = 0; i < picked.length && list.length < 5; i++) for (let j = i + 1; j < picked.length && list.length < 5; j++) {
-      if (familyOf(picked[i]) === familyOf(picked[j])) continue;
-      list.push({ name: tr('{a} and {b}', { a: names[i], b: names[j].toLowerCase() }), description: tr('Scenes where {a} and {b} come together.', { a: names[i].toLowerCase(), b: names[j].toLowerCase() }), concepts: [picked[i], picked[j]] });
-    }
+    const male = Number(req.body?.male);
+    const gender = Number.isFinite(male) ? (male >= 70 ? 'men' : male <= 30 ? 'women' : 'both') : 'both';
+    for (const f of fantasyIdeas(picked, { gender, max: 5 })) if (list.length < 5 && !list.some((x) => x.name === f.name)) list.push(f);
   }
   res.json({ fantasies: list.slice(0, 5), byAi });
 }));
@@ -1023,7 +1023,7 @@ api.post('/setup/finish', wrap(async (req, res) => {
     const ids = (f.concepts || []).map((c) => idFor.get(c)).filter(Boolean);
     if (f.name && ids.length) saveFantasy({ name: String(f.name).slice(0, 60), description: String(f.description || '').slice(0, 300), kinks: ids, saved: 1, origin: 'user' });
   }
-  if (b.gender) setGenderPrefs({ male: Number(b.gender.male ?? 50), auto: !!b.gender.auto, trans: b.gender.trans !== false, everyone: !!b.gender.everyone });
+  if (b.gender) setGenderPrefs({ male: Number(b.gender.male ?? 50), auto: !!b.gender.auto, trans: b.gender.trans !== false, everyone: false });
   for (const [id, on] of Object.entries(b.sources || {})) if (PROVIDERS[id]) setProvider(id, { enabled: !!on });
   for (const t of (b.limits || []).map((x) => normalizeTag(x)).filter(Boolean)) db.prepare('INSERT OR IGNORE INTO limits(tag, created) VALUES(?, ?)').run(t, now());
   if (b.limits?.length) recheckBlocks();

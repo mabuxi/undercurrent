@@ -76,16 +76,16 @@ function passes(item, tags, f, kinkSets) {
     const hay = `${item.title} ${item.author || ''} ${item.community || ''} ${item.aiSummary || ''} ${[...names].join(' ')}`.toLowerCase();
     if (!String(f.q).toLowerCase().split(/\s+/).filter(Boolean).every((w) => hay.includes(w))) return false;
   }
-  for (const set of kinkSets.required) {
-    let hit = false;
-    for (const id of set) if (ids.has(id)) { hit = true; break; }
-    if (!hit) return false;
-  }
-  if (kinkSets.any.length) {
-    let hit = false;
-    for (const set of kinkSets.any) for (const id of set) if (ids.has(id)) { hit = true; break; }
-    if (!hit) return false;
-  }
+  // A kink counts when the post has one of its tags, or says it in its title or text (posts the closer look has
+  // not reached yet still match what they are about).
+  const text = kinkSets.required.length || kinkSets.any.length ? ` ${String(`${item.title || ''} ${String(item.body || '').slice(0, 800)}`).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ')} ` : '';
+  const hits = (set) => {
+    for (const id of set) if (ids.has(id)) return true;
+    for (const n of set.names || []) if (n.length >= 3 && text.includes(` ${n} `)) return true;
+    return false;
+  };
+  for (const set of kinkSets.required) if (!hits(set)) return false;
+  if (kinkSets.any.length && !kinkSets.any.some(hits)) return false;
   return true;
 }
 
@@ -239,12 +239,19 @@ export function buildFeed(filters = {}, { exclude = [], limit = 12, mix = 15 } =
   const kidx = kinkIndex(kinks);
   const kinkTags = new Set(kinks.filter((k) => !k.isGroup && (k.status === 'active' || k.origin === 'user')).flatMap((k) => k.tags.map((x) => x.id)));
   const topIds = new Set([...aff].filter(([k, v]) => k.startsWith('t:') && (v.long || 0) > 0.5).sort((a, b) => (b[1].long || 0) - (a[1].long || 0)).slice(0, 40).map(([k]) => Number(k.slice(2))));
-  const kinkSet = (id) => new Set((kinks.find((k) => k.id === Number(id))?.tags || []).map((x) => x.id));
+  const kinkSet = (id) => {
+    const tags = kinks.find((k) => k.id === Number(id))?.tags || [];
+    const set = new Set(tags.map((x) => x.id));
+    set.names = [...new Set(tags.map((x) => String(x.name || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()).filter(Boolean))];
+    return set;
+  };
   const kinkSets = { required: [], any: [] };
   const spec2 = tagSpecificity().map;
   const wantTags = new Set((f.tags || []).map((n) => String(n).toLowerCase()));
   if (f.kink) kinkSets.required.push(kinkSet(f.kink));
-  if (f.pair?.length === 2) kinkSets.any.push(kinkSet(f.pair[0]), kinkSet(f.pair[1]));
+  // A pair ("Abs × Shower") or a mix of two kinks shows posts that have both, never just one of them.
+  if (f.pair?.length === 2) kinkSets.required.push(kinkSet(f.pair[0]), kinkSet(f.pair[1]));
+  if (f.allKinks?.length) for (const id of f.allKinks) kinkSets.required.push(kinkSet(id));
   if (f.fantasy) {
     const fan = listFantasies().find((x) => x.id === Number(f.fantasy));
     for (const k of fan?.kinks || []) kinkSets.any.push(kinkSet(k.id));

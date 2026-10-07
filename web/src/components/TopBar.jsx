@@ -46,6 +46,7 @@ export default function TopBar() {
   const [pinned, setPinned] = useState(false);
   const [phone, setPhone] = useState(false);
   const [stepsOpen, setStepsOpen] = useState(false);
+  const [stepsFull, setStepsFull] = useState(false);
   const hideTimer = useRef(null);
   const stepTimer = useRef(null);
   const headRef = useRef(null);
@@ -180,12 +181,18 @@ export default function TopBar() {
             <button className="btn-accent" type="submit" disabled={running} aria-label={t('Search')}><span className="btn-l">{running ? t('Working') : t('Search')}</span><span className="btn-ic" aria-hidden="true">{running ? <span className="spin" /> : <Icon name="go" />}</span></button>
           )}
         </form>
-        {shownSteps.length || others.length ? (
-          <ul className="sb-steps" aria-label={t('What is happening')}>
-            {shownSteps.map((s) => <Step key={s.key} s={s} />)}
-            {others.map((s) => <Step key={s.key} s={s} />)}
-          </ul>
-        ) : null}
+        {shownSteps.length || others.length ? (() => {
+          // Only the latest line shows; pointing at it (or tapping it) folds the earlier steps out above it.
+          const all = [...shownSteps, ...others];
+          const latest = [...all].reverse().find((x) => x.state === 'run') || all[all.length - 1];
+          const older = all.filter((x) => x !== latest);
+          return (
+            <div className={`sb-steps${stepsFull ? ' open' : ''}${older.length ? ' has-older' : ''}`} aria-label={t('What is happening')} onMouseEnter={() => setStepsFull(true)} onMouseLeave={() => setStepsFull(false)} onClick={() => setStepsFull((x) => !x)}>
+              {older.length ? <div className="sb-older"><ul>{older.map((x) => <Step key={x.key} s={x} />)}</ul></div> : null}
+              <ul className="sb-latest"><Step key={latest.key} s={latest} />{older.length ? <li className="sb-more" aria-hidden="true">{stepsFull ? <Icon name="chevU" /> : <>+{older.length}<Icon name="chevD" /></>}</li> : null}</ul>
+            </div>
+          );
+        })() : null}
         {(() => {
           // What the feed is showing (filters) and what the search looks for, in one row with one look.
           const list = crumbList(filters, { kinks, fantasies }).filter(([k]) => !(k === 'search' && activeNow) && !(k === 'sources' && chips.some((c) => c.kind === 'source')));

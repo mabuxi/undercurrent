@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import QRCode from 'qrcode';
 import { api } from '../api.js';
 import { t } from '../i18n.js';
@@ -27,7 +28,7 @@ export function PhoneModal({ onClose }) {
     window.addEventListener('keydown', k);
     return () => window.removeEventListener('keydown', k);
   }, [onClose]);
-  return (
+  return createPortal(
     <div className="upmodal" role="dialog" aria-modal="true" aria-label={t('Open on your iPhone')} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="upcard phonecard">
         <div className="uphead">
@@ -60,5 +61,5 @@ export function PhoneModal({ onClose }) {
         ) : null}
       </div>
     </div>
-  );
+  , document.body);
 }

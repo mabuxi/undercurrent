@@ -6,6 +6,13 @@ import { ModelChooser } from './ModelChooser.jsx';
 import { t, tn } from '../i18n.js';
 
 const STEPS = [t('Welcome'), t('Local AI'), t('Who'), t('Kinks'), t('Fantasies'), t('Sources'), t('Limits'), t('Ready')];
+const FAMILY_ICON = { ethnicity: 'globe', body: 'body', positions: 'twist', types: 'person', oral: 'lips', sex: 'flame', solo: 'hand', cum: 'drop', dynamic: 'bolt', clothing: 'shirt', places: 'pin', scenarios: 'book', group: 'people', camera: 'video', fluids: 'wave', drawn: 'edit' };
+
+// A big icon above each step's title.
+function StepIcon({ name }) {
+  return <span className="ob-hicon" aria-hidden="true"><Icon name={name} /></span>;
+}
+
 const LIMIT_IDEAS = ['piss', 'feet', 'bondage', 'hentai', 'ai generated', 'toys', 'step family', 'cheating', 'bbw', 'trans'];
 
 function Blobs({ colors }) {
@@ -20,6 +27,7 @@ function Welcome({ ok, setOk }) {
   return (
     <div className="ob-step ob-welcome">
       <LanguageSwitch compact />
+      <StepIcon name="flame" />
       <p className="ob-kicker">{t('Welcome to')}</p>
       <h1 className="ob-title">Undercurrent</h1>
       <p className="ob-lede">{t("One feed from all your sources, tuned to exactly what you're into. It learns from what you heat, like and save, and everything (your taste, your history, the AI) stays on this Mac.")}</p>
@@ -39,6 +47,7 @@ function LocalAi({ status, options, choice, setChoice }) {
   const inst = st.ollama.install;
   return (
     <div className="ob-step">
+      <StepIcon name="brain" />
       <h2 className="ob-h">{t('The local AI')}</h2>
       <p className="ob-lede">{t('Undercurrent runs AI models on this Mac with Ollama. They tag posts, look at pictures and power the assistant. Nothing is sent anywhere. The recommended models fit this Mac; choose others if you like. They download when you continue, while you set up the rest.')}</p>
       <div className={`ob-card ${st.ollama.running ? 'good' : ''}`}>
@@ -58,22 +67,22 @@ function Who({ gender, setGender }) {
   const men = gender.male;
   return (
     <div className="ob-step">
+      <StepIcon name="people" />
       <h2 className="ob-h">{t('Who do you want to see?')}</h2>
       <p className="ob-lede">{t("Slide toward who you're into. You can change it any time above the feed, or let it follow what you like.")}</p>
       <div className="ob-who">
         <div className="ob-face f" style={{ '--s': 0.55 + (100 - men) / 160 }}><Icon name="female" /><span>{100 - men}%</span></div>
-        {men >= 45 && men <= 65 ? <div className="ob-plus" aria-hidden="true">+</div> : null}
+        {men >= 45 && men <= 55 ? <div className="ob-plus" aria-hidden="true">+</div> : null}
         <div className="ob-face m" style={{ '--s': 0.55 + men / 160 }}><Icon name="male" /><span>{men}%</span></div>
       </div>
       <div className="ob-slidewrap">
-        <span className="ob-band" style={{ left: '45%', width: '20%' }} aria-hidden="true" />
-        <input className="uslider gender ob-slider" type="range" min="0" max="100" step="5" value={men} disabled={gender.auto || gender.everyone} onChange={(e) => setGender({ ...gender, male: Number(e.target.value) })} aria-label={t('Balance between women and men')} />
+        <span className="ob-band" style={{ left: '45%', width: '10%' }} aria-hidden="true" />
+        <input className="uslider gender ob-slider" type="range" min="0" max="100" step="5" value={men} disabled={gender.auto} onChange={(e) => setGender({ ...gender, male: Number(e.target.value) })} aria-label={t('Balance between women and men')} />
       </div>
       <div className="ob-scale" aria-hidden="true"><span>{t('Women only')}</span><span>{t('Hetero')}</span><span>{t('Men only')}</span></div>
-      <p className="ob-center"><b>{gender.everyone ? t('Everyone: men, women and both together') : men >= 90 ? t('Men only') : men <= 10 ? t('Women only') : men >= 45 && men <= 65 ? t('Hetero only: a man and a woman together') : t('{w}% women · {m}% men', { w: 100 - men, m: men })}</b></p>
+      <p className="ob-center"><b>{men >= 90 ? t('Men only') : men <= 10 ? t('Women only') : men >= 45 && men <= 55 ? t('Hetero only: a man and a woman together') : t('{w}% women · {m}% men', { w: 100 - men, m: men })}</b></p>
       <div className="ob-toggles">
         <button type="button" className={`ob-toggle${gender.auto ? ' on' : ''}`} onClick={() => setGender({ ...gender, auto: !gender.auto })}><Icon name="auto" />{t('Follow what I like')}</button>
-        <button type="button" className={`ob-toggle${gender.everyone ? ' on' : ''}`} onClick={() => setGender({ ...gender, everyone: !gender.everyone })}><Icon name="grid" />{t('Everyone, any mix')}</button>
         <button type="button" className={`ob-toggle${gender.trans ? ' on' : ''}`} onClick={() => setGender({ ...gender, trans: !gender.trans })}><Icon name="trans" />{gender.trans ? t('Trans content on') : t('Trans content off')}</button>
       </div>
     </div>
@@ -108,6 +117,7 @@ function Kinks({ families, picked, setPicked }) {
   const nameOf = useMemo(() => { const m = new Map(); for (const f of families) for (const c of f.concepts) m.set(c.concept, c.name); return m; }, [families]);
   return (
     <div className="ob-step wide">
+      <StepIcon name="flame" />
       <h2 className="ob-h">{t('What are you into?')}</h2>
       <p className="ob-lede">{t("Pick the specific things you keep coming back to. They become your first kinks, each in its family's colour. Undercurrent adds and fades kinks by itself later, from what you really heat, like and save.")}</p>
       {picked.length ? (
@@ -116,26 +126,29 @@ function Kinks({ families, picked, setPicked }) {
           {picked.map((c) => <button type="button" key={c} className="ob-chip on" style={{ '--c': colorOf.get(c) || '#E39A83' }} onClick={() => toggle(c)}>{nameOf.get(c) || c}<Icon name="x" /></button>)}
         </div>
       ) : null}
-      {sugg.length ? (
-        <div className="ob-sugg">
-          <span className="ob-label"><Icon name="spark" />{t('Goes well with that')}</span>
-          {sugg.map((s) => <button type="button" key={s.concept} className="ob-chip sugg" style={{ '--c': s.color || '#E39A83' }} onClick={() => toggle(s.concept)}>+ {s.name}</button>)}
-        </div>
-      ) : null}
       <div className="ob-fams">
-        {families.map((f) => {
+        {families.map((f, fi) => {
           const n = f.concepts.filter((c) => picked.includes(c.concept)).length;
-          const shown = open === f.key ? f.concepts : f.concepts.slice(0, 8);
+          // What goes with your picks shows up inside its own family, first, with a dashed outline.
+          const sug = sugg.filter((x) => x.family === f.key && !picked.includes(x.concept));
+          const sugSet = new Set(sug.map((x) => x.concept));
+          const rest = f.concepts.filter((c) => !sugSet.has(c.concept));
+          const shown = open === f.key ? rest : rest.slice(0, 8);
           return (
-            <section key={f.key} className="ob-fam" style={{ '--c': f.color }}>
-              <header><span className="ob-swatch" /><b>{f.name}</b>{n ? <em>{n}</em> : null}</header>
+            <section key={f.key} className={`ob-fam${sug.length ? ' has-sugg' : ''}`} style={{ '--c': f.color, '--i': fi }}>
+              <header><span className="ob-famicon"><Icon name={FAMILY_ICON[f.key] || 'spark'} /></span><b>{f.name}</b>{n ? <em>{n}</em> : null}</header>
               <div className="ob-tiles">
+                {sug.map((x) => (
+                  <button type="button" key={`s-${x.concept}`} className="ob-tile sugg" onClick={() => toggle(x.concept)} title={t('Goes well with that')}>
+                    <Icon name="plus" />{x.name}
+                  </button>
+                ))}
                 {shown.map((c) => (
                   <button type="button" key={c.concept} className={`ob-tile${picked.includes(c.concept) ? ' on' : ''}`} onClick={() => toggle(c.concept)} aria-pressed={picked.includes(c.concept)}>
                     {c.name}{picked.includes(c.concept) ? <Icon name="check" /> : null}
                   </button>
                 ))}
-                {f.concepts.length > 8 ? <button type="button" className="ob-tile more" onClick={() => setOpen(open === f.key ? null : f.key)}>{open === f.key ? t('Less') : t('+{n} more', { n: f.concepts.length - 8 })}</button> : null}
+                {rest.length > 8 ? <button type="button" className="ob-tile more" onClick={() => setOpen(open === f.key ? null : f.key)}>{open === f.key ? t('Less') : t('+{n} more', { n: rest.length - 8 })}</button> : null}
               </div>
             </section>
           );
@@ -149,17 +162,18 @@ function Kinks({ families, picked, setPicked }) {
   );
 }
 
-function Fantasies({ picked, chosen, setChosen, list, setList }) {
+function Fantasies({ picked, chosen, setChosen, list, setList, gender }) {
   const [loading, setLoading] = useState(false);
   const [own, setOwn] = useState({ name: '', description: '' });
   useEffect(() => {
     if (list || picked.length < 2) return;
     setLoading(true);
-    api('/setup/fantasies', { method: 'POST', body: { picked } }).then((r) => setList(r.fantasies)).catch(() => setList([])).finally(() => setLoading(false));
+    api('/setup/fantasies', { method: 'POST', body: { picked, male: gender?.male } }).then((r) => setList(r.fantasies)).catch(() => setList([])).finally(() => setLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const has = (f) => chosen.some((x) => x.name === f.name);
   return (
     <div className="ob-step">
+      <StepIcon name="why" />
       <h2 className="ob-h">{t('Any fantasies?')}</h2>
       <p className="ob-lede">{t('A fantasy ties a few kinks together into a scenario. Pick any that speak to you; the feed and the map use them. This step is optional.')}</p>
       {picked.length < 2 ? <p className="ob-note">{t('Pick at least two kinks to get fantasy ideas, or write your own below.')}</p> : null}
@@ -185,6 +199,7 @@ function Fantasies({ picked, chosen, setChosen, list, setList }) {
 function Sources({ sources, on, setOn }) {
   return (
     <div className="ob-step">
+      <StepIcon name="globe" />
       <h2 className="ob-h">{t('Where should posts come from?')}</h2>
       <p className="ob-lede">{t('Most popular first. Turn on as many as you like; you can add searches, creators and communities to each one later in Settings.')}</p>
       <div className="ob-sources">
@@ -209,6 +224,7 @@ function Limits({ limits, setLimits }) {
   const toggle = (tag) => setLimits(limits.includes(tag) ? limits.filter((x) => x !== tag) : [...limits, tag]);
   return (
     <div className="ob-step">
+      <StepIcon name="block" />
       <h2 className="ob-h">{t('Anything you never want to see?')}</h2>
       <p className="ob-lede">{t('Hard limits are hidden everywhere, always. Optional, and editable later in Settings.')}</p>
       <div className="ob-limits">
@@ -225,6 +241,7 @@ function Limits({ limits, setLimits }) {
 function Ready({ picked, fantasies, sourcesOn, status }) {
   return (
     <div className="ob-step ob-welcome">
+      <StepIcon name="check" />
       <p className="ob-kicker">{t('All set')}</p>
       <h1 className="ob-title">{t('Your feed is ready')}</h1>
       <div className="ob-sum">
@@ -245,7 +262,7 @@ export default function Onboarding({ onDone }) {
   const [picked, setPicked] = useState([]);
   const [fantList, setFantList] = useState(null);
   const [chosen, setChosen] = useState([]);
-  const [gender, setGender] = useState({ male: 50, auto: false, trans: true, everyone: false });
+  const [gender, setGender] = useState({ male: 50, auto: false, trans: true });
   const [sources, setSources] = useState([]);
   const [srcOn, setSrcOn] = useState({});
   const [limits, setLimits] = useState([]);
@@ -264,7 +281,7 @@ export default function Onboarding({ onDone }) {
   useEffect(() => {
     reload();
     api('/setup/concepts').then((r) => { setFamilies(r.families); setPicked(r.picked || []); }).catch(() => {});
-    api('/settings/gender').then((g) => setGender({ male: g.male ?? 50, auto: !!g.auto, trans: g.trans !== false, everyone: !!g.everyone })).catch(() => {});
+    api('/settings/gender').then((g) => setGender({ male: g.male ?? 50, auto: !!g.auto, trans: g.trans !== false })).catch(() => {});
     api('/setup/sources').then((r) => setSources(r.sources)).catch(() => {});
     api('/limits').then((r) => setLimits((r.limits || []).map((x) => x.tag || x))).catch(() => {});
     api('/setup/models/options').then(setModelOpts).catch(() => {});
@@ -330,7 +347,7 @@ export default function Onboarding({ onDone }) {
           {step === 1 ? <LocalAi status={status} options={modelOpts} choice={choice} setChoice={setChoice} /> : null}
           {step === 2 ? <Who gender={gender} setGender={setGender} /> : null}
           {step === 3 ? <Kinks families={families} picked={picked} setPicked={setPicked} /> : null}
-          {step === 4 ? <Fantasies picked={picked} chosen={chosen} setChosen={setChosen} list={fantList} setList={setFantList} /> : null}
+          {step === 4 ? <Fantasies picked={picked} chosen={chosen} setChosen={setChosen} list={fantList} setList={setFantList} gender={gender} /> : null}
           {step === 5 ? <Sources sources={sources} on={srcOn} setOn={setSrcOn} /> : null}
           {step === 6 ? <Limits limits={limits} setLimits={setLimits} /> : null}
           {step === 7 ? <Ready picked={picked.length} fantasies={chosen.length} sourcesOn={sourcesOn} status={status} /> : null}

@@ -152,14 +152,17 @@ function build(type, r, ctx) {
       return { type: f.formats?.includes('story') ? 'stories' : 'kinkList', layout: f.layout || pickLayout(r), title: `${subj.kind === 'kink' ? subj.name : displayTag(subj.name)} · ${tr(f.label)}`, meta: subj.kind === 'kink' ? tr('from your map') : tr('a tag you respond to'), filter, items: items.map((it) => ({ ...it, readMin: it.media?.readMin || undefined })), color: subj.color || '#B6A8B0', ...(subj.kind === 'kink' ? { kink: { id: subj.id, name: subj.name, color: subj.color } } : {}) };
     }
     case 'kinkMix': {
+      // Two kinks from your map that posts here actually have together: every post in it has both.
       if (ctx.kinks.length < 3) return null;
-      const a = pickKink(r, ctx);
-      let b = pickKink(r, ctx);
-      for (let t = 0; t < 4 && b?.id === a?.id; t++) b = pickKink(r, ctx);
-      if (!a || !b || a.id === b.id) return null;
-      const items = feed({ anyKinks: [a.id, b.id] }, 6, off);
-      if (items.length < 3) return null;
-      return { type: 'kinkList', layout: pickLayout(r), title: tr('{a} and {b}', { a: a.name, b: b.name }), meta: tr('a mix from your map'), filter: { anyKinks: [a.id, b.id] }, items, color: a.color };
+      for (let tries = 0; tries < 5; tries++) {
+        const a = pickKink(r, ctx);
+        const b = pickKink(r, ctx);
+        if (!a || !b || a.id === b.id || a.parentId === b.id || b.parentId === a.id) continue;
+        const items = feed({ pair: [a.id, b.id] }, 6, off);
+        if (items.length < 3) continue;
+        return { type: 'kinkList', layout: pickLayout(r), title: tr('{a} and {b}', { a: a.name, b: b.name }), meta: tr('a mix from your map'), filter: { pair: [a.id, b.id] }, items, color: a.color };
+      }
+      return null;
     }
     case 'nearby': {
       // Similar to what you watched lately, but not the same thing.

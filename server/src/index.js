@@ -25,6 +25,8 @@ process.on('uncaughtException', (err) => log('error', 'Uncaught exception', err?
 
 openDb();
 ensureDefaults();
+// "Everyone, any mix" is gone (0.20.2): whoever had it on gets their balance back.
+{ const gp = getSetting('genderPrefs', null); if (gp?.everyone) setSetting('genderPrefs', { ...gp, everyone: false }); }
 // Test mode from the Mac app (Option held while opening it): fake posts and a fake model in a data folder of its own.
 // It opens straight on the feed, in the app's language, like a quick look around; the welcome steps stay in Settings.
 if (config.mock && process.env.UC_TEST_MODE === '1') {

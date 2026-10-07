@@ -75,12 +75,11 @@ function Balance() {
       <span className="tlabel">{t('Gender')}</span>
       <div className="uslider-row">
         <span className="gsym f" title={t('Women')}><Icon name="female" /></span>
-        <input className="uslider gender" type="range" min="0" max="100" step="5" value={male} disabled={g.auto || g.everyone} aria-label={t('Balance between women and men')} onChange={(e) => save({ male: Number(e.target.value) })} />
+        <span className="gwrap"><span className="gband" aria-hidden="true" title={t('Hetero')} /><input className="uslider gender" type="range" min="0" max="100" step="5" value={male} disabled={g.auto} aria-label={t('Balance between women and men')} onChange={(e) => save({ male: Number(e.target.value) })} /></span>
         <span className="gsym m" title={t('Men')}><Icon name="male" /></span>
-        <output>{g.everyone ? t('everyone') : male >= 90 ? t('men only') : male <= 10 ? t('women only') : male >= 45 && male <= 65 ? t('hetero only') : t('{w}% women · {m}% men', { w: 100 - male, m: male })}</output>
+        <output>{male >= 90 ? t('men only') : male <= 10 ? t('women only') : male >= 45 && male <= 55 ? t('hetero only') : t('{w}% women · {m}% men', { w: 100 - male, m: male })}</output>
       </div>
       <TChip on={g.auto} icon="auto" color="#B6A8B0" label={t('Auto')} sub={g.auto ? t('from what you like') : null} onClick={() => save({ auto: !g.auto }, !g.auto ? t('The balance now follows what you like, heat and save.') : t('Balance set by hand again.'))} title={t('Let the balance follow what you interact with')} />
-      <TChip on={g.everyone} icon="grid" color="#E8C66B" label={t('Everyone')} sub={g.everyone ? t('all of it') : null} onClick={() => save({ everyone: !g.everyone }, !g.everyone ? t('Showing everyone: men, women and both together.') : t('The balance decides again.'))} title={t('Show posts with anyone, whatever the balance says')} />
       <TChip on={g.trans} icon="trans" color="#C9A7E8" label={t('Trans')} sub={g.trans ? t('allowed') : t('hidden')} onClick={() => save({ trans: !g.trans })} title={t('Allow trans content')} />
     </div>
   );
@@ -304,14 +303,8 @@ function Controls({ total, loading }) {
 
 export default function FeedView() {
   const { filters, opts, mix, feedKey, toast, refreshMeta, search, searchMore, withoutFilters } = useApp();
-  const [genderOpen, setGenderOpen] = useState(true);
-  useEffect(() => {
-    const load = () => api('/settings/gender').then((g) => setGenderOpen(!!g.everyone)).catch(() => {});
-    load();
-    window.addEventListener('uc-gender', load);
-    return () => window.removeEventListener('uc-gender', load);
-  }, []);
-  const narrowing = !filters.noTune && !!(filters.formats?.length || filters.window || filters.minMatch || filters.length || opts.mood || !genderOpen);
+  // The balance between women and men always narrows what a search finds, so a search can always be shown without it.
+  const narrowing = !filters.noTune;
   const narrow = useNarrow();
   const [items, setItems] = useState([]);
   const [wins, setWins] = useState([]);
