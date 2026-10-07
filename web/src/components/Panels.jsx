@@ -102,7 +102,7 @@ export function AskPanel({ item, onPatch }) {
       <div className="pt">{t('Ask or tell the assistant')}</div>
       <form className="askrow" onSubmit={(e) => { e.preventDefault(); ask(); }}>
         <input ref={inputRef} id={`ask-${item.id}`} type="text" autoComplete="off" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('I liked the…, more like this, follow her, block this tag')} aria-label={t('Ask or tell the assistant about this post')} />
-        <button className="ghost-btn small accent" type="submit" disabled={busy}>{busy ? t('Working') : t('Go')}</button>
+        <button className="ghost-btn small accent" type="submit" disabled={busy}><Icon name="go" />{busy ? t('Working') : t('Go')}</button>
       </form>
       <div className="chiprow">
         <button type="button" className="chip btn accent" onClick={() => { setQ(t('I liked this because ')); inputRef.current?.focus(); }}>{t('I liked this because…')}</button>
@@ -182,7 +182,41 @@ export function InlineFlames({ value, onChange }) {
   );
 }
 
-export function PerformerPanel({ name }) {
+const TILE_SRC = { pornhub: 'Pornhub', redtube: 'RedTube', eporner: 'Eporner', redgifs: 'RedGIFs', lemmy: 'Lemmy', bluesky: 'Bluesky', reddit: 'Reddit', xvideos: 'XVideos', xhamster: 'xHamster', xnxx: 'XNXX' };
+
+// Their posts as small pictures: what is here plus what was just fetched from the sources, best known first.
+function ThumbGrid({ items, onOpen, loading }) {
+  if (!items?.length) return loading ? <p className="wnote"><span className="spin" />{t('Getting their top posts from the sources…')}</p> : null;
+  return (
+    <div className="perfgrid">
+      {items.slice(0, 12).map((it) => {
+        const u = it.media?.poster || it.media?.thumbs?.[0] || it.media?.mid || it.media?.items?.[0]?.mid || (it.media?.kind === 'image' ? it.media.src : null);
+        return (
+          <button type="button" key={it.id} className="ptile" onClick={() => onOpen(it)} title={it.title}>
+            {u ? <img src={imgSrc(u)} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} /> : <span className="ptxt">{it.title}</span>}
+            <span className="tb">{TILE_SRC[it.source] || it.source}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// Blocking: two taps, so it never happens by accident.
+function BlockButton({ name, onBlock }) {
+  const [sure, setSure] = useState(false);
+  const [busy, setBusy] = useState(false);
+  if (!sure) return <button type="button" className="ghost-btn small danger" onClick={() => setSure(true)}><Icon name="block" />{t('Block {name}', { name })}</button>;
+  return (
+    <span className="blockask">
+      <span className="wnote">{t('Hide everything from {name}, now and later? Stronger than hiding a post.', { name })}</span>
+      <button type="button" className="ghost-btn small danger" disabled={busy} onClick={async () => { setBusy(true); try { await onBlock(); } finally { setBusy(false); setSure(false); } }}><Icon name="block" />{t('Block')}</button>
+      <button type="button" className="ghost-btn small" onClick={() => setSure(false)}><Icon name="x" />{t('Cancel')}</button>
+    </span>
+  );
+}
+
+export function PerformerPanel({ name, itemId, onBlocked }) {
   const { setFilters, toast, runSearch } = useApp();
   const [d, setD] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -210,22 +244,13 @@ export function PerformerPanel({ name }) {
         {d.match !== null ? <span><b>{d.match}%</b>{t('match with you')}</span> : null}
       </div>
       {d.tags.length ? <div className="chiprow">{d.tags.map((t) => <button type="button" key={t} className="chip ghost link" onClick={() => setFilters({ tags: [name.toLowerCase()], q: t })}>{t}</button>)}</div> : null}
-      {d.items.length ? (
-        <div className="perfgrid">
-          {d.items.slice(0, 8).map((it) => {
-            const u = it.media?.poster || it.media?.thumbs?.[0] || it.media?.mid || it.media?.items?.[0]?.mid;
-            return (
-              <button type="button" key={it.id} className="ptile" onClick={() => setFilters({ tags: [name.toLowerCase()] }, { focus: it.id })} title={it.title}>
-                {u ? <img src={imgSrc(u)} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} /> : null}
-                <span className="tb">{SRC[it.source] || it.source}</span>
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
+      <ThumbGrid items={d.items} loading={loading} onOpen={(it) => setFilters({ tags: [name.toLowerCase()] }, { focus: it.id })} />
       <div className="wbtns">
-        <button type="button" className={`ghost-btn small ${d.followed ? '' : 'accent'}`} onClick={follow}>{d.followed ? plain(t('Following [button state]')) : t('Follow everywhere')}</button>
-        <button type="button" className="ghost-btn small" onClick={() => runSearch(`content from ${name}`).catch((e) => toast(e.message))}>{t('Find everything from {name}', { name })}</button>
+        <button type="button" className={`ghost-btn small ${d.followed ? '' : 'accent'}`} onClick={follow}><Icon name={d.followed ? 'check' : 'plus'} />{d.followed ? plain(t('Following [button state]')) : t('Follow everywhere')}</button>
+        <button type="button" className="ghost-btn small" onClick={() => runSearch(`content from ${name}`).catch((e) => toast(e.message))}><Icon name="search" />{t('Look up {name}', { name })}</button>
+        <BlockButton name={d.name} onBlock={async () => {
+          try { const r = await api('/creators/block', { method: 'POST', body: { kind: 'performer', name, itemId } }); toast(tn(r.hidden, 'Blocked {name}: {n} post hidden. The bigger model is looking at their posts to learn what you did not like.', 'Blocked {name}: {n} posts hidden. The bigger model is looking at their posts to learn what you did not like.', { name: d.name })); onBlocked?.(); } catch (e) { toast(e.message); }
+        }} />
       </div>
     </>
   );
@@ -282,16 +307,16 @@ export function PersonPanel({ person, item }) {
       <div className="prof"><Avatar name={handle} size="l" /><div className="pn"><strong>{handle}</strong><span>{d.profiles.length ? t('found on {list}', { list: d.profiles.filter((x) => !x.unverified).map((x) => SOURCE_NAME[x.platform]).join(', ') || t('Reddit (not checked)') }) : t('not found on the sources that can be checked')}{localN ? ` · ${tn(localN, '{n} post in your feed', '{n} posts in your feed')}` : ''}</span></div></div>
       <div className="wbtns">
         <button type="button" className={`ghost-btn small${d.profiles.length ? '' : ' accent'}`} onClick={search}><Icon name="search" />{t('Search everywhere for {name}', { name: handle })}</button>
-        {localN ? <button type="button" className="ghost-btn small" onClick={() => setFilters({ tags: [handle.toLowerCase()] })}>{tn(localN, 'Show their {n} post here', 'Show their {n} posts here')}</button> : null}
+        {localN ? <button type="button" className="ghost-btn small" onClick={() => setFilters({ tags: [handle.toLowerCase()] })}><Icon name="grid" />{tn(localN, 'Show their {n} post here', 'Show their {n} posts here')}</button> : null}
       </div>
       {d.profiles.map((pr) => (
         <div key={pr.platform} className="personrow">
           {pr.avatar ? <img className="avatar av-m avimg" src={pr.avatar} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.display = 'none'; }} /> : <Avatar name={pr.name} />}
           <div className="pn"><strong>{pr.name}</strong><span>{SOURCE_NAME[pr.platform]}{pr.posts != null ? ` · ${tn(pr.posts, '{n} post', '{n} posts', { n: fmtNum(pr.posts) })}` : ''}{pr.followers != null ? ` · ${tn(pr.followers, '{n} follower', '{n} followers', { n: fmtNum(pr.followers) })}` : ''}{pr.unverified ? ` · ${t('not checked')}` : ''}</span>{pr.about ? <em>{pr.about}</em> : null}</div>
           <div className="memacts">
-            {pr.url ? <a className="ghost-btn small" href={pr.url} target="_blank" rel="noreferrer noopener">{t('Open')}</a> : null}
-            <button type="button" className="ghost-btn small" onClick={() => setFilters({ author: pr.handle })}>{t('Show here')}</button>
-            <button type="button" className="ghost-btn small accent" onClick={async () => { try { const r = await api('/follow-creator', { method: 'POST', body: { source: pr.platform, name: pr.handle } }); toast(tn(r.followed.length, 'Following {name} on {n} source.', 'Following {name} on {n} sources.', { name: pr.handle })); } catch (e) { toast(e.message); } }}>{t('Follow')}</button>
+            {pr.url ? <a className="ghost-btn small" href={pr.url} target="_blank" rel="noreferrer noopener"><Icon name="open" />{t('Open')}</a> : null}
+            <button type="button" className="ghost-btn small" onClick={() => setFilters({ author: pr.handle })}><Icon name="grid" />{t('Show here')}</button>
+            <button type="button" className="ghost-btn small accent" onClick={async () => { try { const r = await api('/follow-creator', { method: 'POST', body: { source: pr.platform, name: pr.handle } }); toast(tn(r.followed.length, 'Following {name} on {n} source.', 'Following {name} on {n} sources.', { name: pr.handle })); } catch (e) { toast(e.message); } }}><Icon name="plus" />{t('Follow')}</button>
           </div>
         </div>
       ))}
@@ -299,13 +324,15 @@ export function PersonPanel({ person, item }) {
   );
 }
 
-export function ProfilePanel({ item }) {
+export function ProfilePanel({ item, onBlocked }) {
   const { setFilters, toast } = useApp();
   const [p, setP] = useState(null);
   const [error, setError] = useState(null);
+  const [fetching, setFetching] = useState(true);
   useEffect(() => {
     track(item.id, 'profile');
-    api(`/authors/${item.source}/${encodeURIComponent(item.author)}`).then(setP).catch((e) => setError(e.message));
+    const url = `/authors/${item.source}/${encodeURIComponent(item.author)}`;
+    api(url).then((r) => { setP(r); return api(`${url}?fetch=1`).then(setP); }).catch((e) => setError(e.message)).finally(() => setFetching(false));
   }, [item.id, item.source, item.author]);
   async function toggleFollow() {
     try {
@@ -335,11 +362,15 @@ export function ProfilePanel({ item }) {
       <div className="prof"><Avatar name={p.name} size="l" /><div className="pn"><strong>{p.name}</strong><span>{item.source === 'reddit' ? `u/${p.name}` : `@${p.name}`} · {t('mostly in {name}', { name: p.community || item.community })}</span></div></div>
       <div className="pstats">{p.platformPosts != null ? <span><b>{fmtNum(p.platformPosts)}</b>{t('posts on {source}', { source: SOURCE_NAME[item.source] || item.source })}</span> : <span><b>{p.posts}</b>{t('posts in your feed')}</span>}{p.followers != null ? <span><b>{fmtNum(p.followers)}</b>{t('followers')}</span> : null}<span><b>{fmtNum(p.score)}</b>{t('total score')}</span>{p.match !== null ? <span><b>{p.match}%</b>{t('match with you')}</span> : null}</div>
       {p.tags?.length ? <div className="chiprow">{p.tags.map((t) => <span key={t} className="chip ghost">{t}</span>)}</div> : null}
+      <ThumbGrid items={p.items} loading={fetching} onOpen={(it) => setFilters({ author: p.name }, { focus: it.id })} />
       <div className="wbtns">
-        {p.canFollow ? <button type="button" className={`ghost-btn small ${p.followed ? '' : 'accent'}`} onClick={toggleFollow}>{p.followed ? plain(t('Following [button state]')) : t('Follow')}</button> : null}
-        <button type="button" className="ghost-btn small" onClick={() => setFilters({ author: p.name })}>{t('Only this creator in the feed')}</button>
-        {p.profileUrl ? <a className="ghost-btn small" href={p.profileUrl} target="_blank" rel="noreferrer noopener">{t('Open on {source}', { source: SOURCE_NAME[item.source] || item.source })}</a> : null}
-        {item.community && ['reddit', 'lemmy'].includes(item.source) ? <button type="button" className="ghost-btn small" onClick={followCommunity}>{t('Add {name} as a source', { name: item.community })}</button> : null}
+        {p.canFollow ? <button type="button" className={`ghost-btn small ${p.followed ? '' : 'accent'}`} onClick={toggleFollow}><Icon name={p.followed ? 'check' : 'plus'} />{p.followed ? plain(t('Following [button state]')) : t('Follow')}</button> : null}
+        <button type="button" className="ghost-btn small" onClick={() => setFilters({ author: p.name })}><Icon name="person" />{t('Only this creator in the feed')}</button>
+        {p.profileUrl ? <a className="ghost-btn small" href={p.profileUrl} target="_blank" rel="noreferrer noopener"><Icon name="open" />{t('Open on {source}', { source: SOURCE_NAME[item.source] || item.source })}</a> : null}
+        {item.community && ['reddit', 'lemmy'].includes(item.source) ? <button type="button" className="ghost-btn small" onClick={followCommunity}><Icon name="plus" />{t('Add {name} as a source', { name: item.community })}</button> : null}
+        <BlockButton name={p.name} onBlock={async () => {
+          try { const r = await api('/creators/block', { method: 'POST', body: { kind: 'author', source: item.source, name: p.name, itemId: item.id } }); toast(tn(r.hidden, 'Blocked {name}: {n} post hidden. The bigger model is looking at their posts to learn what you did not like.', 'Blocked {name}: {n} posts hidden. The bigger model is looking at their posts to learn what you did not like.', { name: p.name })); onBlocked?.(); } catch (e) { toast(e.message); }
+        }} />
       </div>
       <p className="wnote">{t('Following checks RedGIFs, Bluesky and Reddit for the same name and follows them there too. Only their new posts show up, marked Following.')}</p>
     </>

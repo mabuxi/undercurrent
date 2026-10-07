@@ -153,6 +153,8 @@ function identity(it) {
 export default function Post({ item: initial, focus = false, onStrong }) {
   const { toast, setFilters, runSearch, kinks: allKinks, refreshMeta } = useApp();
   const [item, setItem] = useState(initial);
+  const itemRef = useRef(initial);
+  itemRef.current = item;
   const [kinkPick, setKinkPick] = useState(false);
   const [panel, setPanel] = useState(null);
   const [gone, setGone] = useState(false);
@@ -209,14 +211,14 @@ export default function Post({ item: initial, focus = false, onStrong }) {
   function onMediaClick(e) {
     const r = tap.current;
     if (r.pass) { r.pass = false; return; }
-    if (e.target.closest('a, input, select, textarea, .mutebtn, .linkbtn, .ghost-btn, .icon-btn, .play, .tbtn')) return;
+    if (e.target.closest('a, input, select, textarea, .mutebtn, .linkbtn, .ghost-btn, .icon-btn, .play, .tbtn, .fsbox, .fsbtn')) return;
     const at = Date.now();
     if (at - r.t < 330 && Math.abs(e.clientX - r.x) < 40 && Math.abs(e.clientY - r.y) < 40) {
       clearTimeout(r.timer);
       r.t = 0;
       e.preventDefault();
       e.stopPropagation();
-      if (item.vote > 0) play('up'); else vote(1);
+      likeByTap();
       return;
     }
     r.t = at;
@@ -231,7 +233,10 @@ export default function Post({ item: initial, focus = false, onStrong }) {
     }
   }
   useEffect(() => () => clearTimeout(tap.current.timer), []);
+  const voteRef = useRef(null);
+  const likeByTap = () => { if (itemRef.current.vote > 0) play('up'); else voteRef.current?.(1); };
 
+  voteRef.current = (d) => vote(d);
   async function vote(dir) {
     const next = item.vote === dir ? 0 : dir;
     play(next > 0 ? 'up' : next < 0 ? 'down' : item.vote > 0 ? 'unup' : 'undown');
@@ -300,6 +305,7 @@ export default function Post({ item: initial, focus = false, onStrong }) {
   }
 
   const toggle = (p) => setPanel((cur) => (cur === p ? null : p));
+  const blocked = () => { play('hide'); setLeaving(true); setTimeout(() => setGone('block'), 720); };
   const panelRef = useRef(null);
   // Opening a profile, a performer or any panel under the post scrolls it into view.
   useEffect(() => {
@@ -332,7 +338,7 @@ export default function Post({ item: initial, focus = false, onStrong }) {
     document.addEventListener('pointerdown', off, true);
     return () => document.removeEventListener('pointerdown', off, true);
   }, [menu]);
-  if (gone) return <div className="post gone fxin"><span>{t('Hidden. The feed will show less like this.')}</span><DislikeNote id={item.id} /></div>;
+  if (gone) return <div className="post gone fxin"><span>{gone === 'block' ? t('Blocked. Nothing from them shows up again; you can unblock them in Memory.') : t('Hidden. The feed will show less like this.')}</span><DislikeNote id={item.id} /></div>;
   const id = identity(item);
   const isText = item.media?.kind === 'text';
   const liked = item.media?.rating;
@@ -369,7 +375,7 @@ export default function Post({ item: initial, focus = false, onStrong }) {
         </div>
       ) : null}
       {!isText ? <p className="ptitle"><Linkify text={trTitle.text || item.title} source={item.source} onPerson={openPerson} /><TranslateButton tr={trTitle} small /><TranslatedNote tr={trTitle} /></p> : null}
-      <div ref={mediaRef} className="pmedia" onClickCapture={onMediaClick}><PostFx fx={fx} /><HeatFx heat={heat} /><Media item={item} active={active} near={near} height={lastH.current} onPlay={() => strong('play')} onReady={() => setReady(true)} onPerson={openPerson} /></div>
+      <div ref={mediaRef} className="pmedia" onClickCapture={onMediaClick}><PostFx fx={fx} /><HeatFx heat={heat} /><Media item={item} active={active} near={near} height={lastH.current} onPlay={() => strong('play')} onReady={() => setReady(true)} onPerson={openPerson} onLike={likeByTap} /></div>
       {!isText && item.body ? <p className="ptext caption"><Linkify text={trBody.text || item.body} source={item.source} onPerson={openPerson} /><TranslateButton tr={trBody} small /><TranslatedNote tr={trBody} /></p> : null}
       {item.aiSummary && !isText ? <p className="aisum">{item.aiSummary}</p> : null}
       <div className={`chipwrap${over && !allTags ? ' over' : ''}`}>
@@ -429,8 +435,8 @@ export default function Post({ item: initial, focus = false, onStrong }) {
           {panel === 'why' ? <WhyPanel item={item} /> : null}
           {panel === 'ask' ? <AskPanel item={item} onPatch={applyPatch} /> : null}
           {panel === 'comments' ? <CommentsPanel item={item} /> : null}
-          {panel === 'profile' ? <ProfilePanel item={item} /> : null}
-          {panel.startsWith('performer:') ? <PerformerPanel name={panel.slice(10)} /> : null}
+          {panel === 'profile' ? <ProfilePanel item={item} onBlocked={blocked} /> : null}
+          {panel.startsWith('performer:') ? <PerformerPanel name={panel.slice(10)} itemId={item.id} onBlocked={blocked} /> : null}
           {panel.startsWith('person:') ? <PersonPanel key={panel} item={item} person={{ platform: panel.slice(7).split('|')[0], handle: panel.slice(7).split('|').slice(1).join('|') }} /> : null}
         </div>
       ) : null}

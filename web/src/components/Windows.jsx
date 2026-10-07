@@ -78,7 +78,7 @@ function Tonight({ w, setAskOut }) {
       <div className="sess"><div><b>{s.minutes >= 90 ? `${Math.floor(s.minutes / 60)}h${String(s.minutes % 60).padStart(2, '0')}` : s.minutes}</b><span>{s.minutes >= 90 ? t('tonight') : t('minutes')}</span></div><div><b>{s.seen}</b><span>{t('posts seen')}</span></div><div><b>{s.saved}</b><span>{plain(t('saved [tonight count]'))}</span></div><div><b>{s.rated}</b><span>{t('rated')}</span></div></div>
       <div className="barrow" style={{ padding: '4px 2px' }}><div className="bt"><span>{t('Long vs short')}</span><em>{s.longShare} / {100 - s.longShare}</em></div><div className="track2"><i style={{ width: `${s.longShare}%`, background: 'var(--accent)' }} /></div></div>
       {s.topTagsNow?.length ? <p className="wnote">{t('Right now: {tags}', { tags: s.topTagsNow.join(', ') })}</p> : null}
-      <div className="wbtns"><button type="button" className="ghost-btn small" onClick={async () => { setAskOut(t('Summarizing tonight…')); window.scrollTo({ top: 0, behavior: 'smooth' }); try { const r = await api('/session/summary'); setAskOut(r.text); } catch (e) { setAskOut(e.message); } }}>{t('Summarize tonight')}</button></div>
+      <div className="wbtns"><button type="button" className="ghost-btn small" onClick={async () => { setAskOut(t('Summarizing tonight…')); window.scrollTo({ top: 0, behavior: 'smooth' }); try { const r = await api('/session/summary'); setAskOut(r.text); } catch (e) { setAskOut(e.message); } }}><Icon name="why" />{t('Summarize tonight')}</button></div>
     </div>
   );
 }
@@ -279,8 +279,8 @@ function FantasySuggest({ w, open }) {
       {sg.why ? <p className="wnote">{sg.why}</p> : null}
       {w.items?.length ? <div className="wgrid three">{w.items.slice(0, 3).map((it) => <Tile key={it.id} it={it} onOpen={open} />)}</div> : null}
       <div className="wbtns">
-        <button type="button" className="ghost-btn small accent" onClick={() => act('save')} disabled={state === 'saved'}>{state === 'saved' ? plain(t('Saved [button state]')) : t('Save fantasy')}</button>
-        <button type="button" className="ghost-btn small" onClick={() => act('dismiss')}>{t('Not for me')}</button>
+        <button type="button" className="ghost-btn small accent" onClick={() => act('save')} disabled={state === 'saved'}><Icon name="save" filled={state === 'saved'} />{state === 'saved' ? plain(t('Saved [button state]')) : t('Save fantasy')}</button>
+        <button type="button" className="ghost-btn small" onClick={() => act('dismiss')}><Icon name="less" />{t('Not for me')}</button>
       </div>
     </div></div>
   );
@@ -299,10 +299,38 @@ function NewKink({ w, open }) {
       <Layout w={w} items={w.items || []} open={open} />
       {state !== 'hidden' ? (
         <div className="wbtns">
-          <button type="button" className="ghost-btn small accent" onClick={() => set('active')} disabled={state === 'active'}>{state === 'active' ? t('In your kinks') : t('Keep it')}</button>
-          <button type="button" className="ghost-btn small" onClick={() => set('hidden')}>{t('Not for me')}</button>
+          <button type="button" className="ghost-btn small accent" onClick={() => set('active')} disabled={state === 'active'}><Icon name="check" />{state === 'active' ? t('In your kinks') : t('Keep it')}</button>
+          <button type="button" className="ghost-btn small" onClick={() => set('hidden')}><Icon name="less" />{t('Not for me')}</button>
         </div>
       ) : <p className="wnote">{t('Hidden.')}</p>}
+    </div>
+  );
+}
+
+// A memory to review between the windows: keep it or not, right there.
+function ReviewWin({ w }) {
+  const { toast } = useApp();
+  const m = w.memory;
+  const [done, setDone] = useState(null);
+  const recheck = m.status === 'recheck';
+  async function act(keep) {
+    try {
+      if (keep) await api(`/memory/${m.id}`, { method: 'PATCH', body: { status: 'active' } });
+      else if (recheck) await api(`/memory/${m.id}`, { method: 'PATCH', body: { status: 'archived' } });
+      else await api(`/memory/${m.id}`, { method: 'DELETE' });
+      setDone(keep ? 'kept' : 'dropped');
+    } catch (e) { toast(e.message); }
+  }
+  return (
+    <div className="win-body reviewwin">
+      <p className="memquote">{m.content}</p>
+      {m.evidence ? <span className="wnote">{t('Because: {evidence}', { evidence: m.evidence })}</span> : null}
+      {done ? <p className="wnote reviewdone"><Icon name={done === 'kept' ? 'check' : 'x'} />{done === 'kept' ? t('Kept in your memory.') : recheck ? t('Moved out of your memory.') : t('Not kept.')}</p> : (
+        <div className="wbtns">
+          <button type="button" className="ghost-btn small accent" onClick={() => act(true)}><Icon name="check" />{recheck ? t('Still true') : t('Keep')}</button>
+          <button type="button" className="ghost-btn small" onClick={() => act(false)}><Icon name="x" />{recheck ? t('Not anymore') : t('Not right')}</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -315,6 +343,8 @@ function Body({ w, open }) {
   const [fant, setFant] = useState(w.fantasy);
   const items = w.items || [];
   switch (w.type) {
+    case 'review':
+      return <ReviewWin w={w} />;
     case 'stories':
       return (
         <div className="win-body scroll">
@@ -373,7 +403,7 @@ function Body({ w, open }) {
           <div className="chiprow">{fant.kinks.map((k) => <span key={k.id} className="chip" style={{ '--c': k.color, '--c2': rgba(k.color, 0.16) }}>{k.name}</span>)}</div>
           <div className="wbtns">
             <button type="button" className="ghost-btn small accent" onClick={() => openMode('journey', { fantasy: fant.id })}><Icon name="route" />{t('Start a journey')}</button>
-            <button type="button" className="ghost-btn small" onClick={async () => { await api(`/fantasies/${fant.id}`, { method: 'PATCH', body: { saved: !fant.saved } }); setFant({ ...fant, saved: !fant.saved }); refreshMeta(); toast(fant.saved ? t('Removed from your fantasies.') : t('Saved to your fantasies.')); }}>{fant.saved ? plain(t('Saved [button state]')) : t('Save fantasy')}</button>
+            <button type="button" className="ghost-btn small" onClick={async () => { await api(`/fantasies/${fant.id}`, { method: 'PATCH', body: { saved: !fant.saved } }); setFant({ ...fant, saved: !fant.saved }); refreshMeta(); toast(fant.saved ? t('Removed from your fantasies.') : t('Saved to your fantasies.')); }}><Icon name="check" />{fant.saved ? plain(t('Saved [button state]')) : t('Save fantasy')}</button>
           </div>
         </div></div>
       );
@@ -410,7 +440,7 @@ function Body({ w, open }) {
           <div className="prof"><Avatar name={w.creator.name} size="l" /><div className="pn"><strong>{w.creator.name}</strong><span>{w.creator.source === 'reddit' ? `u/${w.creator.name}` : `@${w.creator.name}`} · {tn(w.creator.posts, '{n} post', '{n} posts')}</span></div></div>
           {w.creator.match ? <MatchBar value={w.creator.match} /> : null}
           <Layout w={w} items={items} open={open} />
-          <div className="wbtns"><button type="button" className="ghost-btn small accent" onClick={async () => { await api('/follow', { method: 'POST', body: { kind: 'creator', value: `${w.creator.source}|${w.creator.name}`, on: true, label: w.creator.name } }); toast(t('Following {name}.', { name: w.creator.name })); }}>{w.creator.followed ? plain(t('Following [button state]')) : t('Follow')}</button></div>
+          <div className="wbtns"><button type="button" className="ghost-btn small accent" onClick={async () => { await api('/follow', { method: 'POST', body: { kind: 'creator', value: `${w.creator.source}|${w.creator.name}`, on: true, label: w.creator.name } }); toast(t('Following {name}.', { name: w.creator.name })); }}><Icon name="plus" />{w.creator.followed ? plain(t('Following [button state]')) : t('Follow')}</button></div>
         </div>
       );
     case 'tonight': {
@@ -536,7 +566,7 @@ function Body({ w, open }) {
           <div className="limits">{limits.map((l) => <span className="limit" key={l}>{l}<button type="button" aria-label={t('Remove {tag}', { tag: l })} onClick={async () => { await api(`/limits/${encodeURIComponent(l)}`, { method: 'DELETE' }); setLimits(limits.filter((x) => x !== l)); }}><Icon name="close" /></button></span>)}</div>
           <form className="limitform" onSubmit={async (e) => { e.preventDefault(); const tag = limIn.trim(); if (!tag) { toast(t('Type a tag to block first.')); return; } const r = await api('/limits', { method: 'POST', body: { tag } }); setLimits([...limits, tag.toLowerCase()]); setLimIn(''); toast(tn(r.hidden, 'Blocked. {n} post hidden.', 'Blocked. {n} posts hidden.')); }}>
             <input id={`lim-${w.uid}`} value={limIn} onChange={(e) => setLimIn(e.target.value)} placeholder={t('Add a tag to block')} aria-label={t('Tag to block')} />
-            <button type="submit" className="ghost-btn small">{t('Block')}</button>
+            <button type="submit" className="ghost-btn small"><Icon name="block" />{t('Block')}</button>
           </form>
           <p className="wnote">{t('Never shown, never suggested, and nothing can override them.')}</p>
         </div>
@@ -550,7 +580,7 @@ function Body({ w, open }) {
               <span className="mini-text"><span className="mini-title">{f.name}</span><span className="mini-meta">{f.kinks.map((k) => k.name).join(' + ') || t('no kinks yet')} · {f.match}%</span></span>
             </button>
           )) : <p className="wnote">{t('No fantasies yet. Save one from a journey, or write one in Memory.')}</p>}
-          <div className="wbtns"><button type="button" className="ghost-btn small" onClick={() => openMode('memory')}>{t('Write a fantasy')}</button></div>
+          <div className="wbtns"><button type="button" className="ghost-btn small" onClick={() => openMode('memory')}><Icon name="edit" />{t('Write a fantasy')}</button></div>
         </div>
       );
     case 'journey':
@@ -593,7 +623,7 @@ function Body({ w, open }) {
             {th.aiSummary ? <span className="mini-meta">{th.aiSummary}</span> : null}
           </button>
           <TopReplies item={th} compact />
-          <div className="rowline"><span className="mini-meta">{[th.comments ? tn(th.comments, '{n} reply', '{n} replies', { n: fmtNum(th.comments) }) : null, th.upvotes ? t('{n} up', { n: fmtNum(th.upvotes) }) : null].filter(Boolean).join(' · ')}</span><button type="button" className="ghost-btn small" onClick={() => open(th)}>{t('Open thread')}</button></div>
+          <div className="rowline"><span className="mini-meta">{[th.comments ? tn(th.comments, '{n} reply', '{n} replies', { n: fmtNum(th.comments) }) : null, th.upvotes ? t('{n} up', { n: fmtNum(th.upvotes) }) : null].filter(Boolean).join(' · ')}</span><button type="button" className="ghost-btn small" onClick={() => open(th)}><Icon name="open" />{t('Open thread')}</button></div>
         </div>
       );
     }

@@ -4,7 +4,9 @@ import { tr } from './i18n.js';
 export const CATEGORIES = ['Right now', 'Kinks and interests', 'Fantasies', 'Turn-offs and limits', 'Formats and moods', 'Creators and communities', 'Notes'];
 
 export function listMemory({ status } = {}) {
-  const rows = getDb().prepare(`SELECT * FROM memory ${status ? 'WHERE status = ?' : "WHERE status != 'archived'"} ORDER BY pinned DESC, updated DESC`).all(...(status ? [status] : []));
+  // "Still true?" memories keep counting until you answer.
+  const where = status === 'active' ? "WHERE status IN ('active', 'recheck')" : status ? 'WHERE status = ?' : "WHERE status != 'archived'";
+  const rows = getDb().prepare(`SELECT * FROM memory ${where} ORDER BY pinned DESC, updated DESC`).all(...(status && status !== 'active' ? [status] : []));
   return rows.map((r) => ({ id: r.id, category: r.category, content: r.content, origin: r.origin, status: r.status, pinned: !!r.pinned, evidence: r.evidence, created: r.created, updated: r.updated }));
 }
 
@@ -65,4 +67,29 @@ export function listPrompts(limit = 200) {
 export function deletePrompt(id) {
   if (id === 'all') getDb().prepare('DELETE FROM prompts').run();
   else getDb().prepare('DELETE FROM prompts WHERE id = ?').run(Number(id));
+}
+
+// Memories do not stay forever without a check. Old ones the assistant wrote itself, things that may well have been
+// a phase (moods, formats, creators) and taste notes whose tags have cooled down are asked about again: "still true?".
+// Pinned memories and your limits are never asked about. Suggestions nobody answered for a week make room for new ones.
+const RECHECK_DAYS = { 'Kinks and interests': 75, Fantasies: 90, 'Formats and moods': 45, 'Creators and communities': 45, Notes: 120 };
+export function memoryUpkeep({ cooling = [] } = {}) {
+  const db = getDb();
+  const t = now();
+  const day = 86400000;
+  db.prepare("UPDATE memory SET status = 'archived', updated = ? WHERE status = 'proposed' AND origin = 'ai' AND created < ?").run(t, t - 7 * day);
+  const open = db.prepare("SELECT COUNT(*) c FROM memory WHERE status = 'recheck'").get().c;
+  if (open >= 3) return 0;
+  const cool = cooling.map((x) => String(x).toLowerCase()).filter((x) => x.length > 2);
+  let n = 0;
+  for (const m of db.prepare("SELECT * FROM memory WHERE status = 'active' AND pinned = 0 AND category != 'Turn-offs and limits' AND category != 'Right now' ORDER BY updated ASC").all()) {
+    if (open + n >= 3) break;
+    const age = (t - (m.updated || m.created || t)) / day;
+    const limit = (RECHECK_DAYS[m.category] || 90) * (m.origin === 'ai' ? 0.5 : 1);
+    const cooled = cool.some((c) => m.content.toLowerCase().includes(c)) && age > 21;
+    if (age < limit && !cooled) continue;
+    db.prepare("UPDATE memory SET status = 'recheck' WHERE id = ?").run(m.id);
+    n++;
+  }
+  return n;
 }

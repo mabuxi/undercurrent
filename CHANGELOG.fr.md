@@ -2,6 +2,51 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.20.0 · 7 octobre 2026
+
+### Filtres
+- Les réglages du fil sont derrière un seul bouton Filtres, sur le Mac aussi, avec le nombre de filtres actifs. Les suggestions « En ce moment » restent visibles à côté.
+- Chaque filtre reste réglé jusqu’à ce que vous le changiez, même après avoir fermé Undercurrent : formats, nouveau ou populaire et la période, la part de nouveautés, l’humeur, et si le panneau est ouvert.
+- Les filtres s’appliquent aussi aux recherches : l’équilibre femmes et hommes, les formats, nouveau ou populaire. Seule une recherche qui dit qui elle veut, ou qui cherche une personne, ignore l’équilibre.
+- À la fin d’une recherche avec des filtres, « Retirer les filtres pour trouver plus de résultats » montre la même recherche sans eux, pour cette recherche seulement.
+
+### Recherche
+- La réponse de l’assistant prend la place de la ligne sous la salutation (« Ce soir, le fil penche vers… »), dans la même taille, et la page défile jusqu’à elle.
+- Une recherche n’ajoute plus de publications « en allant plus loin » après une que vous avez aimée : elle montre ce que vous avez cherché.
+- « Gay pour les fans » (gay for pay) est un kink à part entière, aussi dans les recherches en français.
+
+### Vidéos
+- Double-cliquez sur un lecteur d’un autre site pour aimer la publication, comme un double toucher sur une image.
+- Nouveau bouton plein écran sur les vidéos : la vidéo entière tient toujours à l’écran, jamais rognée. Pincez pour zoomer sur l’iPhone et le trackpad du Mac, ou ctrl et la molette, touchez deux fois pour zoomer ou dézoomer, faites glisser pour vous déplacer. Sur le Mac, c’est le vrai plein écran.
+
+### Créateurs
+- Le panneau d’un créateur ou d’un performeur montre ses meilleures publications en images : ce qui est ici plus ce qui est récupéré sur la source à ce moment-là, les plus votées et vues d’abord.
+- « Tout trouver de… » devient « Rechercher… ».
+- Bloquer un créateur ou un performeur : plus fort que masquer une publication. Tout ce qui vient de lui est masqué, aussi ce qui arrive plus tard, et le plus grand modèle regarde plusieurs de ses publications ensemble pour apprendre ce qui ne vous a pas plu. Les créateurs bloqués se débloquent dans Mémoire.
+- Chaque petit bouton de l’app a maintenant une icône.
+
+### Mémoire
+- Nouvelle section « Pas aimé » : ce que le plus grand modèle a trouvé après les masquages, pouces baissés et blocages, sans ce que vous aimez. Seuls les tags qui comptent encore contre les publications s’affichent, avec leur fréquence ; touchez × si ce n’était pas ça, et c’est annulé.
+- De nouvelles suggestions de souvenirs arrivent d’elles-mêmes toutes les deux sessions, et celles sans réponse laissent la place après une semaine.
+- Environ toutes les dix fenêtres, un souvenir à valider s’intercale, deux au plus par session.
+- Les souvenirs anciens, ceux qui n’étaient peut-être qu’une passade et ceux dont les tags ont refroidi sont redemandés : « Toujours vrai ? ». Jamais les souvenirs épinglés ni vos limites.
+- Idées de fantasmes : quatre au plus, une nouvelle série toutes les deux sessions.
+- Tout ce que vous avez fait : aimer une publication plusieurs fois compte une fois et s’affiche une fois ; la chaleur montre son niveau actuel.
+
+### Fil et fenêtres
+- La fenêtre des enregistrements vient bien moins souvent : jamais dans les vingt premières fenêtres, au plus une fois sur soixante et une fois toutes les deux heures.
+- Des miniatures plus grandes dans les fenêtres en liste.
+
+### Premiers pas
+- Les kinks à choisir sont plus variés : hétéro d’abord, avec du gay et du lesbien.
+- Chaque choix ajoute ses propres kinks liés à « Va bien avec », et ils restent, donc la liste grandit à mesure que vous cliquez.
+
+### Corrections
+- Sur un téléphone, les filtres que vous gardez n’étirent plus la barre du haut ; ils sont dans le bouton Filtres et la ligne Affichage.
+- Changer de vue ouvre la nouvelle vue en haut.
+- La fin d’une recherche ne laisse plus un écran vide, et ses boutons sont plus lisibles.
+- Les textes parmi les images d’un créateur affichent leur titre au lieu d’une case vide.
+
 ## 0.19.2 · 6 octobre 2026
 
 ### Mode test

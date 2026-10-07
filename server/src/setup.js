@@ -260,24 +260,42 @@ export function conceptCatalog() {
   return families.filter((f) => f.concepts.length);
 }
 
-const ALL_CONCEPTS = ['latino', 'asian', 'black', 'arab', 'indian', 'interracial', 'muscle', 'abs', 'hairy', 'hairy chest', 'beard', 'smooth', 'chubby', 'thighs', 'feet', 'armpits', 'tattoo', 'piercing', 'bubble butt', 'big ass', 'big tits', 'small tits', 'blonde', 'redhead', 'brunette', 'petite', 'curvy', 'bbw',
-  'uncut', 'cut', 'veiny', 'bwc', 'bbc', 'big balls', 'twink', 'daddy', 'jock', 'bear', 'femboy', '18 25', 'mature', 'milf', 'trans', 'straight guy', 'blowjob', 'sloppy', 'deepthroat', 'face fucking', 'cock worship', 'rimming', 'pussy licking', 'kissing',
-  'anal', 'handjob', 'fingering', 'toys', 'bareback', 'breeding', 'doggystyle', 'missionary', 'riding', 'squirting', 'solo', 'masturbation', 'gooning', 'edging', 'ruined orgasm', 'prostate', 'huge load', 'precum', 'dripping', 'creampie', 'facial', 'swallow', 'bukkake',
-  'rough', 'dominant', 'submissive', 'sensual', 'dirty talk', 'moaning', 'bondage', 'femdom', 'size difference', 'teasing', 'jockstrap', 'underwear', 'socks', 'lingerie', 'jeans', 'shorts', 'uniform', 'bulge', 'shower', 'public', 'outdoor', 'office', 'gym', 'car', 'hotel', 'massage',
-  'step family', 'cheating', 'cuckold', 'roleplay', 'caught', 'threesome', 'group sex', 'double penetration', 'pov', 'close up', 'webcam', 'audio', 'piss', 'oiled', 'sweaty', 'hentai', 'yaoi', 'bara', 'animated', 'ai generated', 'futanari', 'furry'];
+// Broad on purpose: straight first, gay and lesbian mixed in. On a fresh install each family shows its first ones.
+const ALL_CONCEPTS = ['latino', 'asian', 'black', 'interracial', 'arab', 'indian',
+  'big tits', 'big ass', 'petite', 'curvy', 'blonde', 'natural tits', 'muscle', 'brunette', 'redhead', 'hairy', 'abs', 'small tits', 'bubble butt', 'thighs', 'feet', 'tattoo', 'hairy chest', 'beard', 'smooth', 'chubby', 'bbw', 'piercing', 'armpits',
+  'bbc', 'bwc', 'uncut', 'veiny', 'big balls', 'cut',
+  'milf', '18 25', 'college', 'lesbian', 'mature', 'twink', 'daddy', 'jock', 'straight guy', 'gay for pay', 'bear', 'trans', 'femboy',
+  'blowjob', 'deepthroat', 'pussy licking', 'facesitting', 'sloppy', 'kissing', 'face fucking', 'rimming', 'cock worship',
+  'missionary', 'doggystyle', 'riding', 'anal', 'squirting', 'titfuck', 'handjob', 'fingering', 'toys', 'scissoring', 'strap on', 'bareback', 'breeding',
+  'masturbation', 'solo', 'edging', 'gooning', 'ruined orgasm', 'prostate',
+  'creampie', 'facial', 'swallow', 'huge load', 'dripping', 'precum', 'bukkake',
+  'sensual', 'rough', 'dominant', 'submissive', 'teasing', 'dirty talk', 'moaning', 'femdom', 'bondage', 'size difference',
+  'lingerie', 'heels', 'yoga pants', 'underwear', 'uniform', 'jeans', 'shorts', 'socks', 'jockstrap', 'bulge',
+  'massage', 'shower', 'outdoor', 'public', 'office', 'hotel', 'car', 'gym',
+  'step family', 'cheating', 'casting', 'first time', 'roleplay', 'cuckold', 'caught',
+  'threesome', 'group sex', 'double penetration', 'pov', 'close up', 'webcam', 'audio', 'oiled', 'sweaty', 'piss',
+  'hentai', 'animated', 'ai generated', 'yaoi', 'bara', 'futanari', 'furry'];
 
 // Things that tend to go with what you picked: from posts already here when there are any, otherwise the
 // same family, so the suggestions change live with every pick.
 const RELATED = {
   muscle: ['abs', 'jock', 'gym', 'hairy chest'], hairy: ['hairy chest', 'beard', 'bear', 'daddy'], twink: ['smooth', 'femboy', 'daddy', 'bareback'], daddy: ['hairy', 'beard', 'bear', 'twink'],
   jockstrap: ['jock', 'gym', 'bulge', 'underwear'], latino: ['uncut', 'muscle', 'bareback'], bareback: ['breeding', 'creampie', 'dripping'], edging: ['precum', 'gooning', 'ruined orgasm', 'masturbation'],
-  blowjob: ['deepthroat', 'sloppy', 'facial', 'swallow'], pov: ['close up', 'dirty talk'], dominant: ['submissive', 'rough', 'bondage'], shower: ['oiled', 'sweaty', 'gym'], big_tits: ['milf', 'curvy']
+  blowjob: ['deepthroat', 'sloppy', 'facial', 'swallow'], pov: ['close up', 'dirty talk'], dominant: ['submissive', 'rough', 'bondage'], shower: ['oiled', 'sweaty', 'gym'],
+  'big tits': ['natural tits', 'titfuck', 'milf', 'curvy'], milf: ['mature', 'step family', 'big tits', 'cheating'], lesbian: ['scissoring', 'strap on', 'pussy licking', 'kissing', 'facesitting'],
+  'pussy licking': ['facesitting', 'squirting', 'lesbian'], 'straight guy': ['gay for pay', 'first time', 'jock'], 'gay for pay': ['straight guy', 'first time', 'casting'],
+  college: ['18 25', 'petite', 'first time'], petite: ['small tits', 'size difference', '18 25'], lingerie: ['heels', 'teasing', 'big tits'], heels: ['lingerie', 'femdom', 'teasing'],
+  'yoga pants': ['big ass', 'gym', 'teasing'], riding: ['big ass', 'missionary', 'creampie'], doggystyle: ['big ass', 'anal', 'rough'], casting: ['first time', 'pov', 'interracial'],
+  squirting: ['pussy licking', 'toys', 'fingering'], scissoring: ['strap on', 'kissing', 'fingering', 'toys'], 'strap on': ['femdom', 'toys', 'scissoring'], facesitting: ['pussy licking', 'femdom', 'rimming'], titfuck: ['big tits', 'facial', 'natural tits'], 'big ass': ['bubble butt', 'doggystyle', 'riding', 'yoga pants'], anal: ['creampie', 'doggystyle', 'toys'], massage: ['oiled', 'sensual', 'happy ending']
 };
-export function suggestFor(picked = []) {
+// Suggestions for what goes with your picks. With `focus` (the one you just picked), what goes with that one comes
+// first, so every pick brings its own related kinks.
+export function suggestFor(picked = [], focus = null) {
   const want = new Set(picked);
+  if (focus && want.has(focus)) picked = [focus, ...picked.filter((p) => p !== focus)];
   const score = new Map();
   const add = (c, w) => { if (!want.has(c) && isKinkConcept(c) && familyOf(c)) score.set(c, (score.get(c) || 0) + w); };
-  for (const p of picked) for (const r of RELATED[p] || RELATED[p.replace(/ /g, '_')] || []) add(r, 3);
+  for (const p of picked) for (const r of RELATED[p] || []) add(r, focus && p === focus ? 8 : 3);
   try {
     const db = getDb();
     for (const p of picked.slice(0, 8)) {
@@ -285,7 +303,8 @@ export function suggestFor(picked = []) {
       const rows = db.prepare(`SELECT t2.name, COUNT(*) c FROM item_tags a JOIN tags t1 ON t1.id = a.tag_id JOIN item_tags b ON b.item_id = a.item_id JOIN tags t2 ON t2.id = b.tag_id
         WHERE t1.name IN (${names.map(() => '?').join(',')}) AND a.weight >= 0.45 AND b.weight >= 0.45 AND t2.kind != 'performer' GROUP BY t2.id ORDER BY c DESC LIMIT 60`).all(...names);
       const total = rows.reduce((x, r) => x + r.c, 0) || 1;
-      for (const r of rows) for (const c of conceptsOf(r.name)) if (c !== p) add(c, (6 * r.c) / total);
+      const w = focus && p === focus ? 14 : 6;
+      for (const r of rows) for (const c of conceptsOf(r.name)) if (c !== p) add(c, (w * r.c) / total);
     }
   } catch {}
   for (const p of picked) { const f = familyOf(p); if (f) for (const c of ALL_CONCEPTS) if (familyOf(c) === f) add(c, 0.4); }

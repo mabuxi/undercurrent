@@ -117,6 +117,10 @@ What you do turns into scores per tag, creator, community and format on three ti
 
 **Kinks** are specific things you keep coming back to: at least four posts you clearly liked, on more than one day, and clearly more common in what you love than in everything you see. Tags that are on almost every post never become kinks. Kinks get plain names, are grouped by family once two share one (Body, Clothing, Places…), update by themselves and fade when you stop. Anything you change by hand stays. Manage them on **Your map**.
 
+**What you did not like**: hiding a post, a thumbs down or blocking a creator makes the bigger local model look at it (several posts together for a block), leaving out what you already like. What it finds counts against similar posts and is listed in Memory, Did not like, where you can take it back.
+
+**Filters** (formats, new or popular, how much new to you, the mood) stay set until you change them, also after closing the app, and apply to searches too.
+
 ## Safety
 
 A built-in filter removes anything that suggests a person under 18 before it is stored or shown, and searches for minors are refused. Posts from sites that do not verify ages get an image check by the local model. This cannot be turned off. Your own hard limits work on top of it.

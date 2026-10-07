@@ -210,6 +210,9 @@ export function buildFeed(filters = {}, { exclude = [], limit = 12, mix = 15 } =
   const gp = genderPrefs();
   const only = sq && f.profile ? getProfileItems(f.search, f.profile) || new Set() : null;
   const explicit = !!(f.q || f.author || f.community || f.saved || sq?.gender || sq?.people?.length || only);
+  // Your gender balance applies to searches too, except when the search says who it wants, looks up one person or
+  // profile, or you asked to see the results without your filters.
+  const genderFree = !!(f.anyGender || f.author || f.community || f.saved || sq?.gender || sq?.people?.length || only);
   const where = ['i.blocked = 0', 'COALESCE(s.hidden, 0) = 0', "NOT (i.format = 'discussion' AND COALESCE(i.thread_ok, 1) = 0)"];
   // Only some sources, for a while ("only bluesky and reddit"): those, also when one of them is switched off.
   const onlySources = Array.isArray(f.sources) ? f.sources.filter((x) => /^[a-z0-9]+$/.test(x)) : [];
@@ -224,8 +227,8 @@ export function buildFeed(filters = {}, { exclude = [], limit = 12, mix = 15 } =
   if (f.formats?.length) where.push(`i.format IN (${f.formats.filter((x) => FORMAT_KEYS.includes(x)).map((x) => `'${x}'`).join(',') || "''"})`);
   // At 90% or more one way, posts known to show only the other side never make it into the pool at all,
   // so the pool is filled with posts that can actually be shown.
-  if (!explicit && gp.male >= 90) where.push('NOT (COALESCE(i.g_women, 0) > 0 AND COALESCE(i.g_men, 0) = 0)', ...(gp.male >= 98 ? ['NOT (COALESCE(i.g_women, 0) > 0 AND COALESCE(i.g_men, 0) > 0)'] : []));
-  if (!explicit && gp.male <= 10) where.push('NOT (COALESCE(i.g_men, 0) > 0 AND COALESCE(i.g_women, 0) = 0)', ...(gp.male <= 2 ? ['NOT (COALESCE(i.g_women, 0) > 0 AND COALESCE(i.g_men, 0) > 0)'] : []));
+  if (!genderFree && gp.male >= 90) where.push('NOT (COALESCE(i.g_women, 0) > 0 AND COALESCE(i.g_men, 0) = 0)', ...(gp.male >= 98 ? ['NOT (COALESCE(i.g_women, 0) > 0 AND COALESCE(i.g_men, 0) > 0)'] : []));
+  if (!genderFree && gp.male <= 10) where.push('NOT (COALESCE(i.g_men, 0) > 0 AND COALESCE(i.g_women, 0) = 0)', ...(gp.male <= 2 ? ['NOT (COALESCE(i.g_women, 0) > 0 AND COALESCE(i.g_men, 0) > 0)'] : []));
   const pool = candidatePool(where.join(' AND '), only ? [...only] : sq ? [...sq.fetched, ...(sq.weak || [])] : []);
   const ex = new Set(exclude.map(Number));
   const items = pool.items.filter((it) => !ex.has(it.id));
@@ -275,7 +278,7 @@ export function buildFeed(filters = {}, { exclude = [], limit = 12, mix = 15 } =
       if (it.gTrans && !gp.trans && sq.trans !== true) continue;
     } else {
       const allow = allowance(gp.male, gk, it.gTrans, gp.trans, sureOf(it), gp.everyone);
-      if (!explicit && stableRand(it.id) >= allow) continue;
+      if (!genderFree && stableRand(it.id) >= allow) continue;
     }
     if (popCut && popOf(it) < (popCut.get(it.source) || 0)) continue;
     // Threads: only the popular ones of the last month, unless you asked for something specific.

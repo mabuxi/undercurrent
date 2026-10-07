@@ -65,6 +65,7 @@ function pickLayout(r) {
   return 'carousel';
 }
 const SAVES = new Set(['recentSaved', 'oldSaves', 'savedPick']);
+let LAST_SAVES = 0;
 const RARE = new Set(['fantasySuggest', 'combo', 'tonight', 'analytics', 'map', 'limits', 'savedFant', 'moodCheck', 'rateRecent', 'recentSaved', 'oldSaves', 'shortsRail', 'memory', 'newKink', 'savedPick']);
 
 // Windows that come in variants take turns, so two analytics or map windows in a row never look the same.
@@ -383,6 +384,13 @@ function build(type, r, ctx) {
       EXCLUDE.push(item.id);
       return { type: 'hotThread', title: tr('Hot thread'), meta: `${item.community || item.source} · ${tr('{n}% match', { n: item.match })}`, filter: { formats: ['discussion'] }, items: [item], color: '#81737B' };
     }
+    // One memory to review between the windows: a suggestion from the assistant, or an older one to confirm.
+    case 'review': {
+      const db = getDb();
+      const m = db.prepare("SELECT * FROM memory WHERE status IN ('proposed', 'recheck') AND id NOT IN (SELECT value FROM json_each(?)) ORDER BY status = 'recheck' DESC, created DESC LIMIT 1").get(JSON.stringify(ctx.reviewed || []));
+      if (!m) return null;
+      return { type, title: m.status === 'recheck' ? tr('Still true?') : tr('Is this you?'), meta: m.status === 'recheck' ? tr('an older memory, to keep it right') : tr('a memory the assistant suggests'), memory: { id: m.id, category: m.category, content: m.content, evidence: m.evidence, status: m.status }, color: '#C9A7E8' };
+    }
     case 'memory': {
       const mem = listMemory();
       return { type, title: tr('Memory'), meta: tr('{n} remembered · {m} to review', { n: mem.filter((m) => m.status === 'active').length, m: mem.filter((m) => m.status === 'proposed').length }), memories: mem.slice(0, 4), color: '#C9A7E8' };
@@ -437,7 +445,7 @@ function analytics(r, ctx) {
 // Content windows (categories, formats, kinks, mixes, fantasies, creators) make up most of the column;
 // every two or three windows one of the other kinds (numbers, map, journeys, memory…) comes in between.
 const CONTENT_W = [['formatMix', 7], ['kinkDeep', 4], ['kinkList', 4], ['kinkMix', 3], ['nearby', 2], ['pair', 2], ['combo', 2], ['fantasy', 2], ['fantasySuggest', 2], ['newKink', 2], ['performer', 2], ['creator', 2], ['hotThread', 3], ['stories', 1], ['gifs', 1], ['shortsRail', 1], ['gallery', 1], ['trending', 1], ['discovery', 1], ['community', 1], ['followLatest', 2], ['followSpotlight', 1], ['following', 1], ['kinkSpot', 1], ['tagNow', 1]];
-const OTHER_W = [['analytics', 4], ['map', 3], ['journey', 4], ['rateRecent', 2], ['recentSaved', 1], ['oldSaves', 1], ['tonight', 1], ['limits', 1], ['savedFant', 1], ['moodCheck', 1], ['memory', 1]];
+const OTHER_W = [['analytics', 4], ['map', 3], ['journey', 4], ['rateRecent', 2], ['recentSaved', 0.5], ['oldSaves', 0.5], ['tonight', 1], ['limits', 1], ['savedFant', 1], ['moodCheck', 1], ['memory', 1]];
 const RHYTHM = [0, 0, 1, 0, 0, 0, 1];
 function pickFrom(list, r) {
   const total = list.reduce((a, b) => a + b[1], 0);
@@ -479,11 +487,17 @@ export function windows({ cursor = 0, count = 4, side = 0, sessionId = null, see
     const other = RHYTHM[(idx + side * 3) % RHYTHM.length] === 1;
     let w = null;
     let fallback = null;
+    // Every ten windows or so, one memory to review: at most two per session.
+    if ((served.shown || 0) >= 6 && (served.shown || 0) - (served.reviewAt ?? -999) >= 10 && (served.reviews || 0) < 2) {
+      try { w = build('review', r, { ...ctx, reviewed: served.reviewed || [] }); } catch { w = null; }
+      if (w) { served.reviewAt = served.shown; served.reviews = (served.reviews || 0) + 1; served.reviewed = [...(served.reviewed || []), w.memory.id]; }
+    }
     for (let tries = 0; tries < 24 && !w; tries++) {
       const t = pickFrom(tries < 16 ? (other ? OTHER_W : CONTENT_W) : [...CONTENT_W, ...OTHER_W], r);
       if ((RARE.has(t) || ['tagNow', 'nearby', 'hotThread', 'stories', 'journey', 'creator', 'performer'].includes(t)) && usedTypes.has(t)) continue;
-      // Your saves come back now and then, not all the time: at most one saves window in every 30 windows.
-      if (SAVES.has(t) && (served.shown || 0) - (served.savesAt ?? -999) < 30) continue;
+      // Your saves come back now and then, not all the time: never in the first 20 windows, at most one in every
+      // 60 windows and at most once every two hours, also across sessions.
+      if (SAVES.has(t) && ((served.shown || 0) < 20 || (served.shown || 0) - (served.savesAt ?? -999) < 60 || Date.now() - LAST_SAVES < 2 * 3600000)) continue;
       let c = null;
       try { c = build(t, r, ctx); } catch { c = null; }
       if (!c) continue;
@@ -500,7 +514,7 @@ export function windows({ cursor = 0, count = 4, side = 0, sessionId = null, see
       SHOWN.set(sigOf(w), t0);
       served.titles = [...(served.titles || []), w.title].slice(-8);
       served.shown = (served.shown || 0) + 1;
-      if (w.filter?.saved) served.savesAt = served.shown;
+      if (w.filter?.saved) { served.savesAt = served.shown; LAST_SAVES = Date.now(); }
       // A full-size preview only for a post that fits you for at least 90%; otherwise a carousel or a list.
       if (w.layout === 'hero' && !((w.items?.[0]?.match || 0) >= 90)) w = { ...w, layout: (w.items?.length || 0) >= 2 ? 'carousel' : 'list' };
       for (const it of w.items || []) { served.ids.set(Number(it.id), Date.now()); const k = mediaKey(it); if (k) served.media.set(k, Date.now()); }

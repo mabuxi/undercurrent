@@ -42,13 +42,13 @@ function ProfileRow({ p, onChange, onSwitch }) {
       {confirm ? (
         <div className="profacts">
           <span className="diag bad">{t('Delete {name} and everything in it for good?', { name: p.name })}</span>
-          <button type="button" className="ghost-btn small danger" onClick={() => act('delete', async () => { await api(`/profiles/${p.id}`, { method: 'DELETE' }); toast(t('{name} deleted.', { name: p.name })); onChange(); })}>{t('Delete')}</button>
-          <button type="button" className="ghost-btn small" onClick={() => setConfirm(false)}>{t('Cancel')}</button>
+          <button type="button" className="ghost-btn small danger" onClick={() => act('delete', async () => { await api(`/profiles/${p.id}`, { method: 'DELETE' }); toast(t('{name} deleted.', { name: p.name })); onChange(); })}><Icon name="trash" />{t('Delete')}</button>
+          <button type="button" className="ghost-btn small" onClick={() => setConfirm(false)}><Icon name="x" />{t('Cancel')}</button>
         </div>
       ) : (
         <div className="profacts">
-          {!p.active ? <button type="button" className="ghost-btn small accent" onClick={() => onSwitch(p)}>{t('Switch')}</button> : null}
-          <button type="button" className="ghost-btn small" disabled={busy === 'backup'} onClick={() => act('backup', async () => { const r = await api(`/profiles/${p.id}/backup`, { method: 'POST', body: {} }); toast(t('Backed up {name} ({size}).', { name: p.name, size: fmtBytes(r.size) })); onChange(); })}>{busy === 'backup' ? t('Backing up…') : t('Back up')}</button>
+          {!p.active ? <button type="button" className="ghost-btn small accent" onClick={() => onSwitch(p)}><Icon name="route" />{t('Switch')}</button> : null}
+          <button type="button" className="ghost-btn small" disabled={busy === 'backup'} onClick={() => act('backup', async () => { const r = await api(`/profiles/${p.id}/backup`, { method: 'POST', body: {} }); toast(t('Backed up {name} ({size}).', { name: p.name, size: fmtBytes(r.size) })); onChange(); })}><Icon name="download" />{busy === 'backup' ? t('Backing up…') : t('Back up')}</button>
           <button type="button" className="icon-btn" onClick={() => { setName(p.name); setEdit(true); }} aria-label={t('Rename {name}', { name: p.name })} title={t('Rename')}><Icon name="edit" /></button>
           {!p.active ? <button type="button" className="icon-btn" onClick={() => setConfirm(true)} aria-label={t('Delete {name}', { name: p.name })} title={t('Delete')}><Icon name="trash" /></button> : null}
         </div>
@@ -98,7 +98,7 @@ export function ProfilesCard() {
               <div key={b.file} className="profrow small">
                 <div className="profinfo"><strong>{b.name}</strong><span className="count">{new Date(b.made).toLocaleString(locale(), { dateStyle: 'medium', timeStyle: 'short' })} · {fmtBytes(b.size)}</span></div>
                 <div className="profacts">
-                  <button type="button" className="ghost-btn small" onClick={async () => { try { const r = await api(`/backups/${encodeURIComponent(b.file)}/restore`, { method: 'POST', body: {} }); toast(t('Restored as the profile {name}.', { name: r.profile.name })); load(); } catch (e) { toast(e.message); } }}>{t('Restore as a profile')}</button>
+                  <button type="button" className="ghost-btn small" onClick={async () => { try { const r = await api(`/backups/${encodeURIComponent(b.file)}/restore`, { method: 'POST', body: {} }); toast(t('Restored as the profile {name}.', { name: r.profile.name })); load(); } catch (e) { toast(e.message); } }}><Icon name="refresh" />{t('Restore as a profile')}</button>
                   <button type="button" className="icon-btn" onClick={async () => { await api(`/backups/${encodeURIComponent(b.file)}`, { method: 'DELETE' }); load(); }} aria-label={t('Delete this backup')} title={t('Delete this backup')}><Icon name="trash" /></button>
                 </div>
               </div>

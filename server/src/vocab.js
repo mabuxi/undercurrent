@@ -24,7 +24,10 @@ export const KINK_FR = {
   prostate: 'Prostate', hentai: 'Hentai', yaoi: 'Yaoi', bara: 'Bara', animated: 'Animé', 'ai generated': 'Généré par IA', audio: 'Audio',
   'big ass': 'Gros cul', 'big tits': 'Gros seins', 'small tits': 'Petits seins', blonde: 'Blondes', redhead: 'Rousses', brunette: 'Brunes',
   petite: 'Menues', curvy: 'Pulpeuses', bbw: 'BBW', squirting: 'Femme fontaine', 'pussy licking': 'Cunnilingus', 'cum in mouth': 'Dans la bouche',
-  webcam: 'Webcam', 'size queen': 'Size queen', futanari: 'Futanari', furry: 'Furry', femdom: 'Femdom'
+  webcam: 'Webcam', 'size queen': 'Size queen', futanari: 'Futanari', furry: 'Furry', femdom: 'Femdom',
+  lesbian: 'Lesbiennes', 'gay for pay': 'Gay pour les fans', college: 'Étudiants', 'natural tits': 'Seins naturels', heels: 'Talons',
+  'yoga pants': 'Leggings', titfuck: 'Branlette espagnole', scissoring: 'Ciseaux', 'strap on': 'Gode-ceinture', facesitting: 'Facesitting',
+  casting: 'Casting', 'first time': 'Première fois'
 };
 
 export const FAMILY_FR = {
@@ -54,7 +57,7 @@ export const FR_TAGS = {
   'gros cul': 'big ass', 'grosses fesses': 'big ass', 'fesses rebondies': 'bubble butt', 'gros seins': 'big tits', 'petits seins': 'small tits',
   rousse: 'redhead', roux: 'redhead', blonde: 'blonde', brune: 'brunette', pulpeuse: 'curvy', ronde: 'curvy', minet: 'twink', minets: 'twink',
   rebeu: 'arab', beur: 'arab', arabe: 'arab', arabes: 'arab', asiatique: 'asian', asiatiques: 'asian', black: 'black', latino: 'latino',
-  indien: 'indian', 'interracial': 'interracial', sportif: 'jock', sportifs: 'jock', 'mec hétéro': 'straight guy', hétéro: 'straight guy',
+  indien: 'indian', 'interracial': 'interracial', sportif: 'jock', sportifs: 'jock', 'mec hétéro': 'straight guy', hétéro: 'straight guy', 'gay pour les fans': 'gay for pay', 'gay pour le fric': 'gay for pay', 'hétéro payé': 'gay for pay', lesbienne: 'lesbian', lesbiennes: 'lesbian', étudiante: 'college', étudiant: 'college', talons: 'heels', 'talons hauts': 'heels', leggings: 'yoga pants', 'branlette espagnole': 'titfuck', 'gode ceinture': 'strap on', 'première fois': 'first time', 'seins naturels': 'natural tits',
   douche: 'shower', 'en public': 'public', exhib: 'public', exhibition: 'public', dehors: 'outdoor', 'plein air': 'outdoor', 'en plein air': 'outdoor',
   bureau: 'office', 'salle de sport': 'gym', voiture: 'car', hôtel: 'hotel', hotel: 'hotel', massage: 'massage', cocu: 'cuckold',
   infidèle: 'cheating', tromperie: 'cheating', trompe: 'cheating', 'jeu de rôle': 'roleplay', 'pris sur le fait': 'caught', surpris: 'caught',

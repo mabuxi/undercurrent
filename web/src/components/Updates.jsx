@@ -119,8 +119,8 @@ export function VersionCard() {
       {info?.error ? <p className="diag">{info.error}</p> : null}
       <div className="wbtns">
         <button type="button" className="ghost-btn small" onClick={() => check(true)} disabled={busy}><Icon name="refresh" />{busy ? t('Checking…') : t('Check for updates')}</button>
-        {info?.available ? <button type="button" className="ghost-btn small accent" onClick={() => setOpen(true)}>{t("See what's new and update")}</button> : null}
-        <button type="button" className="ghost-btn small" onClick={async () => { await api('/setup/reset', { method: 'POST', body: {} }); window.location.reload(); }}>{t('Show the welcome steps again')}</button>
+        {info?.available ? <button type="button" className="ghost-btn small accent" onClick={() => setOpen(true)}><Icon name="why" />{t("See what's new and update")}</button> : null}
+        <button type="button" className="ghost-btn small" onClick={async () => { await api('/setup/reset', { method: 'POST', body: {} }); window.location.reload(); }}><Icon name="refresh" />{t('Show the welcome steps again')}</button>
       </div>
       {log?.notes?.length ? <details className="uplog"><summary>{t('Change history')}</summary><Notes notes={log.notes} /></details> : null}
       {open && info ? <UpdateModal info={info} onClose={() => setOpen(false)} /> : null}

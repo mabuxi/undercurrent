@@ -18,9 +18,22 @@ import { useNarrow } from './components/FeedView.jsx';
 import { t, tn } from './i18n.js';
 
 export default function App() {
-  const [filters, setFiltersState] = useState({});
-  const [opts, setOpts] = useState({ activeWin: null, preset: null, mood: null, focus: null });
-  const [mix, setMix] = useState(15);
+  const [filterState, setFiltersState] = useState({});
+  const [opts, setOpts] = useState({ activeWin: null, preset: null, mood: null, focus: null, mix: null });
+  // The filters you set yourself (formats, new or popular, how much new to you, the mood) are kept on the server,
+  // stay set after closing Undercurrent, and apply to searches too.
+  const [tune, setTuneState] = useState({});
+  const [tuneReady, setTuneReady] = useState(false);
+  const tuneRef = useRef({});
+  const saveTune = useCallback((patch) => {
+    const next = { ...tuneRef.current, ...patch };
+    for (const k of Object.keys(next)) if (next[k] === null || next[k] === undefined || (Array.isArray(next[k]) && !next[k].length)) delete next[k];
+    tuneRef.current = next;
+    setTuneState(next);
+    api('/settings/tune', { method: 'PUT', body: next }).catch(() => {});
+  }, []);
+  const filters = useMemo(() => (filterState.noTune ? filterState : { ...(tune.formats ? { formats: tune.formats } : {}), ...(tune.window ? { window: tune.window } : {}), ...filterState }), [filterState, tune]);
+  const mix = opts.mix ?? tune.mix ?? 15;
   const [mode, setMode] = useState('feed');
   const [journeySpec, setJourneySpec] = useState(null);
   const [feedKey, setFeedKey] = useState(0);
@@ -110,7 +123,7 @@ export default function App() {
   // After a search, a click on a tag or any other change of what the feed shows: straight to where the feed starts,
   // with the line that says what is shown.
   const scrollToFeed = useCallback(() => {
-    const el = document.getElementById('feedStart');
+    const el = document.getElementById('feedAnswer') || document.getElementById('feedStart');
     if (!el) return;
     const head = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--toph'), 10) || 92;
     window.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + window.scrollY - head - 8), behavior: 'smooth' });
@@ -118,9 +131,8 @@ export default function App() {
 
   const setFilters = useCallback((f, o = {}) => {
     setFiltersState({ ...(f || {}) });
-    setOpts({ activeWin: o.win || null, preset: o.preset ?? null, mood: o.mood || null, focus: o.focus ?? null });
-    if (o.mix !== undefined) setMix(o.mix);
-    else if (!o.keepMix) setMix(15);
+    setOpts((cur) => ({ activeWin: o.win || null, preset: o.preset ?? null, mood: o.mood || null, focus: o.focus ?? null, mix: o.mix !== undefined ? o.mix : o.keepMix ? cur.mix : null }));
+    if ((tuneRef.current.mood || null) !== (o.mood || null) && !o.restore) saveTune({ mood: o.mood || null });
     setMode('feed');
     setFeedKey((k) => k + 1);
     if (!o.keepAnswer) setAskOut(null);
@@ -128,21 +140,26 @@ export default function App() {
   }, [scrollToFeed]);
 
   const patchFilters = useCallback((patch) => {
+    const tp = {};
+    const rest = { ...patch };
+    for (const k of ['formats', 'window']) if (k in rest) { tp[k] = rest[k]; delete rest[k]; }
+    if (Object.keys(tp).length) saveTune(tp);
     setFiltersState((cur) => {
-      const next = { ...cur, ...patch };
+      const next = { ...cur, ...rest };
+      for (const k of Object.keys(tp)) delete next[k];
       for (const k of Object.keys(next)) if (next[k] === null || next[k] === undefined || next[k] === false || (Array.isArray(next[k]) && !next[k].length)) delete next[k];
       return next;
     });
-    setOpts((o) => ({ ...o, preset: null, mood: null, activeWin: null, focus: null }));
+    setOpts((o) => ({ ...o, preset: null, activeWin: null, focus: null }));
     setFeedKey((k) => k + 1);
     setAskOut(null);
     setTimeout(scrollToFeed, 60);
-  }, [scrollToFeed]);
+  }, [scrollToFeed, saveTune]);
 
   const applyMood = useCallback((id) => {
     const m = MOODS.find((x) => x.id === id);
     if (!m) return;
-    if (opts.mood === id) { setFilters({}); return; }
+    if (opts.mood === id) { setFilters({}, { keepAnswer: false }); return; }
     setFilters(m.filters, { mood: id, mix: m.mix ?? 15 });
     setAskOut(t('Mood set to {mood}. The feed follows it until you change it.', { mood: m.label.toLowerCase() }));
   }, [opts.mood, setFilters]);
@@ -150,10 +167,8 @@ export default function App() {
   const openMode = useCallback((m, spec = null) => {
     setMode(m);
     if (m === 'journey') setJourneySpec({ ...spec, key: Date.now() });
-    setTimeout(() => {
-      const el = centerRef.current;
-      if (el && el.getBoundingClientRect().top < 0) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 8, behavior: 'smooth' });
-    }, 30);
+    // Another view opens at its top, with its title under the top bar, not halfway down.
+    setTimeout(() => window.scrollTo({ top: 0, behavior: 'auto' }), 30);
   }, []);
 
   const applyClient = useCallback(async (actions = [], { onPatch } = {}) => {
@@ -187,13 +202,23 @@ export default function App() {
         for (const c of fresh) if (c.type === 'gender') { window.dispatchEvent(new Event('uc-gender')); refreshWindows(); }
         await applyClient(fresh.filter((c) => c.type !== 'gender'));
       }
-      if (v.answer && v.answer !== seen.answer) { seen.answer = v.answer; setAskOut(v.answer); }
+      if (v.answer && v.answer !== seen.answer) { seen.answer = v.answer; setAskOut(v.answer); setTimeout(scrollToFeed, 80); }
       if (v.found > seen.found) { seen.found = v.found; window.dispatchEvent(new CustomEvent('uc-search-progress', { detail: { id, found: v.found } })); }
       if (v.done && !seen.done) { seen.done = true; window.dispatchEvent(new CustomEvent('uc-search-done', { detail: { id, found: v.found } })); }
       if (!v.done) pollRef.current = setTimeout(tick, 600);
     };
     tick();
-  }, [setFilters, applyClient]);
+  }, [setFilters, applyClient, scrollToFeed]);
+
+  // The filters you set last time come back, and so does the mood you were in.
+  useEffect(() => {
+    api('/settings/tune').then((v) => {
+      tuneRef.current = v || {};
+      setTuneState(v || {});
+      const m = v?.mood ? MOODS.find((x) => x.id === v.mood) : null;
+      if (m) setFilters(m.filters, { mood: m.id, mix: m.mix, noScroll: true, restore: true });
+    }).catch(() => {}).finally(() => setTuneReady(true));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const runSearch = useCallback(async (q, { deep = false } = {}) => {
     const v = await api('/search', { method: 'POST', body: { q, deep } });
@@ -236,9 +261,18 @@ export default function App() {
     if (key === 'mood') { setFilters({}); return; }
     if (key === 'profile') { patchFilters({ profile: null, profileLabel: null }); return; }
     if (key === 'sources') { patchFilters({ sources: null, sourcesLabel: null }); return; }
+    if (key === 'noTune') { patchFilters({ noTune: null, anyGender: null }); return; }
     if (key.startsWith('tag:')) { patchFilters({ tags: (filters.tags || []).filter((tag) => `tag:${tag}` !== key) }); return; }
     patchFilters({ [key]: null });
   }, [clearSearch, setFilters, patchFilters, filters]);
+
+  // At the end of a search: the same search without your filters (formats, new or popular, the gender balance),
+  // for this search only. Your filters stay set for the feed.
+  const withoutFilters = useCallback(() => {
+    setFiltersState((cur) => { const next = { ...cur, noTune: true, anyGender: true }; delete next.formats; delete next.window; delete next.minMatch; delete next.length; return next; });
+    setOpts((o) => ({ ...o, mood: null, mix: null, preset: null }));
+    setFeedKey((k) => k + 1);
+  }, []);
 
   // Only the posts of one profile or community from the search: their posts are fetched first.
   const openProfile = useCallback(async (p) => {
@@ -252,10 +286,10 @@ export default function App() {
   }, [search, setFilters, toast]);
 
   const ctx = useMemo(() => ({
-    filters, opts, mix, setMix: (v) => { setMix(v); setFeedKey((k) => k + 1); }, mode, setFilters, patchFilters, applyMood, openMode,
+    filters, opts, mix, setMix: (v) => { saveTune({ mix: v }); setOpts((o) => ({ ...o, mix: null })); setFeedKey((k) => k + 1); }, tune, withoutFilters, mode, setFilters, patchFilters, applyMood, openMode,
     kinks, fantasies, presets, refreshMeta, toast, sessionId, update: updates.info, openUpdate: () => setUpdateOpen(true), askOut, setAskOut, settings, setSettings, feedKey, applyClient, refreshFeed: () => setFeedKey((k) => k + 1),
     search, runSearch, searchMore, editChip, clearSearch, openProfile, clearFilter
-  }), [filters, opts, mix, mode, setFilters, patchFilters, applyMood, openMode, kinks, fantasies, presets, refreshMeta, toast, askOut, settings, feedKey, applyClient, search, runSearch, searchMore, editChip, clearSearch, openProfile, clearFilter, updates.info]);
+  }), [filters, opts, mix, mode, setFilters, patchFilters, applyMood, openMode, kinks, fantasies, presets, refreshMeta, toast, askOut, settings, feedKey, applyClient, search, runSearch, searchMore, editChip, clearSearch, openProfile, clearFilter, updates.info, tune, withoutFilters, saveTune]);
 
   return (
     <AppCtx.Provider value={ctx}>
@@ -266,7 +300,7 @@ export default function App() {
           <SideColumn side={0} />
           <main className="center" ref={centerRef}>
             <ErrorBoundary name={mode} big key={mode}>
-              {mode === 'feed' ? <FeedView key="feed" /> : null}
+              {mode === 'feed' ? (tuneReady ? <FeedView key="feed" /> : <div className="feedwait" />) : null}
               {mode === 'map' ? <MapView /> : null}
               {mode === 'journey' && journeySpec ? <JourneyView key={journeySpec.key} spec={journeySpec} /> : null}
               {mode === 'memory' ? <MemoryView /> : null}

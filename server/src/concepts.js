@@ -91,6 +91,18 @@ const SYN = {
   roleplay: ['role play', 'roleplay', 'cosplay'],
   caught: ['caught', 'getting caught'],
   'straight guy': ['straight guy', 'straight guys', 'str8', 'first gay'],
+  'gay for pay': ['gay for pay', 'gay for fans', 'gay4pay', 'gay 4 pay', 'g4p', 'gfp', 'straight for pay', 'gay for the camera', 'straight guys for pay'],
+  lesbian: ['lesbian', 'lesbians', 'lesbian sex', 'girl on girl', 'girls only', 'sapphic', 'wlw', 'lesbo'],
+  college: ['college', 'student', 'coed', 'university', 'dorm', 'college girl', 'college guy'],
+  'natural tits': ['natural tits', 'natural boobs', 'natural breasts', 'real tits'],
+  heels: ['heels', 'high heels', 'stilettos'],
+  'yoga pants': ['yoga pants', 'leggings', 'yoga'],
+  titfuck: ['titfuck', 'titty fuck', 'tit fuck', 'titjob', 'tit job', 'boobjob', 'boob job', 'paizuri'],
+  scissoring: ['scissoring', 'tribbing', 'tribadism'],
+  'strap on': ['strap on', 'strapon', 'pegging'],
+  facesitting: ['facesitting', 'face sitting', 'queening', 'sit on face'],
+  casting: ['casting', 'audition', 'casting couch'],
+  'first time': ['first time', 'first time on camera', 'first porn'],
   dominant: ['dominant', 'domination', 'dominant male', 'gay domination', 'dom', 'dominating'],
   submissive: ['submissive', 'sub', 'obedient'],
   rough: ['rough', 'rough sex', 'hard rough sex', 'rough sex gay', 'pounding', 'hard fuck'],
@@ -151,6 +163,7 @@ const FAMILY_OF = {
   muscle: 'body', abs: 'body', hairy: 'body', 'hairy chest': 'body', beard: 'body', smooth: 'body', chubby: 'body', thighs: 'body', feet: 'body', armpits: 'body', tattoo: 'body', piercing: 'body', 'bubble butt': 'body', 'big ass': 'body', 'big tits': 'body', 'small tits': 'body', blonde: 'body', redhead: 'body', brunette: 'body', petite: 'body', curvy: 'body', bbw: 'body',
   uncut: 'cock', cut: 'cock', veiny: 'cock', bwc: 'cock', bbc: 'cock', 'big balls': 'cock',
   twink: 'types', daddy: 'types', jock: 'types', bear: 'types', femboy: 'types', '18 25': 'types', mature: 'types', milf: 'types', trans: 'types', 'straight guy': 'types',
+  lesbian: 'types', 'gay for pay': 'types', college: 'types', 'natural tits': 'body', heels: 'clothing', 'yoga pants': 'clothing', titfuck: 'sex', scissoring: 'sex', 'strap on': 'sex', facesitting: 'oral', casting: 'scenarios', 'first time': 'scenarios',
   blowjob: 'oral', sloppy: 'oral', deepthroat: 'oral', 'face fucking': 'oral', 'cock worship': 'oral', rimming: 'oral', 'pussy licking': 'oral', kissing: 'oral',
   anal: 'sex', handjob: 'sex', fingering: 'sex', toys: 'sex', bareback: 'sex', breeding: 'sex', doggystyle: 'sex', missionary: 'sex', riding: 'sex', squirting: 'sex',
   solo: 'solo', masturbation: 'solo', gooning: 'solo', edging: 'solo', 'ruined orgasm': 'solo', prostate: 'solo',
@@ -185,7 +198,7 @@ export const FAMILIES = {
   drawn: { name: 'Drawn and animated', color: '#B6A8B0' }
 };
 
-const DISPLAY = { '18 25': 'Young adults 18+', bwc: 'BWC', bbc: 'BBC', bbw: 'BBW', milf: 'MILF', pov: 'POV', 'close up': 'Close-up', 'step family': 'Step family', 'ai generated': 'AI generated', 'huge load': 'Huge load', 'big balls': 'Big balls', 'hairy chest': 'Hairy chest', 'dirty talk': 'Dirty talk', 'size difference': 'Size difference', 'group sex': 'Group sex', 'double penetration': 'Double penetration', 'face fucking': 'Face fucking', 'cock worship': 'Cock worship', 'ruined orgasm': 'Ruined orgasm', 'bubble butt': 'Bubble butt', 'straight guy': 'Straight guys', 'pussy licking': 'Pussy licking', 'big ass': 'Big ass', 'big tits': 'Big tits', 'small tits': 'Small tits', 'size queen': 'Size queen', sloppy: 'Sloppy blowjob', uncut: 'Uncut', cut: 'Cut' };
+const DISPLAY = { '18 25': 'Young adults 18+', bwc: 'BWC', bbc: 'BBC', bbw: 'BBW', milf: 'MILF', pov: 'POV', 'close up': 'Close-up', 'step family': 'Step family', 'ai generated': 'AI generated', 'huge load': 'Huge load', 'big balls': 'Big balls', 'hairy chest': 'Hairy chest', 'dirty talk': 'Dirty talk', 'size difference': 'Size difference', 'group sex': 'Group sex', 'double penetration': 'Double penetration', 'face fucking': 'Face fucking', 'cock worship': 'Cock worship', 'ruined orgasm': 'Ruined orgasm', 'bubble butt': 'Bubble butt', 'straight guy': 'Straight guys', 'gay for pay': 'Gay for pay', 'natural tits': 'Natural tits', 'yoga pants': 'Yoga pants', 'strap on': 'Strap-on', 'first time': 'First time', 'pussy licking': 'Pussy licking', 'big ass': 'Big ass', 'big tits': 'Big tits', 'small tits': 'Small tits', 'size queen': 'Size queen', sloppy: 'Sloppy blowjob', uncut: 'Uncut', cut: 'Cut' };
 
 const VARIANT = new Map();
 for (const [concept, list] of Object.entries(SYN)) {

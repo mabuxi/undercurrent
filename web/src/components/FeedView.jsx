@@ -207,7 +207,7 @@ const fmtCount = (n) => { n = Number(n) || 0; return n >= 1e6 ? `${dec((n / 1e6)
 // Right where the feed starts: what it is showing now and how much matched, or the assistant's answer. A search,
 // a tag or any other change scrolls here.
 function FeedHead({ total, loading }) {
-  const { filters, opts, kinks, fantasies, askOut } = useApp();
+  const { filters, opts, kinks, fantasies } = useApp();
   const mood = opts?.mood ? MOODS.find((m) => m.id === opts.mood) : null;
   // The search itself is in the answer and the search bar; this line says what else narrows the feed.
   const what = crumbList(filters, { kinks, fantasies }).filter(([k]) => k !== 'search').map(([, l]) => l);
@@ -216,9 +216,8 @@ function FeedHead({ total, loading }) {
   const count = filtered && total != null && !loading ? tn(total, '{n} post matches', '{n} posts match') : null;
   return (
     <div className="feedhead" id="feedStart">
-      {askOut || filtered ? (
+      {filtered ? (
         <div className="fh-line" aria-live="polite">
-          {askOut ? <p className="fh-answer">{askOut}</p> : null}
           {filtered ? <p className="fh-what">{what.length ? <span>{t('Showing: {what}', { what: what.join(' · ') })}</span> : null}{count ? <em>{count}</em> : loading ? <em className="fh-wait"><span className="spin" />{t('Loading…')}</em> : null}</p> : null}
         </div>
       ) : null}
@@ -227,23 +226,45 @@ function FeedHead({ total, loading }) {
   );
 }
 
-function Controls({ total, narrow }) {
-  const { filters, opts, mix, setMix, setFilters, patchFilters, applyMood, presets, kinks, fantasies, askOut, clearSearch } = useApp();
+// The panel stays open or closed as you left it.
+const PANEL_KEY = 'uc-filters-open';
+function readOpen() { try { return localStorage.getItem(PANEL_KEY) === '1'; } catch { return false; } }
+
+function Controls() {
+  const { filters, opts, mix, setMix, setFilters, patchFilters, applyMood, presets, askOut } = useApp();
   const [summary, setSummary] = useState(null);
-  const [tuneOpen, setTuneOpen] = useState(false);
+  const [tuneOpen, setTuneOpen] = useState(readOpen);
   useEffect(() => { api('/home/summary').then((r) => setSummary(r.text)).catch(() => {}); }, []);
+  const toggleOpen = () => setTuneOpen((o) => { try { localStorage.setItem(PANEL_KEY, o ? '0' : '1'); } catch {} return !o; });
   const toggleFormat = (f) => {
     const cur = filters.formats || [];
     patchFilters({ formats: cur.includes(f) ? cur.filter((x) => x !== f) : [...cur, f] });
   };
+  const active = (filters.formats?.length ? 1 : 0) + (filters.window ? 1 : 0) + (opts.mood ? 1 : 0) + (mix !== 15 ? 1 : 0);
   return (
     <>
-      <div className="hello">
+      <div className="hello" id={askOut ? 'feedAnswer' : undefined}>
         <h2>{greeting()}</h2>
-        <p className="hello-sum">{summary || ''}</p>
-        {narrow ? <button type="button" className={`tunebtn${tuneOpen ? ' on' : ''}`} onClick={() => setTuneOpen((o) => !o)} aria-expanded={tuneOpen}><Icon name="sliders" />{tuneOpen ? t('Hide the controls') : t('Tune the feed')}</button> : null}
+        <p className={`hello-sum${askOut ? ' answer' : ''}`} aria-live="polite">{askOut || summary || ''}</p>
+        <div className="hello-row">
+          <button type="button" className={`tunebtn${tuneOpen ? ' on' : ''}`} onClick={toggleOpen} aria-expanded={tuneOpen}>
+            <Icon name="sliders" />{t('Filters')}{active ? <em className="tunecount">{active}</em> : null}<Icon name={tuneOpen ? 'chevU' : 'chevD'} />
+          </button>
+          {presets.length ? (
+            <div className="nowrow" aria-label={t('Right now')}>
+              {presets.map((p, i) => {
+                const k = NOW_KIND[p.kind] || NOW_KIND.tag;
+                return (
+                  <button type="button" key={`${p.kind}${p.label}`} className={`nowchip${opts.preset === i ? ' on' : ''}`} style={{ '--tc': k.color }} onClick={() => setFilters(p.filters, { preset: i })} title={`${k.label}: ${p.label}`}>
+                    <Icon name={k.icon} /><span className="nk">{k.label}</span><span>{p.label}</span>{p.match !== null ? <small>{p.match}%</small> : null}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
       </div>
-      {narrow && !tuneOpen ? null : <section className="tuner" aria-label={t('Tune the feed')}>
+      {tuneOpen ? <section className="tuner" aria-label={t('Filters')}>
         <FeedWindow />
         <div className="tline tline-top">
           <span className="tlabel">{t('Mood')}</span>
@@ -257,19 +278,6 @@ function Controls({ total, narrow }) {
             ))}
           </div>
         </div>
-        {presets.length ? (
-          <div className="tline">
-            <span className="tlabel">{t('Right now')}</span>
-            <div className="tchips">{presets.map((p, i) => {
-              const k = NOW_KIND[p.kind] || NOW_KIND.tag;
-              return (
-                <button type="button" key={`${p.kind}${p.label}`} className={`nowchip${opts.preset === i ? ' on' : ''}`} style={{ '--tc': k.color }} onClick={() => setFilters(p.filters, { preset: i })} title={`${k.label}: ${p.label}`}>
-                  <Icon name={k.icon} /><span className="nk">{k.label}</span><span>{p.label}</span>{p.match !== null ? <small>{p.match}%</small> : null}
-                </button>
-              );
-            })}</div>
-          </div>
-        ) : null}
         <div className="tline">
           <span className="tlabel">{t('Formats')}</span>
           <div className="tchips">{Object.entries(FORMATS).map(([f, label]) => <TChip key={f} on={(filters.formats || []).includes(f)} icon={FORMAT_ICON[f]} color={FORMAT_COLOR[f]} label={label} onClick={() => toggleFormat(f)} />)}</div>
@@ -283,13 +291,22 @@ function Controls({ total, narrow }) {
             <span className="count">{filters.onlyNew ? t('only things you haven’t opened') : mix ? t('about 1 in {n} is new to you', { n: Math.max(2, Math.round(100 / mix)) }) : t('nothing new mixed in')}</span>
           </div>
         </div>
-      </section>}
+        <p className="wnote">{t('Your filters stay set, also after closing Undercurrent, and apply to searches too.')}</p>
+      </section> : null}
     </>
   );
 }
 
 export default function FeedView() {
-  const { filters, opts, mix, feedKey, toast, refreshMeta, search, searchMore } = useApp();
+  const { filters, opts, mix, feedKey, toast, refreshMeta, search, searchMore, withoutFilters } = useApp();
+  const [genderOpen, setGenderOpen] = useState(true);
+  useEffect(() => {
+    const load = () => api('/settings/gender').then((g) => setGenderOpen(!!g.everyone)).catch(() => {});
+    load();
+    window.addEventListener('uc-gender', load);
+    return () => window.removeEventListener('uc-gender', load);
+  }, []);
+  const narrowing = !filters.noTune && !!(filters.formats?.length || filters.window || filters.minMatch || filters.length || opts.mood || !genderOpen);
   const narrow = useNarrow();
   const [items, setItems] = useState([]);
   const [wins, setWins] = useState([]);
@@ -425,8 +442,11 @@ export default function FeedView() {
   }, [filters.search, reset, done]);
 
   const WHY = { dwell: t('You stayed on this'), play: t('You played this'), up: t('You liked this'), save: t('You saved this'), rate: t('You rated this high'), comments: t('You opened the comments'), performer: t('You looked at who is in this') };
+  const searchingRef = useRef(searching);
+  searchingRef.current = searching;
+  // "Going deeper" (similar posts after one you were into) is for the feed: a search shows only what you searched for.
   const onStrong = useCallback(async (item, why) => {
-    if (deeperCount.current > 40) return;
+    if (searchingRef.current || deeperCount.current > 40) return;
     deeperCount.current++;
     begin(`sim${item.id}`, t('Finding similar posts'));
     try {
@@ -478,9 +498,9 @@ export default function FeedView() {
 
   return (
     <section className="center" style={{ paddingTop: 0 }}>
-      <Controls total={total} narrow={narrow} />
+      <Controls />
       <FeedHead total={total} loading={loading && !items.length} />
-      <div className="feed" style={items.length < 2 ? { minHeight: '100vh' } : undefined}>{list}</div>
+      <div className="feed" style={items.length < 2 && !done ? { minHeight: '100vh' } : undefined}>{list}</div>
       {error ? <div className="empty">{error}</div> : null}
       {wider && items.length ? <div className="deeper"><span className="deeper-why">{t('Few exact matches left, now also showing close matches')}</span></div> : null}
       {fresh ? <button type="button" className="freshbar" onClick={() => { reset(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>{t('New results from your sources are in · Show them')}</button> : null}
@@ -490,7 +510,11 @@ export default function FeedView() {
         ) : searching && search?.id === filters.search && !search.done ? (
           <span className="finding"><span className="spin" />{t('Still searching your sources…')}</span>
         ) : searching && done ? (
-          <span className="endnote">{t('That is everything found for this search so far.')} <button type="button" className="linkbtn" onClick={searchMore}>{t('Search further on your sources')}</button></span>
+          <span className="endnote">
+            {t('That is everything found for this search so far.')}
+            {narrowing ? <button type="button" className="ghost-btn small accent" onClick={withoutFilters}><Icon name="sliders" />{t('Remove filters to find more results')}</button> : null}
+            <button type="button" className="ghost-btn small" onClick={searchMore}><Icon name="search" />{t('Search further on your sources')}</button>
+          </span>
         ) : done ? (
           <span className="endnote">{t('Nothing more matches right now.')} <button type="button" className="linkbtn" onClick={fetchNew}>{t('Fetch new posts now')}</button></span>
         ) : <button type="button" className="linkbtn" onClick={fetchNew}>{t('Fetch new posts now')}</button>}

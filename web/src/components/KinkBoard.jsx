@@ -120,12 +120,12 @@ export default function KinkBoard({ onOpen, onChange }) {
           <input value={nk.name} onChange={(e) => setNk({ ...nk, name: e.target.value })} placeholder={t('Name, like Jockstrap')} aria-label={t('New kink name')} />
           <input value={nk.tags} onChange={(e) => setNk({ ...nk, tags: e.target.value })} placeholder={t('tags, comma separated (optional)')} aria-label={t('Tags')} style={{ flex: 2 }} />
           <select value={nk.parent} onChange={(e) => setNk({ ...nk, parent: e.target.value })} aria-label={t('Group')}><option value="">{t('No group')}</option>{groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select>
-          <button type="submit" className="ghost-btn small accent">{t('Add')}</button>
+          <button type="submit" className="ghost-btn small accent"><Icon name="plus" />{t('Add')}</button>
         </form>
       ) : null}
       {form === 'group' ? (
         <form className="kb-form" onSubmit={addGroup}>
-          <div className="rowline"><input value={ng.name} onChange={(e) => setNg({ ...ng, name: e.target.value })} placeholder={t('Group name, like Ethnicity')} aria-label={t('New group name')} style={{ flex: 1 }} /><button type="submit" className="ghost-btn small accent">{t('Make group')}</button></div>
+          <div className="rowline"><input value={ng.name} onChange={(e) => setNg({ ...ng, name: e.target.value })} placeholder={t('Group name, like Ethnicity')} aria-label={t('New group name')} style={{ flex: 1 }} /><button type="submit" className="ghost-btn small accent"><Icon name="plus" />{t('Make group')}</button></div>
           <div className="chiprow">{sort(active).map((k) => <button type="button" key={k.id} className={`chip btn${ng.kinks.includes(k.id) ? ' on' : ''}`} onClick={() => setNg({ ...ng, kinks: ng.kinks.includes(k.id) ? ng.kinks.filter((x) => x !== k.id) : [...ng.kinks, k.id] })}>{k.name}</button>)}</div>
         </form>
       ) : null}

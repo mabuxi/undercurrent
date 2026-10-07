@@ -1,4 +1,5 @@
 import { getDb, now, tagId } from './db.js';
+import { isBlockedCreator } from './blocks.js';
 import { postLangs } from './langdetect.js';
 import { isBlocked } from './safety.js';
 import { extractInto } from './ai/extract.js';
@@ -32,6 +33,7 @@ export function upsertItem(n) {
   n = { ...n, title: oc.title, oc: n.oc || oc.oc };
   let verdict = isBlocked({ title: n.title, body: n.body, tags: n.tags || [] });
   if (!verdict.blocked && isModPost(n)) verdict = { blocked: true, reason: 'announcement' };
+  if (!verdict.blocked && isBlockedCreator(n)) verdict = { blocked: true, reason: 'creator' };
   const existing = db.prepare('SELECT id FROM items WHERE source = ? AND ext_id = ?').get(n.source, n.ext_id);
   if (existing) {
     db.prepare('UPDATE items SET score = ?, comments = ?, blocked = MAX(blocked, ?), block_reason = COALESCE(block_reason, ?), media = COALESCE(?, media) WHERE id = ?')

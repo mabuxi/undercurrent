@@ -195,7 +195,7 @@ export default function TopBar() {
           return (
             <div className="sb-chips" aria-label={t('What the feed is showing')}>
               {mood ? <span className="schip schip-filter"><span>{t('Mood: {mood}', { mood: mood.label })}</span><button type="button" onClick={() => clearFilter('mood')} aria-label={t('Remove the {mood} mood', { mood: mood.label })}><Icon name="x" /></button></span> : null}
-              {list.map(([k, label]) => <span key={k} className={`schip schip-filter${k.startsWith('tag:') ? ' schip-tag' : ''}`}><span>{label}</span><button type="button" onClick={() => clearFilter(k)} aria-label={t('Remove {name}', { name: label })}><Icon name="x" /></button></span>)}
+              {list.map(([k, label]) => <span key={k} className={`schip schip-filter${k.startsWith('tag:') ? ' schip-tag' : ''}${['formats', 'window', 'noTune'].includes(k) ? ' schip-tune' : ''}`}><span>{label}</span><button type="button" onClick={() => clearFilter(k)} aria-label={t('Remove {name}', { name: label })}><Icon name="x" /></button></span>)}
               {chips.map((c) => <Chip key={`${c.kind}:${c.value}`} c={c} onRemove={editChip} />)}
             </div>
           );

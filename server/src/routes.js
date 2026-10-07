@@ -2,14 +2,16 @@ import express from 'express';
 import { Readable } from 'node:stream';
 import { config } from './config.js';
 import { getDb, getSetting, setSetting, now, normalizeTag } from './db.js';
-import { buildFeed, presentOne } from './rank.js';
+import { buildFeed, presentOne, popRaw } from './rank.js';
+import { blockCreator, unblockCreator, listBlocked } from './blocks.js';
 import { getItem, itemTags, setState, hydrate, recheckBlocks, upsertItem, followed, addTags } from './store.js';
 import { applyEvents, applyEvent, topTags, rebuildProfile, points } from './profile.js';
 import { topReplies } from './threads.js';
 import { lookupPerson, platformPosts, profileUrl } from './people.js';
 import { genderPrefs, setGenderPrefs, autoMale } from './gender.js';
 import { queueLook } from './ai/looker.js';
-import { listSuggestions, setSuggestion, suggestCombos, suggestFantasies } from './suggest.js';
+import { listSuggestions, setSuggestion, suggestCombos, suggestFantasies, refreshFantasyIdeas } from './suggest.js';
+import { touchSession } from './sessions.js';
 import { listKinks, createKink, updateKink, deleteKink, mergeKinks, unlockKink, listFantasies, saveFantasy, deleteFantasy, setLink, removeLink } from './kinks.js';
 import { removedConcepts, forgetRemoved, risingConcepts, RULES } from './kinkengine.js';
 import { conceptName } from './concepts.js';
@@ -46,7 +48,7 @@ import { listProfiles, createProfile, renameProfile, setProfileColor, switchProf
 import { updateStatus, applyUpdate, job as updateJob, whatsNew, markSeen, changelog } from './update.js';
 import { lang, languageSet, setLanguage, LANGS, tr, trn, replyIn } from './i18n.js';
 import { kinkLabel, translateItem } from './translate.js';
-import { queueDislike, dislikeOf, dropReason } from './dislike.js';
+import { queueDislike, queueBlock, dislikeOf, dropReason, dislikedTags, forgiveTag } from './dislike.js';
 import { conceptLabel } from './vocab.js';
 import { conceptName as cName, knownVariants, familyOf } from './concepts.js';
 import { boostTags } from './profile.js';
@@ -103,6 +105,7 @@ let kinkRunAt = 0;
 let kinkRun = null;
 api.post('/events', wrap((req, res) => {
   const { sessionId, events = [] } = req.body || {};
+  touchSession();
   const list = events.slice(0, 200).map((e) => ({ ...e, sessionId }));
   const signal = applyEvents(list);
   const strongIds = list.filter((e) => ['save', 'reason', 'complete', 'rewatch', 'up'].includes(e.type) || (e.type === 'rate' && Number(e.value) > 0)).map((e) => Number(e.itemId)).filter(Boolean);
@@ -225,7 +228,7 @@ api.get('/performers/:name', wrap(async (req, res) => {
   const name = normalizeTag(req.params.name);
   const db = getDb();
   if (req.query.fetch === '1') {
-    const targets = [['pornhub', 'creator'], ['redtube', 'creator'], ['eporner', 'search'], ['redgifs', 'search']].filter(([p]) => providerState()[p]?.enabled);
+    const targets = [['pornhub', 'creator'], ['redtube', 'creator'], ['eporner', 'search'], ['redgifs', 'search'], ['xvideos', 'search'], ['xhamster', 'search'], ['xnxx', 'search']].filter(([p]) => PROVIDERS[p] && (providerState()[p]?.enabled || config.mock));
     await Promise.race([
       Promise.all(targets.map(([p, mode]) => PROVIDERS[p].fetch({ mode, value: req.params.name }).then((list) => { db.transaction(() => { for (const n of list) upsertItem({ ...n, performers: [...new Set([...(n.performers || []), mode === 'search' ? req.params.name : null].filter(Boolean))] }); })(); }).catch(() => {}))),
       new Promise((r) => setTimeout(r, 12000))
@@ -242,7 +245,8 @@ api.get('/performers/:name', wrap(async (req, res) => {
     name: info?.display || req.params.name, count: items.length, bySource, followed, thumb: info?.thumb || null, videosElsewhere: info?.videos || null, gender: info?.gender || null,
     match: items.length ? Math.round(items.reduce((a, b) => a + b.match, 0) / items.length) : null,
     tags: Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([t]) => t),
-    items: items.slice(0, 12)
+    // Their best known videos first: the most upvoted and viewed, from here and fetched from the sources.
+    items: topFirst(items).slice(0, 12)
   });
 }));
 
@@ -258,6 +262,8 @@ api.post('/performers/:name/follow', wrap((req, res) => {
 api.post('/items/:id/vote', wrap(async (req, res) => {
   const it = getItem(Number(req.params.id));
   const dir = Number(req.body?.dir) || 0;
+  // Liking what you already like (or the same twice from two windows) is not a new like: nothing is logged.
+  if (Math.sign(it.vote || 0) === Math.sign(dir)) return res.json({ ok: true, same: true });
   applyEvent({ itemId: it.id, type: dir > 0 ? 'up' : dir < 0 ? 'down' : 'unvote', sessionId: req.body?.sessionId });
   if (dir > 0) { fetchForInsight([it.id]); deepNow(it.id); try { strengthen([it.id], 1); } catch {} }
   if (dir < 0) queueDislike(it.id, 'down');
@@ -272,6 +278,7 @@ api.post('/items/:id/vote', wrap(async (req, res) => {
 api.post('/items/:id/save', wrap(async (req, res) => {
   const it = getItem(Number(req.params.id));
   const on = !!req.body?.on;
+  if (!!it.saved === on) return res.json({ ok: true, same: true });
   applyEvent({ itemId: it.id, type: on ? 'save' : 'unsave', sessionId: req.body?.sessionId });
   if (on) { fetchForInsight([it.id]); deepNow(it.id); try { strengthen([it.id], 1.4); } catch {} }
   let synced = false;
@@ -383,6 +390,7 @@ api.get('/hls', async (req, res) => {
 api.get('/home/summary', wrap((req, res) => {
   const db = getDb();
   const t = now();
+  touchSession();
   const prev = getSetting('lastVisit', 0) || 0;
   if (t - prev > 30 * 60000) { setSetting('prevVisit', prev); setSetting('lastVisit', t); }
   const since = getSetting('prevVisit', 0) || t - 86400000;
@@ -442,6 +450,20 @@ api.put('/settings/language', wrap((req, res) => {
   if (b.guessed && languageSet()) return res.json({ language: lang() });
   res.json({ language: setLanguage(b.language) });
 }));
+// The feed filters you set (formats, new or popular, how much new to you, the mood) stay set until you change them,
+// also after closing Undercurrent. They apply to searches too.
+const TUNE_FORMATS = ['long', 'short', 'gif', 'image', 'set', 'story', 'discussion'];
+export function cleanTune(b = {}) {
+  const out = {};
+  const f = Array.isArray(b.formats) ? b.formats.filter((x) => TUNE_FORMATS.includes(x)) : [];
+  if (f.length) out.formats = [...new Set(f)];
+  if (typeof b.window === 'string' && /^(new|popular):(day|week|month|year)$/.test(b.window)) out.window = b.window;
+  if (Number.isFinite(Number(b.mix)) && b.mix !== null && b.mix !== '') out.mix = Math.max(0, Math.min(40, Math.round(Number(b.mix) / 5) * 5));
+  if (typeof b.mood === 'string' && /^[a-z]{2,20}$/.test(b.mood)) out.mood = b.mood;
+  return out;
+}
+api.get('/settings/tune', wrap((req, res) => res.json(getSetting('tune', {}) || {})));
+api.put('/settings/tune', wrap((req, res) => { const v = cleanTune(req.body || {}); setSetting('tune', v); res.json(v); }));
 api.get('/settings/gender', wrap((req, res) => res.json({ ...genderPrefs(), autoValue: autoMale() })));
 api.put('/settings/gender', wrap((req, res) => {
   const b = req.body || {};
@@ -459,19 +481,52 @@ api.get('/people/lookup', wrap(async (req, res) => {
   res.json(await lookupPerson(handle, { platform: String(req.query.platform || 'any') }));
 }));
 
+// Most upvoted and viewed first, then how well they fit you.
+function topFirst(items) {
+  return [...items].sort((a, b) => popRaw({ score: b.upvotes ?? b.score, media: b.media }) - popRaw({ score: a.upvotes ?? a.score, media: a.media }) || b.match - a.match);
+}
+
 api.get('/authors/:source/:name', wrap(async (req, res) => {
   const { source, name } = req.params;
   const db = getDb();
+  // With fetch=1 their posts are also fetched from the source itself, not only what is already here.
+  if (req.query.fetch === '1' && PROVIDERS[source]?.can?.creator && (providerState()[source]?.enabled || config.mock)) {
+    await Promise.race([
+      PROVIDERS[source].fetch({ mode: 'creator', value: name }).then((list) => { db.transaction(() => { for (const n of list || []) upsertItem(n); })(); invalidatePool(); }).catch(() => {}),
+      new Promise((r) => setTimeout(r, 10000))
+    ]);
+  }
   const stats = db.prepare('SELECT COUNT(*) posts, COALESCE(SUM(score),0) score, MIN(community) community FROM items WHERE source = ? AND lower(author) = lower(?) AND blocked = 0').get(source, name);
   const tags = db.prepare(`SELECT t.name, COUNT(*) n FROM items i JOIN item_tags it ON it.item_id = i.id JOIN tags t ON t.id = it.tag_id WHERE i.source = ? AND lower(i.author) = lower(?) GROUP BY t.id ORDER BY n DESC LIMIT 8`).all(source, name);
   const kind = 'creator';
   const followValue = `${source}|${name}`;
   const followed = !!db.prepare("SELECT 1 FROM follows WHERE active = 1 AND ((kind = 'creator' AND lower(value) = lower(?)) OR (kind IN ('reddit_user','redgifs_user') AND lower(value) = lower(?)))").get(followValue, name);
-  const items = buildFeed({ author: name, includeSeen: true }, { limit: 30, mix: 0 }).items;
+  const items = buildFeed({ author: name, includeSeen: true, noCollections: true }, { limit: 40, mix: 0 }).items;
   const match = items.length ? Math.round(items.reduce((a, b) => a + b.match, 0) / items.length) : null;
   const onPlatform = await platformPosts(source, name).catch(() => null);
-  res.json({ name, source, ...stats, platformPosts: onPlatform?.posts ?? null, followers: onPlatform?.followers ?? null, profileUrl: onPlatform?.url || profileUrl(source === 'reddit' ? 'reddit' : source, name), avatar: onPlatform?.avatar || null, tags: tags.map((t) => t.name), followed, kind, followValue, canFollow: !!PROVIDERS[source]?.can?.creator, match, top: items.slice(0, 3).map((x) => ({ id: x.id, title: x.title, format: x.format, match: x.match })) });
+  res.json({ name, source, ...stats, platformPosts: onPlatform?.posts ?? null, followers: onPlatform?.followers ?? null, profileUrl: onPlatform?.url || profileUrl(source === 'reddit' ? 'reddit' : source, name), avatar: onPlatform?.avatar || null, tags: tags.map((t) => t.name), followed, kind, followValue, canFollow: !!PROVIDERS[source]?.can?.creator, match, top: items.slice(0, 3).map((x) => ({ id: x.id, title: x.title, format: x.format, match: x.match })), items: topFirst(items).slice(0, 12) });
 }));
+
+// Blocking a creator: worse than hiding a post. Everything from them goes, now and later, and the bigger model looks
+// at several of their posts together to learn what you did not like.
+api.post('/creators/block', wrap((req, res) => {
+  const kind = req.body?.kind === 'performer' ? 'performer' : 'author';
+  const name = String(req.body?.name || '').trim();
+  if (!name) return res.status(400).json({ error: tr('Which creator?') });
+  const { ids } = blockCreator({ kind, source: req.body?.source || null, name });
+  const first = Number(req.body?.itemId) || null;
+  const look = [...new Set([first, ...ids].filter(Boolean))].slice(0, 5);
+  if (first) { setState(first, { hidden: 1 }); applyEvent({ itemId: first, type: 'less' }); }
+  queueBlock(look);
+  invalidatePool();
+  res.json({ ok: true, hidden: ids.length, analysed: look[0] || null });
+}));
+api.get('/creators/blocked', wrap((req, res) => res.json({ blocked: listBlocked() })));
+api.delete('/creators/blocked/:id', wrap((req, res) => { const ok = unblockCreator(req.params.id); invalidatePool(); res.json({ ok }); }));
+
+// What you probably did not like, from the closer looks after hides, thumbs down and blocks.
+api.get('/memory/disliked', wrap((req, res) => res.json({ tags: dislikedTags(), blocked: listBlocked() })));
+api.delete('/memory/disliked/:tag', wrap((req, res) => res.json({ ok: true, n: forgiveTag(req.params.tag) })));
 
 api.get('/follows', wrap((req, res) => res.json({ follows: listFollows().map((f) => ({ ...f, target: followTarget(f) })) })));
 api.delete('/follows/:id', wrap((req, res) => { removeFollow(Number(req.params.id)); res.json({ ok: true }); }));
@@ -708,11 +763,24 @@ api.get('/history', wrap((req, res) => {
     if (!it) continue;
     const counts = {};
     for (const c of cq.all(r.item_id)) counts[c.type] = { n: c.c, v: c.v, max: c.mx, t: c.t };
+    // Likes, dislikes and saves count once, as they are now: liking, unliking and liking again is one like.
+    // Heat shows how hot it is now.
+    const VOTES = ['up', 'down', 'unvote', 'save', 'unsave', 'rate'];
+    const at = (k) => counts[k]?.t || 0;
+    for (const k of VOTES) delete counts[k];
+    if ((it.vote || 0) > 0) counts.up = { n: 1, t: Math.max(at('up'), r.last) };
+    if ((it.vote || 0) < 0) counts.down = { n: 1, t: r.last };
+    if (it.saved) counts.save = { n: 1, t: r.last };
+    if ((it.rating || 0) > 0) counts.rate = { n: 1, max: it.rating, t: r.last };
     const dwellMs = counts.dwell?.v || 0;
     const meaningful = Object.keys(counts).some((k) => !['impression', 'dwell', 'progress', 'play', 'skip'].includes(k)) || dwellMs >= 6000 || ((counts.progress?.v || 0) >= 0.5 && dwellMs >= 3000);
     if (!meaningful) continue;
     let pts = 0;
-    for (const e of evq.all(r.item_id)) pts += points(e.type, e.value, it);
+    for (const e of evq.all(r.item_id)) if (!VOTES.includes(e.type)) pts += points(e.type, e.value, it);
+    if ((it.vote || 0) > 0) pts += points('up', null, it);
+    if ((it.vote || 0) < 0) pts += points('down', null, it);
+    if (it.saved) pts += points('save', null, it);
+    if ((it.rating || 0) > 0) pts += points('rate', it.rating, it);
     const video = ['long', 'short', 'gif'].includes(it.format);
     out.push({
       id: it.id, title: it.title, source: it.source, format: it.format, media: it.media, author: it.author, community: it.community, last: r.last,
@@ -734,10 +802,10 @@ api.delete('/history/:id', wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
-api.get('/suggestions', wrap((req, res) => res.json({ suggestions: listSuggestions(String(req.query.kind || 'fantasy'), { status: String(req.query.status || 'new'), limit: 30 }) })));
+api.get('/suggestions', wrap((req, res) => { const kind = String(req.query.kind || 'fantasy'); res.json({ suggestions: listSuggestions(kind, { status: String(req.query.status || 'new'), limit: kind === 'fantasy' ? 4 : 30 }) }); }));
 api.post('/suggestions/refresh', wrap(async (req, res) => {
   const kind = req.body?.kind || 'fantasy';
-  const run = kind === 'combo' ? suggestCombos({ force: true }) : suggestFantasies({ force: true });
+  const run = kind === 'combo' ? suggestCombos({ force: true }) : refreshFantasyIdeas();
   res.json({ started: true, added: await Promise.race([run, new Promise((r) => setTimeout(() => r(null), 1500))]) });
 }));
 api.post('/suggestions/:id', wrap((req, res) => {
@@ -893,7 +961,7 @@ api.get('/setup/concepts', wrap((req, res) => {
   const mine = new Set(listKinks({ includeHidden: false }).filter((k) => !k.isGroup).flatMap((k) => k.concepts || []));
   res.json({ families: conceptCatalog(), picked: [...mine] });
 }));
-api.post('/setup/suggest', wrap((req, res) => res.json({ suggestions: suggestFor((req.body?.picked || []).map(String).slice(0, 40)) })));
+api.post('/setup/suggest', wrap((req, res) => res.json({ suggestions: suggestFor((req.body?.picked || []).map(String).slice(0, 60), req.body?.focus ? String(req.body.focus) : null) })));
 api.get('/setup/sources', wrap((req, res) => {
   const st = providerState();
   const order = (id) => { const i = SOURCE_ORDER.indexOf(id); return i < 0 ? 99 : i; };

@@ -5,6 +5,7 @@ import { soundOn, setSound, onSound, soundBlocked } from '../sound.js';
 import Linkify from './Linkify.jsx';
 import { t, tn } from '../i18n.js';
 import { useTranslate, TranslateButton, TranslatedNote } from './Translate.jsx';
+import { useZoomFullscreen } from './Zoom.jsx';
 
 let HlsLib = null;
 async function loadHls() {
@@ -57,8 +58,13 @@ export function VideoPlayer({ item, active, onPlay, onReady }) {
 
   useEffect(() => { if ((active || hover) && !armed) setArmed(true); }, [active, hover, armed]);
   const wrapRef = useRef(null);
+  const boxRef = useRef(null);
+  const zoom = useZoomFullscreen(boxRef);
+  const [holdH, setHoldH] = useState(null);
+  const openFs = () => { setHoldH(wrapRef.current?.offsetHeight || null); zoom.open(); };
+  useEffect(() => { if (!zoom.fs) setHoldH(null); }, [zoom.fs]);
   useFar(wrapRef, () => {
-    if (!armed) return;
+    if (!armed || zoom.fs) return;
     hlsRef.current?.destroy();
     hlsRef.current = null;
     const v = ref.current;
@@ -106,7 +112,7 @@ export function VideoPlayer({ item, active, onPlay, onReady }) {
   useEffect(() => {
     const v = ref.current;
     if (!v || !armed) return;
-    if (active || hover) {
+    if (active || hover || zoom.fs) {
       v.play().catch((err) => {
         if (err?.name === 'NotAllowedError' && !v.muted) {
           applyMuted(true);
@@ -115,7 +121,7 @@ export function VideoPlayer({ item, active, onPlay, onReady }) {
         }
       });
     } else v.pause();
-  }, [active, hover, armed, src, hlsUrl]);
+  }, [active, hover, armed, src, hlsUrl, zoom.fs]);
 
   function onError() {
     if (item.media.kind === 'redgifs' && !refreshed) {
@@ -197,8 +203,8 @@ export function VideoPlayer({ item, active, onPlay, onReady }) {
   const c = item.kinks?.[0]?.color || '#E39A83';
   const style = { '--c': rgba(c, 0.55), '--c2': rgba(c, 0.3), ...(ar ? { '--ar': Math.max(0.4, Math.min(2.6, ar)) } : {}) };
   return (
-    <div className="vidwrap" ref={wrapRef} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
-      <div className={cls} style={style}>
+    <div className="vidwrap" ref={wrapRef} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} style={holdH ? { minHeight: holdH } : undefined}>
+      <div className={`${cls}${zoom.fs ? ' fsbox' : ''}`} style={style} ref={boxRef}>
         {src || hlsUrl ? (
           <video
             ref={ref}
@@ -208,6 +214,7 @@ export function VideoPlayer({ item, active, onPlay, onReady }) {
             playsInline
             preload={armed ? 'auto' : 'metadata'}
             controls={armed}
+            controlsList="nofullscreen"
             onError={onError}
             onTimeUpdate={onTime}
             onPlaying={playing}
@@ -226,6 +233,8 @@ export function VideoPlayer({ item, active, onPlay, onReady }) {
             <Icon name={muted ? 'mute' : 'volume'} />
           </button>
         ) : null}
+        {(src || hlsUrl) && armed && !zoom.fs ? <button type="button" className="fsbtn" onClick={(e) => { e.stopPropagation(); openFs(); }} aria-label={t('Full screen')} title={t('Full screen: pinch or double-tap to zoom')}><Icon name="expand" /></button> : null}
+        {zoom.fs ? <button type="button" className="fsclose" onClick={(e) => { e.stopPropagation(); zoom.close(); }} aria-label={t('Close full screen')}><Icon name="x" /></button> : null}
         {error ? <div className="mediaerr">{error}</div> : null}
       </div>
       {item.format === 'long' ? (
@@ -249,7 +258,7 @@ function thumbSrc(u, forceProxy) {
 // (that is what the "first click opens your browser" ads do) and cannot navigate this page away.
 const SANDBOX = 'allow-scripts allow-same-origin allow-presentation allow-forms';
 
-export function EmbedPlayer({ item, active, onPlay, onReady }) {
+export function EmbedPlayer({ item, active, onPlay, onReady, onLike }) {
   const [m, setM] = useState(item.media);
   const thumbs = (m.thumbs?.length ? m.thumbs : [m.poster]).filter(Boolean);
   const [i, setI] = useState(0);
@@ -257,6 +266,24 @@ export function EmbedPlayer({ item, active, onPlay, onReady }) {
   const [playing, setPlaying] = useState(false);
   const embedRef = useRef(null);
   useFar(embedRef, () => { if (playing) setPlaying(false); });
+  // A player from another site does not tell this page about clicks. When you click into it, this page loses
+  // focus, so two of those within a moment are a double-click: that likes the post, like a double-tap on a picture.
+  // Focus is handed back right after each click so the next one is noticed too.
+  const likeRef = useRef(onLike);
+  likeRef.current = onLike;
+  useEffect(() => {
+    if (!playing) return undefined;
+    let last = 0;
+    const onBlur = () => setTimeout(() => {
+      const fr = embedRef.current?.querySelector('iframe');
+      if (!fr || document.activeElement !== fr) return;
+      const at = Date.now();
+      if (at - last < 450) { last = 0; likeRef.current?.(); } else last = at;
+      setTimeout(() => { try { embedRef.current?.focus({ preventScroll: true }); } catch {} }, 30);
+    }, 0);
+    window.addEventListener('blur', onBlur);
+    return () => window.removeEventListener('blur', onBlur);
+  }, [playing]);
   const [sandboxed, setSandboxed] = useState(true);
   const [proxyAll, setProxyAll] = useState(false);
   const [dead, setDead] = useState(false);
@@ -329,7 +356,7 @@ export function EmbedPlayer({ item, active, onPlay, onReady }) {
     return <div className="media land embed-dead" style={{ '--c': rgba(c, 0.4), '--c2': rgba(c, 0.18) }}><span>{t('This video is no longer available on {provider}.', { provider: m.provider })}</span></div>;
   }
   return (
-    <div ref={embedRef} className={`vidwrap${short ? ' tube-short' : ''}`} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+    <div ref={embedRef} tabIndex={-1} className={`vidwrap${short ? ' tube-short' : ''}`} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
       <div className={`media land${short ? ' shortland' : ''}`} style={{ '--c': rgba(c, 0.55), '--c2': rgba(c, 0.3) }}>
         {playing ? (
           <iframe key={sandboxed ? 's' : 'u'} src={embedUrl} title={item.title} sandbox={sandboxed ? SANDBOX : undefined} allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" />
@@ -390,7 +417,7 @@ export function Gallery({ item, onReady }) {
           <button type="button" className="icon-btn" onClick={() => setOpen((open - 1 + items.length) % items.length)} aria-label={t('Previous image')}><Icon name="chevL" /></button>
           <span className="count">{open + 1} / {items.length}</span>
           <button type="button" className="icon-btn" onClick={() => { const n = (open + 1) % items.length; setOpen(n); if (items[n].itemId && items[n].itemId !== g.itemId) track(items[n].itemId, 'open'); }} aria-label={t('Next image')}><Icon name="chevR" /></button>
-          <button type="button" className="ghost-btn small" onClick={() => setOpen(null)}>{t('Close')}</button>
+          <button type="button" className="ghost-btn small" onClick={() => setOpen(null)}><Icon name="x" />{t('Close')}</button>
         </div>
       </div>
     );
@@ -457,7 +484,7 @@ export function TopReplies({ item, compact = false }) {
       ))}
       {canMore ? (
         <div className="morereplies">
-          <button type="button" className="ghost-btn small" disabled={loading} onClick={() => more(n < 10 ? 10 : 40)}>{loading ? t('Loading replies…') : n < 10 ? t('More replies') : t('All replies')}</button>
+          <button type="button" className="ghost-btn small" disabled={loading} onClick={() => more(n < 10 ? 10 : 40)}><Icon name="comment" />{loading ? t('Loading replies…') : n < 10 ? t('More replies') : t('All replies')}</button>
           {n < 10 ? <button type="button" className="linkbtn" disabled={loading} onClick={() => more(40)}>{t('Load all')}</button> : null}
         </div>
       ) : null}
@@ -485,18 +512,18 @@ export function TextBody({ item, onPerson }) {
       <div className="rowline">
         <TranslateButton tr={trBody} />
         <TranslatedNote tr={trBody} />
-        {body.length > cut || (phone && !story && !open && item.comments > 2) ? <button type="button" className="ghost-btn small" onClick={() => { setOpen((o) => !o); if (!open) track(item.id, 'open'); }}>{open ? t('Show less') : t('Continue reading')}</button> : null}
+        {body.length > cut || (phone && !story && !open && item.comments > 2) ? <button type="button" className="ghost-btn small" onClick={() => { setOpen((o) => !o); if (!open) track(item.id, 'open'); }}><Icon name="book" />{open ? t('Show less') : t('Continue reading')}</button> : null}
         <span className="read">{story ? t('about {n} min to read', { n: readMinutes(item) }) : tn(item.comments, '{n} reply', '{n} replies')}</span>
       </div>
     </div>
   );
 }
 
-export function Media({ item, active, near = true, height, onPlay, onReady, onPerson }) {
+export function Media({ item, active, near = true, height, onPlay, onReady, onPerson, onLike }) {
   const m = item.media || {};
   useEffect(() => { if (m.kind === 'text' || !m.kind) onReady?.(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   if (!near && m.kind !== 'text') return <div className="media-sleep" style={{ height: height || 320 }} aria-hidden="true" />;
-  if (m.kind === 'embed') return <EmbedPlayer item={item} active={active} onPlay={onPlay} onReady={onReady} />;
+  if (m.kind === 'embed') return <EmbedPlayer item={item} active={active} onPlay={onPlay} onReady={onReady} onLike={onLike} />;
   if (m.kind === 'video' || m.kind === 'redgifs') return <VideoPlayer item={item} active={active} onPlay={onPlay} onReady={onReady} />;
   if (m.kind === 'gallery') return <Gallery item={item} onReady={onReady} />;
   if (m.kind === 'image') return <ImageMedia item={item} src={m.src} mid={m.mid} onReady={onReady} />;

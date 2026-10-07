@@ -5,7 +5,8 @@ import { listKinks, listFantasies, kinkPairs } from './kinks.js';
 import { engagement, topTags } from './profile.js';
 import { tagsForItems, tagSpecificity } from './store.js';
 import { userLimits, isBlocked } from './safety.js';
-import { listMemory } from './memory.js';
+import { listMemory, memoryUpkeep } from './memory.js';
+import { onNewSession } from './sessions.js';
 import { log } from './log.js';
 import { replyIn } from './i18n.js';
 
@@ -83,7 +84,7 @@ export async function suggestFantasies({ force = false } = {}) {
     const kinks = listKinks().filter((k) => !k.isGroup && k.status !== 'hidden').slice(0, 14);
     const ev = evidence();
     if (ev.length < 5 || !kinks.length) return 0;
-    const existing = [...listFantasies().map((f) => f.name), ...listSuggestions('fantasy', { status: 'new', limit: 30 }).map((s) => s.title), ...listSuggestions('fantasy', { status: 'dismissed', limit: 30 }).map((s) => s.title)];
+    const existing = [...listFantasies().map((f) => f.name), ...listSuggestions('fantasy', { status: 'new', limit: 30 }).map((s) => s.title), ...listSuggestions('fantasy', { status: 'dismissed', limit: 30 }).map((s) => s.title), ...listSuggestions('fantasy', { status: 'stale', limit: 30 }).map((s) => s.title)];
     const mem = listMemory({ status: 'active' }).slice(0, 12).map((m) => `- ${m.category}: ${m.content}`);
     const user = [
       `Their kinks (strongest first): ${kinks.map((k) => `${k.name} (${Math.round((k.allTime + k.lately) / 2)}%)`).join(', ')}`,
@@ -184,13 +185,37 @@ export function newKinks() {
   return ks.sort((a, b) => b.lately - a.lately);
 }
 
+// Fantasy ideas: at most four at a time, a fresh set every two sessions.
+export const FANTASY_MAX = 4;
+export async function refreshFantasyIdeas() {
+  getDb().prepare("UPDATE suggestions SET status = 'stale' WHERE kind = 'fantasy' AND status = 'new'").run();
+  return suggestFantasies({ force: true });
+}
+
 let timer = null;
 export function startSuggestions() {
   if (timer) return;
   const tick = async () => {
     try { await suggestCombos(); } catch {}
-    try { await suggestFantasies(); } catch {}
+    // Only to fill an empty list; the set itself changes every two sessions.
+    try { if (!listSuggestions('fantasy', { limit: 1 }).length) await suggestFantasies(); } catch {}
   };
+  onNewSession(async (n) => {
+    // "Still true?" for old or cooled-down memories, and new memory suggestions to review now and then.
+    const cooling = topTags({ by: 'long', limit: 40 }).filter((t) => t.name && t.long > 0.2 && t.lately < t.long * 0.4).map((t) => t.name);
+    const asked = memoryUpkeep({ cooling });
+    if (asked) log('info', `Asking again about ${asked} older memories`);
+    const proposed = listMemory({ status: 'proposed' }).length;
+    const lastReflect = getSetting('reflectSession', 0) || 0;
+    if (proposed < 3 && n - lastReflect >= 2 && !config.mock) {
+      setSetting('reflectSession', n);
+      const { reflect } = await import('./ai/assistant.js');
+      const ids = await reflect().catch(() => []);
+      if (ids.length) log('info', `Suggested ${ids.length} new memories to review`);
+    }
+    const lastFant = getSetting('fantasySession', 0) || 0;
+    if (n - lastFant >= 2) { setSetting('fantasySession', n); await refreshFantasyIdeas(); }
+  });
   setTimeout(tick, 90000);
   timer = setInterval(tick, 30 * 60000);
 }

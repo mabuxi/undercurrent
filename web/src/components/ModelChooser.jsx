@@ -89,7 +89,7 @@ export function ModelsCard() {
       <p className="wtext">{t('Which model does which job. The recommendation fits this Mac; pick a lighter one if things feel slow, or a bigger one for better results.')}</p>
       <ModelChooser options={options} choice={choice} setChoice={setChoice} status={status} />
       <div className="wbtns">
-        <button type="button" className="ghost-btn small accent" onClick={save} disabled={!changed && !(status && !status.ready)}>{changed ? t('Save and download') : t('Download what is missing')}</button>
+        <button type="button" className="ghost-btn small accent" onClick={save} disabled={!changed && !(status && !status.ready)}><Icon name="download" />{changed ? t('Save and download') : t('Download what is missing')}</button>
         {msg ? <span className="count">{msg}</span> : null}
       </div>
     </div>

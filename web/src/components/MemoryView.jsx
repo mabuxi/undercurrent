@@ -30,8 +30,8 @@ function MemoryItem({ m, categories, onChange, showCat = false }) {
           <textarea id={`mem-${m.id}`} value={text} onChange={(e) => setText(e.target.value)} rows={2} aria-label={t('Memory text')} />
           <div className="rowline">
             <select value={cat} onChange={(e) => setCat(e.target.value)} aria-label={t('Category')}>{categories.map((c) => <option key={c} value={c}>{t(c)}</option>)}</select>
-            <button type="submit" className="ghost-btn small accent">{t('Save')}</button>
-            <button type="button" className="ghost-btn small" onClick={() => { setEdit(false); setText(m.content); }}>{t('Cancel')}</button>
+            <button type="submit" className="ghost-btn small accent"><Icon name="check" />{t('Save')}</button>
+            <button type="button" className="ghost-btn small" onClick={() => { setEdit(false); setText(m.content); }}><Icon name="x" />{t('Cancel')}</button>
           </div>
         </form>
       ) : (
@@ -39,6 +39,7 @@ function MemoryItem({ m, categories, onChange, showCat = false }) {
           <div className="memtext">
             {showCat ? <span className="memcat" style={{ '--c': metaOf(m.category).color }}><Icon name={metaOf(m.category).icon} />{t(m.category)}</span> : null}
             {m.status === 'proposed' && !showCat ? <span className="sugg">{t('Suggested')}</span> : null}
+            {m.status === 'recheck' ? <span className="sugg ask">{t('Still true?')}</span> : null}
             {m.pinned ? <span className="sugg pin">{t('Pinned')}</span> : null}
             <p>{m.content}</p>
             {m.evidence ? <span className="wnote">{t('Because: {evidence}', { evidence: m.evidence })}</span> : null}
@@ -47,7 +48,12 @@ function MemoryItem({ m, categories, onChange, showCat = false }) {
             {m.status === 'proposed' ? (
               <>
                 <button type="button" className="ghost-btn small accent" onClick={() => patch({ status: 'active' })}><Icon name="check" />{t('Keep')}</button>
-                <button type="button" className="ghost-btn small" onClick={remove}>{t('Not right')}</button>
+                <button type="button" className="ghost-btn small" onClick={remove}><Icon name="less" />{t('Not right')}</button>
+              </>
+            ) : m.status === 'recheck' ? (
+              <>
+                <button type="button" className="ghost-btn small accent" onClick={() => patch({ status: 'active' })}><Icon name="check" />{t('Still true')}</button>
+                <button type="button" className="ghost-btn small" onClick={() => patch({ status: 'archived' })}><Icon name="x" />{t('Not anymore')}</button>
               </>
             ) : null}
             <button type="button" className="icon-btn" onClick={() => patch({ pinned: !m.pinned })} aria-label={m.pinned ? t('Unpin') : t('Pin')} title={m.pinned ? t('Unpin') : t('Pin')}><Icon name="pin" /></button>
@@ -56,6 +62,54 @@ function MemoryItem({ m, categories, onChange, showCat = false }) {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+const kindCount = (k, n) => (k === 'down' ? tn(n, '{n} thumbs down', '{n} thumbs down [many]') : k === 'block' ? tn(n, '{n} block', '{n} blocks') : tn(n, '{n} hide', '{n} hides'));
+
+// What you probably did not like: only from the closer looks after you hid, disliked or blocked something, and only
+// what still counts against posts (not what you like or feel neutral about now).
+function DislikedSection() {
+  const { toast } = useApp();
+  const [d, setD] = useState(null);
+  const load = () => api('/memory/disliked').then(setD).catch(() => setD({ tags: [], blocked: [] }));
+  useEffect(() => { load(); }, []);
+  async function forgive(tag) {
+    setD((cur) => ({ ...cur, tags: cur.tags.filter((x) => x.tag !== tag) }));
+    try { await api(`/memory/disliked/${encodeURIComponent(tag)}`, { method: 'DELETE' }); toast(t('{tag} no longer counts against posts.', { tag })); } catch (e) { toast(e.message); }
+  }
+  async function unblock(b) {
+    setD((cur) => ({ ...cur, blocked: cur.blocked.filter((x) => x.id !== b.id) }));
+    try { await api(`/creators/blocked/${b.id}`, { method: 'DELETE' }); toast(t('{name} is unblocked.', { name: b.name })); } catch (e) { toast(e.message); }
+  }
+  return (
+    <div className="memsec" id="mem-disliked">
+      <div className="sechead"><h3><span className="secic" style={{ '--c': '#E07070' }}><Icon name="less" /></span>{t('Did not like')}</h3><span className="count">{d?.tags?.length || 0}</span></div>
+      <div className="card2">
+        <p className="wnote">{t('What the bigger model found when you hid, disliked or blocked something, leaving out what you like. Only what still counts against posts shows here; tap × if it was not that.')}</p>
+        {d === null ? <p className="wnote">{t('Loading…')}</p> : d.tags.length ? (
+          <div className="dislist">
+            {d.tags.map((x) => (
+              <span key={x.tag} className="dchip big" title={Object.entries(x.kinds).map(([k, n]) => kindCount(k, n)).join(', ')}>
+                {x.tag}<em>{Object.entries(x.kinds).map(([k, n]) => kindCount(k, n)).join(' · ')}</em>
+                <button type="button" onClick={() => forgive(x.tag)} aria-label={t('That was not it: {tag}', { tag: x.tag })} title={t('That is fine')}><Icon name="x" /></button>
+              </span>
+            ))}
+          </div>
+        ) : <p className="wnote">{t('Nothing yet. When you hide, dislike or block something, what you probably did not like shows up here.')}</p>}
+        {d?.blocked?.length ? (
+          <div className="blocklist">
+            <span className="fb-label">{t('Blocked creators')}</span>
+            {d.blocked.map((b) => (
+              <div key={b.id} className="blockrow">
+                <Icon name="block" /><strong>{b.name}</strong><span className="mini-meta">{b.kind === 'performer' ? t('performer, every source') : b.source} · {ago(Math.round((b.ts || 0) / 1000))}</span>
+                <button type="button" className="ghost-btn small" onClick={() => unblock(b)}><Icon name="refresh" />{t('Unblock')}</button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -75,7 +129,7 @@ function PromptLog() {
       <p className="wnote">{t('Everything you typed to the assistant. Searches, questions and feedback on posts stay here and are not memory; only things you say about your taste are saved to memory.')}</p>
       <div className="rowline wrapline">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('Search the log')} aria-label={t('Search the prompt log')} style={{ flex: 2 }} />
-        <button type="button" className="ghost-btn small" onClick={async () => { await api('/prompts/all', { method: 'DELETE' }); load(); toast(t('Prompt log cleared.')); }} disabled={!list?.length}>{t('Clear log')}</button>
+        <button type="button" className="ghost-btn small" onClick={async () => { await api('/prompts/all', { method: 'DELETE' }); load(); toast(t('Prompt log cleared.')); }} disabled={!list?.length}><Icon name="trash" />{t('Clear log')}</button>
       </div>
       <div className="promptlog">
         {shown.slice(0, 150).map((p) => (
@@ -106,7 +160,7 @@ function FantasyIdeas({ onSaved }) {
   return (
     <div className="card2">
       <h3><span className="secic" style={{ '--c': '#F6C35B' }}><Icon name="why" /></span>{t("Fantasies the assistant thinks you'd like")} <span className="count">{list?.length || 0}</span></h3>
-      <p className="wnote">{t('Written from what you liked, heated and saved. Only ideas it is at least 75% sure about are shown.')}</p>
+      <p className="wnote">{t('Written from what you liked, heated and saved: up to four ideas it is at least 75% sure about, and a new set every two sessions.')}</p>
       {list?.length ? (
         <div className="fantgrid">
           {list.map((sg) => (
@@ -115,15 +169,15 @@ function FantasyIdeas({ onSaved }) {
               <span className="wtext">{sg.body}</span>
               <span className="mini-meta">{(sg.data.kinks || []).map((k) => k.name).concat(sg.data.tags || []).join(' · ')}{sg.data.why ? ` · ${sg.data.why}` : ''}</span>
               <div className="memacts">
-                <button type="button" className="ghost-btn small accent" onClick={() => act(sg, 'save')}>{t('Save')}</button>
-                <button type="button" className="ghost-btn small" onClick={() => act(sg, 'dismiss')}>{t('Not for me')}</button>
+                <button type="button" className="ghost-btn small accent" onClick={() => act(sg, 'save')}><Icon name="check" />{t('Save')}</button>
+                <button type="button" className="ghost-btn small" onClick={() => act(sg, 'dismiss')}><Icon name="less" />{t('Not for me')}</button>
               </div>
             </div>
           ))}
         </div>
       ) : null}
       {list && !list.length ? <p className="wnote">{t('No ideas yet. They come as you like, heat and save posts.')}</p> : null}
-      <div className="wbtns"><button type="button" className="ghost-btn small" disabled={busy} onClick={async () => { setBusy(true); try { await api('/suggestions/refresh', { method: 'POST', body: { kind: 'fantasy' } }); toast(t('Thinking about new fantasies in the background. They show up here in a minute or two.')); setTimeout(load, 60000); } finally { setBusy(false); } }}>{t('Suggest fantasies now')}</button></div>
+      <div className="wbtns"><button type="button" className="ghost-btn small" disabled={busy} onClick={async () => { setBusy(true); try { await api('/suggestions/refresh', { method: 'POST', body: { kind: 'fantasy' } }); toast(t('Thinking about new fantasies in the background. They show up here in a minute or two.')); setTimeout(load, 60000); } finally { setBusy(false); } }}><Icon name="why" />{t('Suggest fantasies now')}</button></div>
     </div>
   );
 }
@@ -159,8 +213,8 @@ export default function MemoryView() {
   }
 
   const groups = mem?.groups || [];
-  const proposed = groups.flatMap((g) => g.items.filter((m) => m.status === 'proposed'));
-  const kept = groups.map((g) => ({ ...g, items: g.items.filter((m) => m.status !== 'proposed').sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)) }));
+  const proposed = groups.flatMap((g) => g.items.filter((m) => m.status === 'proposed' || m.status === 'recheck'));
+  const kept = groups.map((g) => ({ ...g, items: g.items.filter((m) => m.status !== 'proposed' && m.status !== 'recheck').sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)) }));
   const filled = kept.filter((g) => g.items.length);
   const empty = kept.filter((g) => !g.items.length);
   const total = kept.reduce((a, g) => a + g.items.length, 0);
@@ -171,6 +225,7 @@ export default function MemoryView() {
     proposed.length ? { id: 'mem-review', icon: 'check', label: t('To review'), n: proposed.length, hot: true } : null,
     { id: 'mem-about', icon: 'brain', label: t('About you'), n: total },
     { id: 'mem-fant', icon: 'spark', label: t('Fantasies'), n: fantasies.length },
+    { id: 'mem-disliked', icon: 'less', label: t('Did not like') },
     { id: 'mem-history', icon: 'clock', label: t('Everything you did') },
     { id: 'mem-log', icon: 'thread', label: t('Prompt log') }
   ].filter(Boolean);
@@ -196,7 +251,7 @@ export default function MemoryView() {
       {proposed.length ? (
         <div className="card2 memsec review" id="mem-review">
           <h3><span className="secic" style={{ '--c': '#F6C35B' }}><Icon name="check" /></span>{t('To review')} <span className="count">{tn(proposed.length, '{n} suggestion', '{n} suggestions')}</span></h3>
-          <p className="wnote">{t('The assistant noticed these from what you did. Keep what is right, drop what is not.')}</p>
+          <p className="wnote">{t('The assistant noticed these from what you did, and asks again about older ones that may have changed. Keep what is right, drop what is not.')}</p>
           <div className="memlist">{proposed.map((m) => <MemoryItem key={m.id} m={m} categories={mem.categories} onChange={load} showCat />)}</div>
         </div>
       ) : null}
@@ -211,7 +266,7 @@ export default function MemoryView() {
         <textarea id="newMem" value={text} onChange={(e) => setText(e.target.value)} rows={2} placeholder={t('I like slow builds more than anything fast. Never show me …')} aria-label={t('New memory')} />
         <div className="rowline">
           <span className="wnote">{metaOf(cat).hint}</span>
-          <button type="submit" className="ghost-btn small accent" style={{ marginLeft: 'auto' }}>{t('Remember')}</button>
+          <button type="submit" className="ghost-btn small accent" style={{ marginLeft: 'auto' }}><Icon name="brain" />{t('Remember')}</button>
         </div>
       </form>
 
@@ -279,10 +334,12 @@ export default function MemoryView() {
             <div className="chiprow">{kinks.filter((k) => k.status === 'active').map((k) => (
               <button type="button" key={k.id} className={`chip btn${newFant.kinks.includes(k.id) ? ' on' : ''}`} onClick={() => setNewFant({ ...newFant, kinks: newFant.kinks.includes(k.id) ? newFant.kinks.filter((x) => x !== k.id) : [...newFant.kinks, k.id] })}>{k.name}</button>
             ))}</div>
-            <button type="submit" className="ghost-btn small accent">{t('Add fantasy')}</button>
+            <button type="submit" className="ghost-btn small accent"><Icon name="plus" />{t('Add fantasy')}</button>
           </form>
         </div>
       </div>
+
+      <DislikedSection />
 
       <div className="memsec" id="mem-history">
         <HistoryDb />

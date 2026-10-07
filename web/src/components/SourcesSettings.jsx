@@ -19,7 +19,7 @@ function KeyForm({ p, onSaved }) {
     <form className="formgrid" onSubmit={async (e) => { e.preventDefault(); await api(`/settings/booru/${p.id}`, { method: 'PUT', body: f }); toast(t('{label} key saved.', { label: p.label })); onSaved(); }}>
       <label htmlFor={`${p.id}-uid`}>{t('User ID')}<input id={`${p.id}-uid`} value={f.userId} onChange={(e) => setF({ ...f, userId: e.target.value })} autoComplete="off" /></label>
       <label htmlFor={`${p.id}-key`}>{t('API key')}<input id={`${p.id}-key`} type="password" value={f.apiKey} onChange={(e) => setF({ ...f, apiKey: e.target.value })} placeholder={p.hasKeys ? t('saved, leave empty to keep') : ''} autoComplete="off" /></label>
-      <div className="rowline"><button type="submit" className="ghost-btn small">{t('Save key')}</button><span className="wnote">{t('Find both on your account options page on {label}.', { label: p.label })}</span></div>
+      <div className="rowline"><button type="submit" className="ghost-btn small"><Icon name="check" />{t('Save key')}</button><span className="wnote">{t('Find both on your account options page on {label}.', { label: p.label })}</span></div>
     </form>
   );
 }
@@ -83,13 +83,13 @@ function ProviderCard({ p, reload }) {
         <form className="rowline wrapline" onSubmit={async (e) => { e.preventDefault(); const r = await api('/settings/lemmy', { method: 'PUT', body: { instance: inst } }); setSettings?.((s) => ({ ...s, lemmyInstance: r.instance || inst })); toast(t('Lemmy server set to {server}.', { server: r.instance || inst })); reload(); }}>
           <label className="fb-label" htmlFor="lemmyInst">{t('Server')}</label>
           <input id="lemmyInst" value={inst} onChange={(e) => setInst(e.target.value)} aria-label={t('Lemmy server')} />
-          <button type="submit" className="ghost-btn small">{t('Save')}</button>
+          <button type="submit" className="ghost-btn small"><Icon name="check" />{t('Save')}</button>
         </form>
       ) : null}
       {p.id === 'reddit' && p.rss ? <p className="count">{p.rss.authenticated ? t('Feed key set: fast updates') : p.rss.waiting ? t('One request per minute, {n} waiting', { n: p.rss.waiting }) : t('One request per minute')}{p.rss.lastError ? ` · ${p.rss.lastError}` : ''}</p> : null}
       {p.hasKeys ? (
         <div className="rowline wrapline">
-          <button type="button" className="ghost-btn small" onClick={runTest} disabled={busy}>{busy ? t('Testing') : t('Test')}</button>
+          <button type="button" className="ghost-btn small" onClick={runTest} disabled={busy}><Icon name="pulse" />{busy ? t('Testing') : t('Test')}</button>
           {test ? (test.ok
             ? <span className="count">{tn(test.fetched, 'Works: {n} post in {sec} s', 'Works: {n} posts in {sec} s', { sec: dec(test.ms / 1000) })}{test.filtered ? `, ${tn(test.filtered, '{n} filtered out', '{n} filtered out')}` : ''}</span>
             : <span className="count down">{t('Failed: {error}', { error: test.error })}</span>) : null}
@@ -104,7 +104,7 @@ function ProviderCard({ p, reload }) {
               {p.can.creator ? <option value="creator">{p.id === 'pornhub' || p.id === 'redtube' ? t('Performer') : p.id === 'reddit' ? t('Reddit user') : p.id === 'bluesky' ? t('Handle') : p.id === 'lemmy' ? t('User') : t('Creator')}</option> : null}
             </select>
             <input id={`add-${p.id}`} value={value} onChange={(e) => setValue(e.target.value)} placeholder={PLACE[mode]} aria-label={t('Search or name')} />
-            <button type="submit" className="ghost-btn small">{t('Add')}</button>
+            <button type="submit" className="ghost-btn small"><Icon name="plus" />{t('Add')}</button>
           </form>
           {p.follows.length ? (
             <div className="follist">
@@ -171,8 +171,8 @@ export function ExtremeSection() {
       <div className="limits">{d.terms.map((x) => <span className="limit" key={x}>{x}<button type="button" aria-label={t('Remove {tag}', { tag: x })} onClick={() => save({ terms: d.terms.filter((y) => y !== x) })}><Icon name="close" /></button></span>)}</div>
       <form className="rowline" onSubmit={(e) => { e.preventDefault(); if (!word.trim()) return; save({ terms: [...d.terms, word.trim()] }); setWord(''); }}>
         <input id="extremeAdd" value={word} onChange={(e) => setWord(e.target.value)} placeholder={t('Add a word')} aria-label={t('Add a word')} />
-        <button type="submit" className="ghost-btn small">{t('Add')}</button>
-        <button type="button" className="ghost-btn small" onClick={() => save({ terms: d.defaults })}>{t('Reset to defaults')}</button>
+        <button type="submit" className="ghost-btn small"><Icon name="plus" />{t('Add')}</button>
+        <button type="button" className="ghost-btn small" onClick={() => save({ terms: d.defaults })}><Icon name="refresh" />{t('Reset to defaults')}</button>
       </form>
     </div>
   );

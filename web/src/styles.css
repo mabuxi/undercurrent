@@ -1593,3 +1593,69 @@ html.snap.snapfree{scroll-snap-type:y proximity}
 .gallery.g2 .gtile,.gallery.g3 .gtile,.gallery.g4 .gtile{min-height:0}
 .postfx.at{inset:auto 0;top:var(--fy);height:0}
 .postfx>*{position:relative;left:calc(var(--fx,50%) - 50%)}
+
+/* 0.20.0: filters behind one button, the "right now" picks next to it, the assistant's answer in the greeting */
+.hello{scroll-margin-top:calc(var(--toph,60px) + 8px)}
+.hello-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px;width:100%}
+.tunebtn .tunecount{font-style:normal;font-family:var(--mono);font-size:11px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;display:inline-grid;place-items:center;background:var(--accent);color:var(--accent-ink)}
+.tunebtn svg:last-child{width:13px;height:13px;color:var(--text-3)}
+.nowrow{display:flex;gap:6px;flex-wrap:wrap;min-width:0}
+.tuner{animation:popin .26s var(--ease-out) both}
+.tuner .wnote{margin:0}
+.endnote{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px}
+.feedwait{min-height:60vh}
+html.narrow .hello-row{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-inline:-2px;padding:2px}
+html.narrow .hello-row::-webkit-scrollbar{display:none}
+html.narrow .nowrow{flex-wrap:nowrap}
+html.narrow .hello-row>*{flex:none}
+
+/* 0.20.0: bigger thumbnails in list windows */
+.thumbbox{width:72px}
+.thumb.land{width:72px;height:41px}
+.thumb.vert{width:30px;height:52px}
+.thumb.sq{width:46px;height:46px}
+.thumb.gif{width:56px;height:42px}
+.thumb.txt{width:52px;height:40px}
+.thumb{border-radius:7px}
+
+/* 0.20.0: our own full screen for videos, always fitting the screen, with pinch zoom */
+.fsbtn{all:unset;cursor:pointer;position:absolute;right:10px;top:50px;width:32px;height:32px;border-radius:50%;background:rgba(10,6,12,.55);display:grid;place-items:center;color:#EFE6EA;z-index:3;opacity:0;transition:opacity .2s}
+.vidwrap:hover .fsbtn,.fsbtn:focus-visible{opacity:.9}
+@media (hover:none){.fsbtn{opacity:.75}}
+.fsbtn svg{width:16px;height:16px}
+.media.fsbox{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;height:100dvh!important;max-width:none!important;max-height:none!important;aspect-ratio:auto!important;margin:0!important;border-radius:0!important;z-index:3000;background:#000;touch-action:none;overflow:hidden}
+.media.fsbox video,.media.fsbox>img{object-fit:contain!important;background:#000;transform:translate(var(--zx,0px),var(--zy,0px)) scale(var(--zs,1));transform-origin:center;will-change:transform}
+.media.fsbox .badge,.media.fsbox .dur{display:none}
+.media.fsbox .mutebtn{top:calc(env(safe-area-inset-top,0px) + 14px);right:64px}
+.fsclose{all:unset;cursor:pointer;position:absolute;right:14px;top:calc(env(safe-area-inset-top,0px) + 14px);width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:#fff;z-index:4;
+  background:rgba(30,22,30,.55);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.16)}
+.fsclose svg{width:18px;height:18px}
+html.vidfs,html.vidfs body{overflow:hidden;scroll-snap-type:none}
+html.vidfs .tabbar,html.vidfs .top{visibility:hidden}
+/* Videos that go full screen by themselves always fit the screen too */
+video:fullscreen,video:-webkit-full-screen{object-fit:contain!important;background:#000}
+video::-webkit-media-controls-fullscreen-button{display:none}
+.vidwrap:focus{outline:none}
+.blockask{display:flex;flex-wrap:wrap;align-items:center;gap:6px;width:100%}
+.reviewwin{display:flex;flex-direction:column;gap:8px}
+.memquote{margin:0;font-family:var(--display);font-style:italic;font-size:18px;line-height:1.35;color:var(--text)}
+.reviewdone{display:flex;align-items:center;gap:6px;color:var(--text-2)}
+.reviewdone svg{width:14px;height:14px}
+.sugg.ask{background:#C9A7E8;color:#1E1428}
+.dislist{display:flex;flex-wrap:wrap;gap:6px}
+.dchip.big{font-size:12.5px;padding:4px 6px 4px 11px;gap:6px;height:auto;min-height:28px}
+.dchip.big em{font-style:normal;font-family:var(--mono);font-size:10.5px;color:var(--text-3)}
+.blocklist{display:flex;flex-direction:column;gap:6px;padding-top:10px;border-top:1px solid var(--line)}
+.blockrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.blockrow>svg{width:15px;height:15px;color:#E07070}
+.blockrow .mini-meta{flex:1;min-width:120px}
+.sentinel .endnote{font-family:var(--ui);font-size:13.5px;color:var(--text-2)}
+.sentinel .ghost-btn{font-family:var(--ui)}
+.sentinel{height:auto;min-height:40px;padding:10px 0}
+/* On a phone the filters you keep set are in the Filters button and the "Showing" line, not in the top bar */
+html.narrow .schip-tune{display:none}
+html.narrow .sb-chips:not(:has(>:not(.schip-tune))){display:none}
+html.narrow .sb-chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+html.narrow .sb-chips::-webkit-scrollbar{display:none}
+html.narrow .sb-chips>*{flex:none}
+.ptile .ptxt{position:absolute;inset:0;padding:10px 10px 24px;font-family:var(--display);font-size:15px;line-height:1.2;color:var(--text-2);overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;border-left:2px solid var(--accent)}

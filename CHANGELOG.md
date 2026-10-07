@@ -3,6 +3,51 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.20.0 · 7 October 2026
+
+### Filters
+- The feed controls are behind one Filters button, on the Mac too, with a count of what is set. The Right now picks stay visible next to it.
+- Every filter stays set until you change it, also after closing Undercurrent: formats, new or popular and the period, how much new to you, the mood, and whether the panel is open.
+- Filters apply to searches too: the gender balance, the formats and new or popular. Only a search that says who it wants, or looks up one person, ignores the gender balance.
+- At the end of a search with filters set, "Remove filters to find more results" shows the same search without them, for that search only.
+
+### Search
+- The assistant's answer takes the place of the line under the greeting ("Tonight leans into…"), in the same size, and the page scrolls to it.
+- Searching no longer adds "going deeper" posts after one you liked: a search shows what you searched for.
+- "Gay for pay" (also "gay for fans") is a kink of its own, in English and French searches too.
+
+### Videos
+- Double-click a player from another site to like the post, like a double-tap on a picture.
+- New full screen button on videos: the whole video always fits the screen, never cropped. Pinch to zoom on the iPhone and the Mac trackpad, or ctrl and the scroll wheel, double-tap to zoom in or out, drag to move around. On a Mac it uses the real full screen.
+
+### Creators
+- A creator's or performer's panel shows their top posts as pictures: what is here plus what is fetched from the source right then, most upvoted and viewed first.
+- "Find everything from…" is now "Look up…".
+- Block a creator or performer: stronger than hiding a post. Everything from them is hidden, also what comes later, and the bigger model looks at several of their posts together to learn what you did not like. Blocked creators can be unblocked in Memory.
+- Every small button in the app has an icon now.
+
+### Memory
+- New "Did not like" section: what the bigger model found after hides, thumbs down and blocks, leaving out what you like. Only tags that still count against posts show, with how often; tap × if it was not that, and it is taken back.
+- New memory suggestions come by themselves every couple of sessions, and unanswered ones make room after a week.
+- Every ten windows or so a memory to review comes in between, at most two per session.
+- Older memories, ones that may have been a phase and ones whose tags have cooled down are asked about again: "Still true?". Pinned memories and your limits never are.
+- Fantasy ideas: at most four, a new set every two sessions.
+- Everything you did: liking a post several times counts once and shows once; heat shows how hot it is now.
+
+### Feed and windows
+- The saves window comes far less often: never in the first twenty windows, at most once in sixty and once every two hours.
+- Bigger thumbnails in list windows.
+
+### Welcome steps
+- The kinks to pick from are broader: straight first, with gay and lesbian mixed in.
+- Every pick adds its own related kinks to "Goes well with that", and they stay, so the list keeps growing as you click.
+
+### Fixes
+- On a phone the filters you keep set no longer stretch the top bar; they are in the Filters button and the Showing line.
+- Switching views opens the new view at its top.
+- The end of a search no longer leaves a screen of empty space, and its buttons are easier to read.
+- Text posts in a creator's pictures show their title instead of an empty tile.
+
 ## 0.19.2 · 6 October 2026
 
 ### Test mode

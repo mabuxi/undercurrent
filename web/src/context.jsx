@@ -32,6 +32,7 @@ export function crumbList(filters, { kinks = [], fantasies = [] } = {}) {
   if (filters.kink) c.push(['kink', kname(filters.kink)]);
   for (const tag of filters.tags || []) c.push([`tag:${tag}`, tag]);
   if (filters.minMatch) c.push(['minMatch', t('Your top matches ({n}%+)', { n: filters.minMatch })]);
+  if (filters.noTune) c.push(['noTune', t('Without your filters')]);
   if (filters.formats?.length) c.push(['formats', filters.formats.map((f) => ({ long: t('Long form'), short: t('Short form'), gif: t('GIFs'), image: t('Images'), set: t('Image sets'), story: t('Stories'), discussion: t('Threads') }[f] || f)).join(', ')]);
   return c;
 }

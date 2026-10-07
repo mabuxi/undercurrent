@@ -29,5 +29,10 @@ export default {
   'Only posts from {list}': 'Seulement les publications de {list}',
   'Showing only posts from {list} for now. Remove it above to see all your sources again.': 'Seulement les publications de {list} pour l’instant. Retirez-le en haut pour revoir toutes vos sources.',
   '{list} is switched off in Settings: you see what was already fetched from it.': '{list} est désactivé dans les Réglages\u00A0: vous voyez ce qui en avait déjà été récupéré.',
-  'Only the Mac itself can do this.': 'Seul le Mac lui-même peut faire ça.'
+  'Only the Mac itself can do this.': 'Seul le Mac lui-même peut faire ça.',
+  'Which creator?': 'Quel créateur\u00A0?',
+  'Still true?': 'Toujours vrai\u00A0?',
+  'Is this you?': 'C’est vous\u00A0?',
+  'an older memory, to keep it right': 'un ancien souvenir, pour qu’il reste juste',
+  'a memory the assistant suggests': 'un souvenir que l’assistant propose'
 };

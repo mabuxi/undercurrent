@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ago, proxied, imgSrc } from '../api.js';
 import { useApp } from '../context.jsx';
+import { Icon } from '../icons.jsx';
 import { t } from '../i18n.js';
 
 // "Everything you did": every post you interacted with and what each one taught your taste. It lives in Memory.
@@ -70,8 +71,8 @@ export default function HistoryDb() {
                 <span className="mini-meta">{it.author || it.community || it.source} · {it.source} · {ago(Math.round(it.last / 1000))}</span>
                 <div className="evchips">{chips(it)}</div>
               </div>
-              <button type="button" className="ghost-btn small" onClick={(e) => { e.stopPropagation(); forget(it, false); }} title={t('Remove from what your profile learned')}>{t('Forget')}</button>
-              <button type="button" className="ghost-btn small" onClick={(e) => { e.stopPropagation(); forget(it, true); }} title={t('Forget it and show less like it')}>{t('Not for me')}</button>
+              <button type="button" className="ghost-btn small" onClick={(e) => { e.stopPropagation(); forget(it, false); }} title={t('Remove from what your profile learned')}><Icon name="x" />{t('Forget')}</button>
+              <button type="button" className="ghost-btn small" onClick={(e) => { e.stopPropagation(); forget(it, true); }} title={t('Forget it and show less like it')}><Icon name="less" />{t('Not for me')}</button>
             </div>
           ))}
         </div>

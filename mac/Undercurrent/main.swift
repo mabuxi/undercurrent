@@ -192,6 +192,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let what = message.body as? String else { return }
         if what == "zoom" { window.performZoom(nil); return }
+        // While a video is full screen in the page, pinching zooms the video, not the whole window.
+        if what == "pinch-off" { web.allowsMagnification = false; return }
+        if what == "pinch-on" { web.allowsMagnification = true; return }
         if what == "drag" { dragWindow() }
     }
 

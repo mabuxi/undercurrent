@@ -55,10 +55,10 @@ function RedditSection({ s, reload }) {
         <label htmlFor="rusr">{t('Username')}<input id="rusr" value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} autoComplete="username" /></label>
         <label htmlFor="rpw">{t('Password')}<input id="rpw" type="password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} placeholder={s?.reddit?.hasPassword ? t('saved, leave empty to keep') : ''} autoComplete="current-password" /></label>
         <div className="rowline wrapline">
-          <button type="submit" className="ghost-btn small accent" disabled={!!busy}>{t('Save')}</button>
-          <button type="button" className="ghost-btn small" disabled={!connected || !!busy} onClick={() => run('test', async () => setDiag(await api('/reddit/test', { method: 'POST', body: {} })))}>{busy === 'test' ? t('Testing') : t('Test')}</button>
-          <button type="button" className="ghost-btn small" disabled={!connected || !!busy} onClick={() => run('sync', async () => { const r = await api('/reddit/sync', { method: 'POST', body: {} }); toast(tn(r.subscriptions, '{n} subscription synced ({nsfw} NSFW). Fetching posts now.', '{n} subscriptions synced ({nsfw} NSFW). Fetching posts now.', { nsfw: r.nsfw })); reload(); })}>{busy === 'sync' ? t('Syncing') : t('Sync subscriptions')}</button>
-          <button type="button" className="ghost-btn small" disabled={!connected || !!busy} onClick={() => run('import', async () => { const r = await api('/reddit/import', { method: 'POST', body: {} }); toast(t('Imported {upvoted} upvoted and {saved} saved posts into your profile.', { upvoted: r.upvoted, saved: r.saved })); })}>{busy === 'import' ? t('Importing') : t('Import upvoted and saved')}</button>
+          <button type="submit" className="ghost-btn small accent" disabled={!!busy}><Icon name="check" />{t('Save')}</button>
+          <button type="button" className="ghost-btn small" disabled={!connected || !!busy} onClick={() => run('test', async () => setDiag(await api('/reddit/test', { method: 'POST', body: {} })))}><Icon name="pulse" />{busy === 'test' ? t('Testing') : t('Test')}</button>
+          <button type="button" className="ghost-btn small" disabled={!connected || !!busy} onClick={() => run('sync', async () => { const r = await api('/reddit/sync', { method: 'POST', body: {} }); toast(tn(r.subscriptions, '{n} subscription synced ({nsfw} NSFW). Fetching posts now.', '{n} subscriptions synced ({nsfw} NSFW). Fetching posts now.', { nsfw: r.nsfw })); reload(); })}><Icon name="refresh" />{busy === 'sync' ? t('Syncing') : t('Sync subscriptions')}</button>
+          <button type="button" className="ghost-btn small" disabled={!connected || !!busy} onClick={() => run('import', async () => { const r = await api('/reddit/import', { method: 'POST', body: {} }); toast(t('Imported {upvoted} upvoted and {saved} saved posts into your profile.', { upvoted: r.upvoted, saved: r.saved })); })}><Icon name="download" />{busy === 'import' ? t('Importing') : t('Import upvoted and saved')}</button>
         </div>
       </form>
       {diag ? (
@@ -86,7 +86,7 @@ function RedditFeedKey({ s, reload }) {
     <form className="rowline wrapline" onSubmit={async (e) => { e.preventDefault(); try { const r = await api('/settings/reddit-feed', { method: 'PUT', body: { url } }); setUrl(''); toast(r.set ? t('Feed key saved. Reddit feeds now load every few seconds instead of once a minute.') : t('Feed key removed.')); reload(); } catch (err) { toast(err.message); } }}>
       <span className="fb-label">{t('Feed key')}</span>
       <input id="redditFeed" value={url} onChange={(e) => setUrl(e.target.value)} placeholder={s?.redditFeed?.set ? t('saved for u/{user}, paste a new link to replace', { user: s.redditFeed.user }) : t('Paste any private feed link from reddit.com/prefs/feeds (optional)')} aria-label={t('Reddit private feed link')} style={{ flex: 2 }} />
-      <button type="submit" className="ghost-btn small">{url ? t('Save') : s?.redditFeed?.set ? t('Remove') : t('Save')}</button>
+      <button type="submit" className="ghost-btn small"><Icon name="check" />{url ? t('Save') : s?.redditFeed?.set ? t('Remove') : t('Save')}</button>
     </form>
   );
 }
@@ -100,7 +100,7 @@ function BoardSection({ name, label, s, reload }) {
       <b className="flabel">{label} {has ? <span className="okpill">{t('key saved')}</span> : null}</b>
       <label htmlFor={`${name}-uid`}>{t('User ID')}<input id={`${name}-uid`} value={f.userId} onChange={(e) => setF({ ...f, userId: e.target.value })} autoComplete="off" /></label>
       <label htmlFor={`${name}-key`}>{t('API key')}<input id={`${name}-key`} type="password" value={f.apiKey} onChange={(e) => setF({ ...f, apiKey: e.target.value })} placeholder={has ? t('saved, leave empty to keep') : ''} autoComplete="off" /></label>
-      <button type="submit" className="ghost-btn small">{t('Save')}</button>
+      <button type="submit" className="ghost-btn small"><Icon name="check" />{t('Save')}</button>
     </form>
   );
 }
@@ -138,7 +138,7 @@ function SourcesSection() {
         </select>
         {kind === 'booru_query' ? <select value={board} onChange={(e) => setBoard(e.target.value)} aria-label={t('Board')}><option value="rule34">Rule34</option><option value="gelbooru">Gelbooru</option></select> : null}
         <input id="followIn" value={value} onChange={(e) => setValue(e.target.value)} placeholder={kind === 'booru_query' ? t('tags separated by spaces, e.g. tag_one tag_two') : kind === 'subreddit' ? t('subreddit name') : t('name')} aria-label={t('Follow')} style={{ flex: 2 }} />
-        <button type="submit" className="ghost-btn small accent">{t('Follow')}</button>
+        <button type="submit" className="ghost-btn small accent"><Icon name="plus" />{t('Follow')}</button>
         <button type="button" className="ghost-btn small" onClick={async () => { const r = await api('/ingest', { method: 'POST', body: { force: true } }); toast(r.skipped ? t('Already fetching.') : tn(r.added, '{n} new post.', '{n} new posts.')); load(); }}><Icon name="refresh" />{t('Fetch now')}</button>
       </form>
       <div className="follist">
@@ -148,7 +148,7 @@ function SourcesSection() {
             <span className="folname">{f.kind === 'booru_query' ? f.value.replace('|', ': ') : f.label || f.value}</span>
             {f.synced_from === 'reddit' ? <span className="count">{t('from your Reddit')}</span> : null}
             <span className="count">{f.last_fetch ? t('fetched {m} min ago', { m: Math.round((Date.now() - f.last_fetch) / 60000) }) : t('not fetched yet')}</span>
-            <button type="button" className="ghost-btn small" onClick={async () => { await api('/follow', { method: 'POST', body: { kind: f.kind, value: f.value, on: !f.active } }); load(); }}>{f.active ? t('Pause') : t('Resume')}</button>
+            <button type="button" className="ghost-btn small" onClick={async () => { await api('/follow', { method: 'POST', body: { kind: f.kind, value: f.value, on: !f.active } }); load(); }}><Icon name="pause" />{f.active ? t('Pause') : t('Resume')}</button>
           </div>
         ))}
       </div>
@@ -181,15 +181,15 @@ function ModelSection({ s, reload }) {
                 <span className="folname">{x.name}</span>
                 <span className="count">{x.parameterSize} · {x.quantization} · {fmtBytes(x.size)}{x.vision ? ` · ${t('sees images')}` : ''}</span>
                 {m.running.some((r) => r.name === x.name) ? <span className="okpill">{t('loaded')}</span> : null}
-                {x.name === m.active ? <span className="okpill">{t('active')}</span> : <button type="button" className="ghost-btn small" onClick={() => pick(x.name)}>{t('Use this')}</button>}
+                {x.name === m.active ? <span className="okpill">{t('active')}</span> : <button type="button" className="ghost-btn small" onClick={() => pick(x.name)}><Icon name="check" />{t('Use this')}</button>}
               </div>
             ))}
             {!m.models.length && !m.error ? <p className="wnote">{t('No models installed yet. Choose them above and press Download.')}</p> : null}
           </div>
           <form className="rowline wrapline" onSubmit={(e) => { e.preventDefault(); if (custom.trim()) pick(custom.trim()); }}>
             <input id="modelIn" value={custom} onChange={(e) => setCustom(e.target.value)} placeholder={t('Or type a model name (active: {name})', { name: m.active })} aria-label={t('Model name')} style={{ flex: 2 }} />
-            <button type="submit" className="ghost-btn small">{t('Set')}</button>
-            <button type="button" className="ghost-btn small" onClick={async () => { setTest(t('Asking the model…')); try { const r = await api('/models/test', { method: 'POST', body: {} }); setTest(`${r.reply} (${dec(r.ms / 1000)} s)`); } catch (e) { setTest(e.message); } }}>{t('Test')}</button>
+            <button type="submit" className="ghost-btn small"><Icon name="check" />{t('Set')}</button>
+            <button type="button" className="ghost-btn small" onClick={async () => { setTest(t('Asking the model…')); try { const r = await api('/models/test', { method: 'POST', body: {} }); setTest(`${r.reply} (${dec(r.ms / 1000)} s)`); } catch (e) { setTest(e.message); } }}><Icon name="pulse" />{t('Test')}</button>
           </form>
           {test ? <p className="answer">{test}</p> : null}
         </>
@@ -243,8 +243,8 @@ function TaggerSection({ s, reload }) {
             <div key={x.name} className={`folrow${x.name === fast ? ' current' : ''}`}>
               <span className="folname">{x.name}</span>
               <span className="count">{x.parameterSize}{x.vision ? ` · ${t('sees images')}` : ''}</span>
-              {x.name === fast ? <span className="okpill">{t('tags posts')}</span> : <button type="button" className="ghost-btn small" onClick={() => setAi({ fastModel: x.name })}>{t('Use for tagging')}</button>}
-              {x.vision ? (x.name === (s?.ai?.deepModel || fast) ? <span className="okpill">{t('looks at frames')}</span> : <button type="button" className="ghost-btn small" onClick={() => setAi({ deepModel: x.name })}>{t('Use for close looks')}</button>) : null}
+              {x.name === fast ? <span className="okpill">{t('tags posts')}</span> : <button type="button" className="ghost-btn small" onClick={() => setAi({ fastModel: x.name })}><Icon name="check" />{t('Use for tagging')}</button>}
+              {x.vision ? (x.name === (s?.ai?.deepModel || fast) ? <span className="okpill">{t('looks at frames')}</span> : <button type="button" className="ghost-btn small" onClick={() => setAi({ deepModel: x.name })}><Icon name="check" />{t('Use for close looks')}</button>) : null}
             </div>
           ))}
           {(m.suggested || []).filter((x) => !installed.has(x.name)).map((x) => {
@@ -254,7 +254,7 @@ function TaggerSection({ s, reload }) {
               <div key={x.name} className="folrow">
                 <span className="folname">{x.name}</span>
                 <span className="count">{x.size} · {x.note}</span>
-                {p?.status === 'pulling' ? <span className="okpill">{pct ? `${pct}%` : t('starting')}</span> : p?.status === 'error' ? <span className="count down">{p.error}</span> : <button type="button" className="ghost-btn small accent" onClick={() => install(x.name)}>{t('Install')}</button>}
+                {p?.status === 'pulling' ? <span className="okpill">{pct ? `${pct}%` : t('starting')}</span> : p?.status === 'error' ? <span className="count down">{p.error}</span> : <button type="button" className="ghost-btn small accent" onClick={() => install(x.name)}><Icon name="download" />{t('Install')}</button>}
               </div>
             );
           })}
@@ -284,7 +284,7 @@ function LimitsSection() {
       <div className="limits">{d?.limits.map((l) => <span className="limit" key={l}>{l}<button type="button" aria-label={t('Remove {tag}', { tag: l })} onClick={async () => { await api(`/limits/${encodeURIComponent(l)}`, { method: 'DELETE' }); load(); }}><Icon name="close" /></button></span>)}</div>
       <form className="rowline" onSubmit={async (e) => { e.preventDefault(); if (!tag.trim()) return; const r = await api('/limits', { method: 'POST', body: { tag } }); toast(tn(r.hidden, 'Blocked. {n} post hidden.', 'Blocked. {n} posts hidden.')); setTag(''); load(); }}>
         <input id="limitAdd" value={tag} onChange={(e) => setTag(e.target.value)} placeholder={t('Tag to block')} aria-label={t('Tag to block')} />
-        <button type="submit" className="ghost-btn small">{t('Block')}</button>
+        <button type="submit" className="ghost-btn small"><Icon name="block" />{t('Block')}</button>
       </form>
     </div>
   );
@@ -298,9 +298,9 @@ function DataSection() {
       <h3>{t('Your data')}</h3>
       <p className="wnote">{t('Everything lives in one file on this computer (data/undercurrent.db). Export gives you a readable copy of your memory, kinks, fantasies, sources and profile.')}</p>
       <div className="rowline wrapline">
-        <a className="ghost-btn small" href="/api/export" download>{t('Export profile')}</a>
+        <a className="ghost-btn small" href="/api/export" download><Icon name="download" />{t('Export profile')}</a>
         <input id="resetConfirm" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder={t('type "reset" to wipe your taste profile')} aria-label={t('Confirm reset')} />
-        <button type="button" className="ghost-btn small" disabled={confirm !== 'reset'} onClick={async () => { await api('/reset-profile', { method: 'POST', body: { confirm } }); setConfirm(''); toast(t('Taste profile wiped. Memory, kinks and fantasies were kept.')); }}>{t('Wipe taste profile')}</button>
+        <button type="button" className="ghost-btn small" disabled={confirm !== 'reset'} onClick={async () => { await api('/reset-profile', { method: 'POST', body: { confirm } }); setConfirm(''); toast(t('Taste profile wiped. Memory, kinks and fantasies were kept.')); }}><Icon name="trash" />{t('Wipe taste profile')}</button>
       </div>
     </div>
   );
@@ -330,7 +330,7 @@ function WebSearchSection() {
       <form className="rowline wrapline" onSubmit={save}>
         <span className="fb-label">{t('API key')}</span>
         <input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder={st?.set ? (st.fromEnv ? t('set in .env (OLLAMA_API_KEY)') : t('saved, paste a new key to replace')) : t('Paste a key from ollama.com/settings/keys')} aria-label={t('Ollama API key')} style={{ flex: 2 }} autoComplete="off" />
-        <button type="submit" className="ghost-btn small">{key ? t('Save and test') : st?.set && !st.fromEnv ? t('Remove') : t('Save')}</button>
+        <button type="submit" className="ghost-btn small"><Icon name="check" />{key ? t('Save and test') : st?.set && !st.fromEnv ? t('Remove') : t('Save')}</button>
       </form>
     </div>
   );
@@ -363,7 +363,7 @@ function ScraperSection() {
       <form className="rowline wrapline" onSubmit={save}>
         <span className="fb-label">{t('Address')}</span>
         <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder={st?.url ? t('paste a new address to replace') : 'https://your-lustpress-server.example'} aria-label={t('Scraper server address')} style={{ flex: 2 }} autoComplete="off" />
-        <button type="submit" className="ghost-btn small" disabled={busy}>{busy ? t('Testing') : url ? t('Save and test') : st?.url ? t('Remove') : t('Save')}</button>
+        <button type="submit" className="ghost-btn small" disabled={busy}><Icon name="pulse" />{busy ? t('Testing') : url ? t('Save and test') : st?.url ? t('Remove') : t('Save')}</button>
       </form>
     </div>
   );

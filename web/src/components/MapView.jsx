@@ -73,7 +73,7 @@ function Detail({ nodeKey, brain, reload, onSelect }) {
         {node.type === 'kink' ? <input className="kname" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => name.trim() && name !== node.name && patch({ name: name.trim() }, t('Renamed.'))} aria-label={t('Name')} /> : <b className="kname static">{node.name}</b>}
         <span className="count">{TYPE_LABEL[node.type]}{node.origin === 'tag' ? ` · ${t('grew from a tag you kept coming back to')}` : ''}{node.status === 'proposed' ? ` · ${t('suggested')}` : ''}</span>
         <div className="wbtns">
-          <button type="button" className="ghost-btn small accent" onClick={() => setFilters(d?.filter || (node.type === 'tag' ? { tags: [node.name] } : node.type === 'fantasy' ? { fantasy: node.id } : { kink: node.id }))}>{t('Show in feed')}</button>
+          <button type="button" className="ghost-btn small accent" onClick={() => setFilters(d?.filter || (node.type === 'tag' ? { tags: [node.name] } : node.type === 'fantasy' ? { fantasy: node.id } : { kink: node.id }))}><Icon name="eye" />{t('Show in feed')}</button>
           {node.type !== 'tag' ? (
             <>
               <button type="button" className="ghost-btn small" onClick={() => openMode('journey', { ...(node.type === 'fantasy' ? { fantasy: node.id } : { kink: node.id }), mode: 'close' })}><Icon name="route" />{t('Dive deeper')}</button>
@@ -81,11 +81,11 @@ function Detail({ nodeKey, brain, reload, onSelect }) {
               <button type="button" className="ghost-btn small" onClick={() => openMode('journey', { ...(node.type === 'fantasy' ? { fantasy: node.id } : { kink: node.id }), mode: 'genre' })}><Icon name="route" />{t('Surprise me, same family')}</button>
             </>
           ) : null}
-          {node.type === 'tag' ? <button type="button" className="ghost-btn small" onClick={async () => { const r = await api(`/brain/promote/${node.id}`, { method: 'POST', body: {} }); toast(t('It is a kink now.')); await reload(); refreshMeta(); onSelect(`k${r.id}`); }}>{t('Make it a kink')}</button> : null}
-          {kinkObj?.status === 'proposed' ? <button type="button" className="ghost-btn small" onClick={() => patch({ status: 'active' }, t('Kept.'))}>{t('Keep')}</button> : null}
-          {kinkObj ? <button type="button" className="ghost-btn small" onClick={() => patch({ status: 'hidden' }, t('Hidden. It stays hidden until you bring it back.'))}>{t('Hide')}</button> : null}
-          {kinkObj ? <button type="button" className="ghost-btn small" onClick={async () => { await api(`/kinks/${node.id}`, { method: 'DELETE' }); toast(t("Removed. It won't come back by itself.")); onSelect(null); reload(); refreshMeta(); }}>{t('Remove')}</button> : null}
-          {node.type === 'fantasy' ? <button type="button" className="ghost-btn small" onClick={async () => { await api(`/fantasies/${node.id}`, { method: 'DELETE' }); onSelect(null); reload(); }}>{t('Delete')}</button> : null}
+          {node.type === 'tag' ? <button type="button" className="ghost-btn small" onClick={async () => { const r = await api(`/brain/promote/${node.id}`, { method: 'POST', body: {} }); toast(t('It is a kink now.')); await reload(); refreshMeta(); onSelect(`k${r.id}`); }}><Icon name="flame" />{t('Make it a kink')}</button> : null}
+          {kinkObj?.status === 'proposed' ? <button type="button" className="ghost-btn small" onClick={() => patch({ status: 'active' }, t('Kept.'))}><Icon name="check" />{t('Keep')}</button> : null}
+          {kinkObj ? <button type="button" className="ghost-btn small" onClick={() => patch({ status: 'hidden' }, t('Hidden. It stays hidden until you bring it back.'))}><Icon name="less" />{t('Hide')}</button> : null}
+          {kinkObj ? <button type="button" className="ghost-btn small" onClick={async () => { await api(`/kinks/${node.id}`, { method: 'DELETE' }); toast(t("Removed. It won't come back by itself.")); onSelect(null); reload(); refreshMeta(); }}><Icon name="trash" />{t('Remove')}</button> : null}
+          {node.type === 'fantasy' ? <button type="button" className="ghost-btn small" onClick={async () => { await api(`/fantasies/${node.id}`, { method: 'DELETE' }); onSelect(null); reload(); }}><Icon name="trash" />{t('Delete')}</button> : null}
         </div>
       </div>
       <div className="bwgrid">
@@ -191,8 +191,8 @@ function FantasyEditor({ brain, reload, onDone }) {
         <textarea className="kdesc" rows={2} value={desc} onChange={(e) => setDesc(e.target.value)} placeholder={t('Describe the scenario')} />
         <div className="chiprow">{kinks.map((k) => <button type="button" key={k.key} className={`chip btn${sel.has(k.id) ? ' on' : ''}`} onClick={() => setSel((cur) => { const n = new Set(cur); if (n.has(k.id)) n.delete(k.id); else n.add(k.id); return n; })}>{k.name}</button>)}</div>
         <div className="wbtns">
-          <button type="button" className="ghost-btn small accent" onClick={async () => { if (!name.trim() || !sel.size) { toast(t('Name it and pick at least one kink.')); return; } await api('/fantasies', { method: 'POST', body: { name: name.trim(), description: desc, kinks: [...sel], saved: 1 } }); toast(t('Fantasy added to your map.')); await reload(); onDone(); }}>{t('Save')}</button>
-          <button type="button" className="ghost-btn small" onClick={onDone}>{t('Cancel')}</button>
+          <button type="button" className="ghost-btn small accent" onClick={async () => { if (!name.trim() || !sel.size) { toast(t('Name it and pick at least one kink.')); return; } await api('/fantasies', { method: 'POST', body: { name: name.trim(), description: desc, kinks: [...sel], saved: 1 } }); toast(t('Fantasy added to your map.')); await reload(); onDone(); }}><Icon name="check" />{t('Save')}</button>
+          <button type="button" className="ghost-btn small" onClick={onDone}><Icon name="x" />{t('Cancel')}</button>
         </div>
       </div>
     </div>

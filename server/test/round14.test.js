@@ -31,6 +31,8 @@ test('the welcome steps suggest related things live and group concepts by family
   assert.ok(s.includes('jock') || s.includes('gym'));
   assert.ok(!s.includes('jockstrap'));
   const fams = conceptCatalog();
-  assert.ok(fams.find((f) => f.name === 'Body').concepts.slice(0, 3).some((c) => c.concept === 'muscle'));
+  // Broad: the first ones shown in a family mix straight and gay (0.20: straight first, muscle still on the first row).
+  assert.ok(fams.find((f) => f.name === 'Body').concepts.slice(0, 8).some((c) => c.concept === 'muscle'));
+  assert.ok(fams.find((f) => f.name === 'Body').concepts.slice(0, 3).some((c) => c.concept === 'big tits'));
   assert.ok(recommendedModels().fast.name.includes('4b'));
 });

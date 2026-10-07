@@ -84,14 +84,26 @@ function Kinks({ families, picked, setPicked }) {
   const [sugg, setSugg] = useState([]);
   const [own, setOwn] = useState('');
   const [open, setOpen] = useState(null);
-  const timer = useRef(null);
+  const last = useRef(null);
+  // Every pick brings its own related kinks: they are added in front of the earlier ones and stay, so the list keeps
+  // growing as you click. What you pick leaves the list.
   useEffect(() => {
-    clearTimeout(timer.current);
     if (!picked.length) { setSugg([]); return undefined; }
-    timer.current = setTimeout(() => api('/setup/suggest', { method: 'POST', body: { picked } }).then((r) => setSugg(r.suggestions)).catch(() => {}), 250);
-    return () => clearTimeout(timer.current);
+    const focus = last.current;
+    const tm = setTimeout(() => api('/setup/suggest', { method: 'POST', body: { picked, focus } }).then((r) => {
+      setSugg((cur) => {
+        const fresh = (r.suggestions || []).filter((x) => !picked.includes(x.concept));
+        const added = fresh.filter((x) => !cur.some((c) => c.concept === x.concept));
+        const keep = cur.filter((x) => !picked.includes(x.concept));
+        return [...added, ...keep].slice(0, 48);
+      });
+    }).catch(() => {}), 200);
+    return () => clearTimeout(tm);
   }, [picked.join('|')]); // eslint-disable-line react-hooks/exhaustive-deps
-  const toggle = (c) => setPicked(picked.includes(c) ? picked.filter((x) => x !== c) : [...picked, c]);
+  const toggle = (c) => {
+    if (picked.includes(c)) { setPicked(picked.filter((x) => x !== c)); last.current = null; }
+    else { last.current = c; setPicked([...picked, c]); }
+  };
   const colorOf = useMemo(() => { const m = new Map(); for (const f of families) for (const c of f.concepts) m.set(c.concept, f.color); return m; }, [families]);
   const nameOf = useMemo(() => { const m = new Map(); for (const f of families) for (const c of f.concepts) m.set(c.concept, c.name); return m; }, [families]);
   return (

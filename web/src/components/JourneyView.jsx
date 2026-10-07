@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { useApp } from '../context.jsx';
+import { Icon } from '../icons.jsx';
 import Post from './Post.jsx';
 import { t, tn, getLang } from '../i18n.js';
 
@@ -60,9 +61,9 @@ export default function JourneyView({ spec }) {
           <h3>{t('Journey complete')}</h3>
           <p className="wtext">{tn(n, '{n} step', '{n} steps')} · {t('{n} rated', { n: end?.rated || 0 })}{end?.avg ? ` · ${t('average {avg} flames', { avg: getLang() === 'fr' ? end.avg.replace('.', ',') : end.avg })}` : ''}. {t('Everything you did is already on your map.')}</p>
           <div className="wbtns">
-            <button type="button" className="ghost-btn small accent" onClick={saveAsFantasy}>{t('Save as a fantasy')}</button>
-            <button type="button" className="ghost-btn small" onClick={() => openMode('journey', spec)}>{t('Another one like this')}</button>
-            <button type="button" className="ghost-btn small" onClick={() => openMode('feed')}>{t('Back to feed')}</button>
+            <button type="button" className="ghost-btn small accent" onClick={saveAsFantasy}><Icon name="save" />{t('Save as a fantasy')}</button>
+            <button type="button" className="ghost-btn small" onClick={() => openMode('journey', spec)}><Icon name="route" />{t('Another one like this')}</button>
+            <button type="button" className="ghost-btn small" onClick={() => openMode('feed')}><Icon name="home" />{t('Back to feed')}</button>
           </div>
         </div>
       )}
