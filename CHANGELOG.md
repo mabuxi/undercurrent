@@ -3,6 +3,31 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.20.1 · 8 October 2026
+
+### What you did not like
+- After a thumbs down, a hide or a block, the post asks what you did not like, with its tags as choices (leaving out what you like). Only what you pick counts against similar posts.
+- A thumbs down only asks. For a hide or a block the bigger model also has a look and its guess is marked in the choices, but a guess never counts on its own.
+- "Not sure", or leaving the question: the guesses wait in Memory, Did not like, under To verify, until you confirm or drop them.
+- Fixed: reasons picked after a thumbs down did not show under Did not like.
+
+### Search and filters
+- A search or a filter shows "Showing: …" and how many posts match in place of the "Tonight leans into…" line. The generic "posts from your sources" sentence is gone; only sources that did not answer and search notes are still written out.
+- New "Clear all" chip next to the search chips: clears the search and every filter shown there at once.
+- The Right now picks refresh with the side windows, also when you scroll back to the top, and rotate through more of what fits you each time.
+
+### Videos
+- Double-clicking a player from another site counts as a like only when both clicks are quick (within 0.3 s).
+- A double-tap on a video no longer pauses it: a single tap waits a moment before playing or pausing.
+
+### Look
+- Moods are small tiles in one full row (two full rows of three on a phone), never with an empty gap at the end. The hint shows when you point at one.
+- The Filters button and the sub-tag chips in windows are less round, and those chips stay on one line instead of turning into tall ovals.
+
+### Tags
+- More tags per post when they are sure: every meaningful word of the title, site tags and hashtags, and what the title plainly means ("stepmom catches me" is stepmom and caught).
+- Hashtags become tags, split into words (#BigBalls is big balls, #hairy_chest is hairy chest), leaving out noise like #fyp. Posts already here get them too.
+
 ## 0.20.0 · 7 October 2026
 
 ### Filters

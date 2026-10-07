@@ -278,7 +278,7 @@ export function EmbedPlayer({ item, active, onPlay, onReady, onLike }) {
       const fr = embedRef.current?.querySelector('iframe');
       if (!fr || document.activeElement !== fr) return;
       const at = Date.now();
-      if (at - last < 450) { last = 0; likeRef.current?.(); } else last = at;
+      if (at - last < 300) { last = 0; likeRef.current?.(); } else last = at;
       setTimeout(() => { try { embedRef.current?.focus({ preventScroll: true }); } catch {} }, 30);
     }, 0);
     window.addEventListener('blur', onBlur);

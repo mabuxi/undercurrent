@@ -117,7 +117,7 @@ What you do turns into scores per tag, creator, community and format on three ti
 
 **Kinks** are specific things you keep coming back to: at least four posts you clearly liked, on more than one day, and clearly more common in what you love than in everything you see. Tags that are on almost every post never become kinks. Kinks get plain names, are grouped by family once two share one (Body, Clothing, Places…), update by themselves and fade when you stop. Anything you change by hand stays. Manage them on **Your map**.
 
-**What you did not like**: hiding a post, a thumbs down or blocking a creator makes the bigger local model look at it (several posts together for a block), leaving out what you already like. What it finds counts against similar posts and is listed in Memory, Did not like, where you can take it back.
+**What you did not like**: after a thumbs down, a hide or a block, the post asks what you did not like, offering its tags minus the ones you like. Only what you pick counts against similar posts. For hides and blocks the bigger local model also has a look (several posts together for a block) and marks its guess; a guess never counts on its own. If you leave the question, the guesses wait in Memory, Did not like, To verify, until you confirm or drop them. What you confirmed is listed there too, and can be taken back.
 
 **Filters** (formats, new or popular, how much new to you, the mood) stay set until you change them, also after closing the app, and apply to searches too.
 

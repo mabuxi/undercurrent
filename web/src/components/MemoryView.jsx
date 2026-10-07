@@ -79,15 +79,19 @@ function DislikedSection() {
     setD((cur) => ({ ...cur, tags: cur.tags.filter((x) => x.tag !== tag) }));
     try { await api(`/memory/disliked/${encodeURIComponent(tag)}`, { method: 'DELETE' }); toast(t('{tag} no longer counts against posts.', { tag })); } catch (e) { toast(e.message); }
   }
+  async function verify(tag, ok) {
+    setD((cur) => ({ ...cur, verify: cur.verify.filter((x) => x.tag !== tag) }));
+    try { await api(`/memory/verify/${encodeURIComponent(tag)}`, { method: 'POST', body: { ok } }); if (ok) load(); toast(ok ? t('{tag} now counts against posts.', { tag }) : t('{tag} dropped.', { tag })); } catch (e) { toast(e.message); }
+  }
   async function unblock(b) {
     setD((cur) => ({ ...cur, blocked: cur.blocked.filter((x) => x.id !== b.id) }));
     try { await api(`/creators/blocked/${b.id}`, { method: 'DELETE' }); toast(t('{name} is unblocked.', { name: b.name })); } catch (e) { toast(e.message); }
   }
   return (
     <div className="memsec" id="mem-disliked">
-      <div className="sechead"><h3><span className="secic" style={{ '--c': '#E07070' }}><Icon name="less" /></span>{t('Did not like')}</h3><span className="count">{d?.tags?.length || 0}</span></div>
+      <div className="sechead"><h3><span className="secic" style={{ '--c': '#E07070' }}><Icon name="less" /></span>{t('Did not like')}</h3><span className="count">{(d?.tags?.length || 0) + (d?.verify?.length ? ` · ${tn(d.verify.length, '{n} to verify', '{n} to verify [many]')}` : '')}</span></div>
       <div className="card2">
-        <p className="wnote">{t('What the bigger model found when you hid, disliked or blocked something, leaving out what you like. Only what still counts against posts shows here; tap × if it was not that.')}</p>
+        <p className="wnote">{t('What you said you did not like when you hid, disliked or blocked something. Only what still counts against posts shows here; tap × to take it back.')}</p>
         {d === null ? <p className="wnote">{t('Loading…')}</p> : d.tags.length ? (
           <div className="dislist">
             {d.tags.map((x) => (
@@ -98,6 +102,20 @@ function DislikedSection() {
             ))}
           </div>
         ) : <p className="wnote">{t('Nothing yet. When you hide, dislike or block something, what you probably did not like shows up here.')}</p>}
+        {d?.verify?.length ? (
+          <div className="verifylist">
+            <span className="fb-label">{t('To verify')}</span>
+            <p className="wnote">{t('Guesses from the bigger model after you hid or blocked something without saying why. They do not count until you confirm them.')}</p>
+            <div className="dislist">
+              {d.verify.map((x) => (
+                <span key={x.tag} className="dchip big guess"><Icon name="why" />{x.tag}<em>{Object.entries(x.kinds).map(([k, n]) => kindCount(k, n)).join(' · ')}</em>
+                  <button type="button" onClick={() => verify(x.tag, true)} aria-label={t('Yes, that was it: {tag}', { tag: x.tag })} title={t('Yes, that was it')}><Icon name="check" /></button>
+                  <button type="button" onClick={() => verify(x.tag, false)} aria-label={t('That was not it: {tag}', { tag: x.tag })} title={t('That was not it')}><Icon name="x" /></button>
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
         {d?.blocked?.length ? (
           <div className="blocklist">
             <span className="fb-label">{t('Blocked creators')}</span>

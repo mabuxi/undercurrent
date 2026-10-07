@@ -1115,15 +1115,15 @@ export function startSearch({ q, deep = false, sessionId = null }) {
 }
 
 function summaryFor(job) {
-  const s = job.spec;
   if (job.person && !job.found) {
     const skipped = job.steps.some((x) => x.state === 'skip');
     return `${tr('Nothing from {name} turned up: no RedGIFs or Bluesky profile under that name and no videos on the tube sites{more}.', { name: job.person.display, more: skipped ? tr(', and Reddit was rate limiting, so try again in a few minutes') : '' })}${webKey() ? '' : ` ${tr('With a web search key in Settings I can also find the other usernames they use.')}`}`;
   }
-  const what = job.person ? job.person.display : [s.gender && { women: tr('women'), men: tr('men'), both: tr('men and women'), 'women-only': tr('only women'), 'men-only': tr('only men') }[s.gender], ...s.concepts.map((c) => c.label || c.name)].filter(Boolean).join(', ');
+  // A plain search needs no sentence of its own: the top of the feed says "Showing: …" and how many posts match.
+  // Only what that line cannot say is written out: sources that did not answer, and notes from the search.
   const failed = job.steps.filter((x) => x.state === 'fail' && !['split', 'local', 'who', 'think'].includes(x.key) && !/^a\d+$/.test(x.key)).length;
-  const head = what ? tr('Showing {what}', { what }) : tr('Showing your search');
-  return `${tr('{head}: {posts} from your sources{added}, plus what already matched.', { head, posts: trn(job.found, '{n} post', '{n} posts'), added: job.added ? tr(', {n} of them new here', { n: job.added }) : '' })}${failed ? ` ${trn(failed, '{n} source did not answer.', '{n} sources did not answer.')}` : ''}${job.notes.length ? ` ${job.notes.join(' ')}` : ''}`;
+  const extra = [failed ? trn(failed, '{n} source did not answer.', '{n} sources did not answer.') : '', ...job.notes].filter(Boolean).join(' ');
+  return extra || null;
 }
 
 export function jobView(id) {

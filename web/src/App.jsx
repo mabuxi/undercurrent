@@ -24,6 +24,7 @@ export default function App() {
   // stay set after closing Undercurrent, and apply to searches too.
   const [tune, setTuneState] = useState({});
   const [tuneReady, setTuneReady] = useState(false);
+  const presetTurn = useRef(0);
   const tuneRef = useRef({});
   const saveTune = useCallback((patch) => {
     const next = { ...tuneRef.current, ...patch };
@@ -105,7 +106,7 @@ export default function App() {
 
   const refreshMeta = useCallback(async () => {
     try {
-      const [k, f, p] = await Promise.all([api('/kinks'), api('/fantasies'), api('/presets')]);
+      const [k, f, p] = await Promise.all([api('/kinks'), api('/fantasies'), api(`/presets?turn=${presetTurn.current}`)]);
       setKinks(k.kinks);
       setFantasies(f.fantasies);
       setPresets(p.presets);
@@ -210,6 +211,25 @@ export default function App() {
     tick();
   }, [setFilters, applyClient, scrollToFeed]);
 
+  // The "right now" picks next to the Filters button follow what you just did: they are fetched again whenever the
+  // windows are, so also when you scroll back to the top after going down a good way.
+  useEffect(() => {
+    let deep = 0;
+    let raf = 0;
+    const reload = () => { presetTurn.current++; api(`/presets?turn=${presetTurn.current}`).then((p) => setPresets(p.presets)).catch(() => {}); };
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        deep = Math.max(deep, window.scrollY);
+        if (window.scrollY < 30 && deep > window.innerHeight * 1.2) { deep = 0; reload(); }
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('uc-refresh-windows', reload);
+    return () => { window.removeEventListener('scroll', onScroll); window.removeEventListener('uc-refresh-windows', reload); cancelAnimationFrame(raf); };
+  }, []);
+
   // The filters you set last time come back, and so does the mood you were in.
   useEffect(() => {
     api('/settings/tune').then((v) => {
@@ -266,6 +286,12 @@ export default function App() {
     patchFilters({ [key]: null });
   }, [clearSearch, setFilters, patchFilters, filters]);
 
+  // "Clear all" in the row under the search bar: the search, the tags and every filter shown there.
+  const clearAll = useCallback((withTune = true) => {
+    if (withTune) saveTune({ formats: null, window: null });
+    clearSearch();
+  }, [clearSearch, saveTune]);
+
   // At the end of a search: the same search without your filters (formats, new or popular, the gender balance),
   // for this search only. Your filters stay set for the feed.
   const withoutFilters = useCallback(() => {
@@ -286,10 +312,10 @@ export default function App() {
   }, [search, setFilters, toast]);
 
   const ctx = useMemo(() => ({
-    filters, opts, mix, setMix: (v) => { saveTune({ mix: v }); setOpts((o) => ({ ...o, mix: null })); setFeedKey((k) => k + 1); }, tune, withoutFilters, mode, setFilters, patchFilters, applyMood, openMode,
+    filters, opts, mix, setMix: (v) => { saveTune({ mix: v }); setOpts((o) => ({ ...o, mix: null })); setFeedKey((k) => k + 1); }, tune, withoutFilters, clearAll, mode, setFilters, patchFilters, applyMood, openMode,
     kinks, fantasies, presets, refreshMeta, toast, sessionId, update: updates.info, openUpdate: () => setUpdateOpen(true), askOut, setAskOut, settings, setSettings, feedKey, applyClient, refreshFeed: () => setFeedKey((k) => k + 1),
     search, runSearch, searchMore, editChip, clearSearch, openProfile, clearFilter
-  }), [filters, opts, mix, mode, setFilters, patchFilters, applyMood, openMode, kinks, fantasies, presets, refreshMeta, toast, askOut, settings, feedKey, applyClient, search, runSearch, searchMore, editChip, clearSearch, openProfile, clearFilter, updates.info, tune, withoutFilters, saveTune]);
+  }), [filters, opts, mix, mode, setFilters, patchFilters, applyMood, openMode, kinks, fantasies, presets, refreshMeta, toast, askOut, settings, feedKey, applyClient, search, runSearch, searchMore, editChip, clearSearch, openProfile, clearFilter, updates.info, tune, withoutFilters, saveTune, clearAll]);
 
   return (
     <AppCtx.Provider value={ctx}>

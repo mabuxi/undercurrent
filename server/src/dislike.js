@@ -9,9 +9,10 @@ import { replyIn, tr } from './i18n.js';
 import { config } from './config.js';
 import { log } from './log.js';
 
-// When you hide or dislike a post, the bigger local model looks at it again (frames from the video when it can) to
-// find what you probably did not like. What you already like is taken out first, so a post you hid because of one
-// thing never makes you see less of what you love. Only what stays counts against future posts.
+// When you hide, dislike or block, you are asked right there which tags you did not like. Only what you pick counts
+// against future posts. For a hide or a block the bigger local model also makes a guess (frames from the video when it
+// can, leaving out what you already like), but a guess never counts against anything until you confirm it: unanswered
+// guesses wait in Memory, to verify.
 
 const PENALTY = -0.6;
 const BLOCK_PENALTY = -0.9;
@@ -20,24 +21,70 @@ const queue = [];
 const GROUP = new Map();
 let busy = false;
 
+let tabled = false;
 function table() {
-  getDb().exec('CREATE TABLE IF NOT EXISTS dislikes (item_id INTEGER PRIMARY KEY, status TEXT, reasons TEXT, note TEXT, kind TEXT, ts INTEGER)');
+  if (tabled) return;
+  const db = getDb();
+  db.exec('CREATE TABLE IF NOT EXISTS dislikes (item_id INTEGER PRIMARY KEY, status TEXT, reasons TEXT, note TEXT, kind TEXT, ts INTEGER)');
+  const cols = db.prepare('PRAGMA table_info(dislikes)').all().map((c) => c.name);
+  if (!cols.includes('guesses')) db.exec("ALTER TABLE dislikes ADD COLUMN guesses TEXT DEFAULT '[]'");
+  if (!cols.includes('answered')) db.exec('ALTER TABLE dislikes ADD COLUMN answered INTEGER DEFAULT 0');
+  if (!cols.includes('cands')) db.exec('ALTER TABLE dislikes ADD COLUMN cands TEXT');
+  tabled = true;
+}
+const parse = (x) => { try { const v = JSON.parse(x || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
+const penaltyOf = (kind) => (kind === 'block' ? BLOCK_PENALTY : PENALTY);
+
+// The tags to ask about: the post's own specific tags you do not already like, most certain first.
+function candidatesFor(itemId, liked = likedNow()) {
+  const item = getItem(itemId);
+  return itemTags(itemId).filter((t) => t.kind !== 'performer' && t.weight >= 0.3 && !isLiked(t.name, liked) && !metaTag(t.name, item))
+    .sort((a, b) => b.weight - a.weight).map((t) => t.name).filter((n, i, a) => a.indexOf(n) === i).slice(0, 10);
 }
 
 export function dislikeOf(itemId) {
   table();
   const r = getDb().prepare('SELECT * FROM dislikes WHERE item_id = ?').get(Number(itemId));
-  if (!r) return { status: 'none', reasons: [] };
-  let reasons = [];
-  try { reasons = JSON.parse(r.reasons || '[]'); } catch {}
-  return { status: r.status, reasons, note: r.note || null, kind: r.kind };
+  if (!r) return { status: 'none', reasons: [], guesses: [], candidates: [] };
+  const reasons = parse(r.reasons);
+  const guesses = parse(r.guesses).filter((g) => !reasons.includes(g));
+  const stored = r.cands ? parse(r.cands) : null;
+  const candidates = [...new Set([...guesses, ...(stored || candidatesFor(r.item_id))])].filter((c) => !reasons.includes(c)).slice(0, 12);
+  return { status: r.status, kind: r.kind, reasons, guesses, candidates, answered: !!r.answered, note: r.note || null };
 }
 
 function save(itemId, patch) {
   table();
   const cur = getDb().prepare('SELECT * FROM dislikes WHERE item_id = ?').get(itemId) || {};
-  const row = { item_id: itemId, status: cur.status || 'waiting', reasons: cur.reasons || '[]', note: cur.note || null, kind: cur.kind || 'less', ts: now(), ...patch };
-  getDb().prepare('INSERT INTO dislikes(item_id, status, reasons, note, kind, ts) VALUES(@item_id, @status, @reasons, @note, @kind, @ts) ON CONFLICT(item_id) DO UPDATE SET status = @status, reasons = @reasons, note = @note, kind = @kind, ts = @ts').run(row);
+  const row = { item_id: itemId, status: cur.status || 'waiting', reasons: cur.reasons || '[]', guesses: cur.guesses || '[]', answered: cur.answered || 0, cands: cur.cands ?? null, note: cur.note || null, kind: cur.kind || 'less', ts: now(), ...patch };
+  getDb().prepare(`INSERT INTO dislikes(item_id, status, reasons, guesses, answered, cands, note, kind, ts) VALUES(@item_id, @status, @reasons, @guesses, @answered, @cands, @note, @kind, @ts)
+    ON CONFLICT(item_id) DO UPDATE SET status = @status, reasons = @reasons, guesses = @guesses, answered = @answered, cands = @cands, note = @note, kind = @kind, ts = @ts`).run(row);
+}
+
+// What you picked: these, and only these, count against future posts.
+export function confirmDislike(itemId, tags = []) {
+  const cur = dislikeOf(itemId);
+  if (cur.status === 'none') return cur;
+  const liked = likedNow();
+  const add = [...new Set(tags.map((x) => normalizeTag(x)).filter(Boolean))].filter((x) => !cur.reasons.includes(x) && !isLiked(x, liked) && !isBlocked({ tags: [x] }).blocked);
+  if (add.length) boostTags(add, penaltyOf(cur.kind));
+  save(Number(itemId), { reasons: JSON.stringify([...cur.reasons, ...add]), guesses: JSON.stringify(cur.guesses.filter((g) => !add.includes(g))), answered: 1 });
+  return dislikeOf(itemId);
+}
+
+// "Not sure": nothing counts; guesses (if any) stay in Memory to verify.
+export function skipDislike(itemId) {
+  if (dislikeOf(itemId).status === 'none') return dislikeOf(itemId);
+  save(Number(itemId), { answered: 1 });
+  return dislikeOf(itemId);
+}
+
+// A guess that was wrong: it goes away without ever having counted.
+export function dropGuess(itemId, tag) {
+  const cur = dislikeOf(itemId);
+  const name = normalizeTag(tag);
+  save(Number(itemId), { guesses: JSON.stringify(cur.guesses.filter((g) => g !== name)) });
+  return dislikeOf(itemId);
 }
 
 // What you clearly like, as tag names and as concepts (so "hairy chest" covers "chest hair" too).
@@ -59,7 +106,13 @@ export function queueBlock(itemIds) {
   const ids = [...new Set((itemIds || []).map(Number).filter(Boolean))];
   if (!ids.length) return;
   GROUP.set(ids[0], ids.slice(1, 5));
-  save(ids[0], { status: 'waiting', kind: 'block', reasons: '[]', note: null });
+  // The tags to ask about for a block: what most of their posts share and you do not already like.
+  const liked = likedNow();
+  const counts = new Map();
+  const posts = ids.slice(0, 5);
+  for (const id of posts) for (const t of new Set(candidatesFor(id, liked))) counts.set(t, (counts.get(t) || 0) + 1);
+  const cands = [...counts].filter(([, n]) => posts.length < 2 || n >= 2).sort((a, b) => b[1] - a[1]).map(([t]) => t).slice(0, 10);
+  save(ids[0], { status: 'waiting', kind: 'block', reasons: '[]', guesses: '[]', answered: 0, cands: JSON.stringify(cands.length >= 2 ? cands : candidatesFor(ids[0], liked)), note: null });
   queue.push(ids[0]);
   setTimeout(() => work().catch(() => {}), 50);
 }
@@ -69,7 +122,9 @@ export function queueDislike(itemId, kind = 'less') {
   if (!id) return;
   const cur = dislikeOf(id);
   if (cur.status === 'running' || cur.status === 'waiting') return;
-  save(id, { status: 'waiting', kind, reasons: '[]', note: null });
+  // A thumbs down only asks; a hide also gets a guess, which waits for you to confirm it.
+  save(id, { status: kind === 'down' ? 'ask' : 'waiting', kind, reasons: '[]', guesses: '[]', answered: 0, cands: null, note: null });
+  if (kind === 'down') return;
   queue.push(id);
   setTimeout(() => work().catch(() => {}), 50);
 }
@@ -126,9 +181,9 @@ He likes: ${likes.join(', ') || 'nothing known yet'}`;
   let reasons = cleanTags((out?.reasons || []).map((r) => String(r).toLowerCase().trim()).filter(Boolean), 5)
     .map((r) => normalizeTag(r.name)).filter((r) => r && !isLiked(r, liked) && !metaTag(r, item) && !isBlocked({ tags: [r] }).blocked);
   reasons = [...new Set(reasons)].slice(0, 5);
-  if (reasons.length) boostTags(reasons, PENALTY);
-  save(id, { status: 'done', reasons: JSON.stringify(reasons), note: String(out?.note || '').slice(0, 240) || null });
-  log('info', `Hidden post ${id}: probably not for him because of ${reasons.join(', ') || 'nothing clear'}`);
+  // A guess only: nothing counts against posts until you confirm it.
+  save(id, { status: 'done', guesses: JSON.stringify(reasons.filter((r) => !dislikeOf(id).reasons.includes(r))), note: String(out?.note || '').slice(0, 240) || null });
+  log('info', `Hidden post ${id}: guessed ${reasons.join(', ') || 'nothing clear'}, waiting for confirmation`);
 }
 
 // "That was not it": takes one reason back.
@@ -136,7 +191,7 @@ export function dropReason(itemId, reason) {
   const cur = dislikeOf(itemId);
   const name = normalizeTag(reason);
   if (!name || !cur.reasons.includes(name)) return cur;
-  boostTags([name], cur.kind === 'block' ? -BLOCK_PENALTY : -PENALTY);
+  boostTags([name], -penaltyOf(cur.kind));
   save(Number(itemId), { reasons: JSON.stringify(cur.reasons.filter((r) => r !== name)) });
   return dislikeOf(itemId);
 }
@@ -167,16 +222,15 @@ He likes: ${[...liked.names].slice(0, 40).join(', ') || 'nothing known yet'}`;
   let reasons = cleanTags((out?.reasons || []).map((r) => String(r).toLowerCase().trim()).filter(Boolean), 6)
     .map((r) => normalizeTag(r.name)).filter((r) => r && !isLiked(r, liked) && !metaTag(r, item) && !isBlocked({ tags: [r] }).blocked);
   reasons = [...new Set(reasons)].slice(0, 6);
-  if (reasons.length) boostTags(reasons, BLOCK_PENALTY);
-  save(id, { status: 'done', reasons: JSON.stringify(reasons), note: String(out?.note || '').slice(0, 240) || null });
-  log('info', `Blocked creator of post ${id}: probably because of ${reasons.join(', ') || 'nothing clear'}`);
+  save(id, { status: 'done', guesses: JSON.stringify(reasons.filter((r) => !dislikeOf(id).reasons.includes(r))), note: String(out?.note || '').slice(0, 240) || null });
+  log('info', `Blocked creator of post ${id}: guessed ${reasons.join(', ') || 'nothing clear'}, waiting for confirmation`);
 }
 
 // "Did not like": what the closer looks after hides, thumbs down and blocks found, and only what still counts
 // against posts now: a tag you have liked since then, or that is back to neutral, is left out.
 export function dislikedTags() {
   table();
-  const rows = getDb().prepare("SELECT item_id, reasons, kind, ts FROM dislikes WHERE status = 'done'").all();
+  const rows = getDb().prepare("SELECT item_id, reasons, kind, ts FROM dislikes WHERE reasons IS NOT NULL AND reasons != '[]'").all();
   const aff = affinityMap();
   const liked = likedNow();
   const by = new Map();
@@ -204,13 +258,44 @@ export function dislikedTags() {
   return out.sort((a, b) => b.n - a.n || b.strength - a.strength).slice(0, 60);
 }
 
+// Guesses nobody confirmed yet: shown in Memory to verify. They do not count until you confirm them.
+export function guessesToVerify() {
+  table();
+  const liked = likedNow();
+  const known = new Set(dislikedTags().map((x) => x.tag));
+  const by = new Map();
+  for (const r of getDb().prepare("SELECT item_id, guesses, reasons, kind, ts FROM dislikes WHERE guesses IS NOT NULL AND guesses != '[]'").all()) {
+    const reasons = parse(r.reasons);
+    for (const tag of parse(r.guesses)) {
+      // Already under "Did not like": nothing left to ask.
+      if (reasons.includes(tag) || isLiked(tag, liked) || known.has(tag)) continue;
+      const cur = by.get(tag) || { tag, n: 0, kinds: {}, items: [], last: 0 };
+      cur.n++;
+      cur.kinds[r.kind || 'less'] = (cur.kinds[r.kind || 'less'] || 0) + 1;
+      cur.items.push(r.item_id);
+      cur.last = Math.max(cur.last, r.ts || 0);
+      by.set(tag, cur);
+    }
+  }
+  return [...by.values()].sort((a, b) => b.n - a.n || b.last - a.last).slice(0, 40);
+}
+
+export function verifyGuess(tag, ok) {
+  const name = normalizeTag(tag);
+  let n = 0;
+  for (const g of guessesToVerify().filter((x) => x.tag === name)) {
+    for (const id of g.items) { if (ok) confirmDislike(id, [name]); else dropGuess(id, name); n++; }
+  }
+  return n;
+}
+
 // "That is fine": takes a tag back from every closer look that named it.
 export function forgiveTag(tag) {
   const name = normalizeTag(tag);
   if (!name) return 0;
   table();
   let n = 0;
-  for (const r of getDb().prepare("SELECT item_id, reasons, kind FROM dislikes WHERE status = 'done'").all()) {
+  for (const r of getDb().prepare("SELECT item_id, reasons, kind FROM dislikes WHERE reasons IS NOT NULL AND reasons != '[]'").all()) {
     let reasons = [];
     try { reasons = JSON.parse(r.reasons || '[]'); } catch {}
     if (!reasons.includes(name)) continue;

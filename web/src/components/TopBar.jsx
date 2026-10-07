@@ -37,7 +37,7 @@ function Chip({ c, onRemove }) {
 }
 
 export default function TopBar() {
-  const { setFilters, filters, openMode, mode, askOut, setAskOut, search, runSearch, editChip, toast, clearSearch, clearFilter, kinks, fantasies, opts, update, openUpdate } = useApp();
+  const { setFilters, filters, openMode, mode, askOut, setAskOut, search, runSearch, editChip, toast, clearSearch, clearFilter, kinks, fantasies, opts, update, openUpdate, clearAll: clearEverything } = useApp();
   const acts = useActivity();
   const [q, setQ] = useState('');
   const [deep, setDeep] = useState(readDeep);
@@ -197,6 +197,7 @@ export default function TopBar() {
               {mood ? <span className="schip schip-filter"><span>{t('Mood: {mood}', { mood: mood.label })}</span><button type="button" onClick={() => clearFilter('mood')} aria-label={t('Remove the {mood} mood', { mood: mood.label })}><Icon name="x" /></button></span> : null}
               {list.map(([k, label]) => <span key={k} className={`schip schip-filter${k.startsWith('tag:') ? ' schip-tag' : ''}${['formats', 'window', 'noTune'].includes(k) ? ' schip-tune' : ''}`}><span>{label}</span><button type="button" onClick={() => clearFilter(k)} aria-label={t('Remove {name}', { name: label })}><Icon name="x" /></button></span>)}
               {chips.map((c) => <Chip key={`${c.kind}:${c.value}`} c={c} onRemove={editChip} />)}
+              <button type="button" className="schip-clear" onClick={() => { setQ(''); clearEverything(!document.documentElement.classList.contains('narrow')); }} title={t('Clear the search and every filter shown here')}><Icon name="x" />{t('Clear all')}</button>
             </div>
           );
         })()}

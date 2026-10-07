@@ -206,21 +206,9 @@ const fmtCount = (n) => { n = Number(n) || 0; return n >= 1e6 ? `${dec((n / 1e6)
 
 // Right where the feed starts: what it is showing now and how much matched, or the assistant's answer. A search,
 // a tag or any other change scrolls here.
-function FeedHead({ total, loading }) {
-  const { filters, opts, kinks, fantasies } = useApp();
-  const mood = opts?.mood ? MOODS.find((m) => m.id === opts.mood) : null;
-  // The search itself is in the answer and the search bar; this line says what else narrows the feed.
-  const what = crumbList(filters, { kinks, fantasies }).filter(([k]) => k !== 'search').map(([, l]) => l);
-  if (mood) what.unshift(t('Mood: {mood}', { mood: mood.label }));
-  const filtered = what.length > 0 || !!filters.search;
-  const count = filtered && total != null && !loading ? tn(total, '{n} post matches', '{n} posts match') : null;
+function FeedHead() {
   return (
     <div className="feedhead" id="feedStart">
-      {filtered ? (
-        <div className="fh-line" aria-live="polite">
-          {filtered ? <p className="fh-what">{what.length ? <span>{t('Showing: {what}', { what: what.join(' · ') })}</span> : null}{count ? <em>{count}</em> : loading ? <em className="fh-wait"><span className="spin" />{t('Loading…')}</em> : null}</p> : null}
-        </div>
-      ) : null}
       <SearchCard />
     </div>
   );
@@ -230,8 +218,8 @@ function FeedHead({ total, loading }) {
 const PANEL_KEY = 'uc-filters-open';
 function readOpen() { try { return localStorage.getItem(PANEL_KEY) === '1'; } catch { return false; } }
 
-function Controls() {
-  const { filters, opts, mix, setMix, setFilters, patchFilters, applyMood, presets, askOut } = useApp();
+function Controls({ total, loading }) {
+  const { filters, opts, mix, setMix, setFilters, patchFilters, applyMood, presets, askOut, kinks, fantasies } = useApp();
   const [summary, setSummary] = useState(null);
   const [tuneOpen, setTuneOpen] = useState(readOpen);
   useEffect(() => { api('/home/summary').then((r) => setSummary(r.text)).catch(() => {}); }, []);
@@ -241,11 +229,28 @@ function Controls() {
     patchFilters({ formats: cur.includes(f) ? cur.filter((x) => x !== f) : [...cur, f] });
   };
   const active = (filters.formats?.length ? 1 : 0) + (filters.window ? 1 : 0) + (opts.mood ? 1 : 0) + (mix !== 15 ? 1 : 0);
+  // What the feed shows takes the place of the summary under the greeting: the assistant's answer, or "Showing: …"
+  // with how many posts match.
+  const mood = opts?.mood ? MOODS.find((m) => m.id === opts.mood) : null;
+  const crumbs = crumbList(filters, { kinks, fantasies });
+  const what = crumbs.filter(([k]) => k !== 'search').map(([, l]) => l);
+  if (mood) what.unshift(t('Mood: {mood}', { mood: mood.label }));
+  const filtered = what.length > 0 || !!filters.search;
+  const q = filters.search ? String(filters.searchLabel || t('your search')).trim() : '';
+  const all = [...(q ? [q.charAt(0).toUpperCase() + q.slice(1)] : []), ...what];
+  const count = filtered && total != null && !loading ? tn(total, '{n} post matches', '{n} posts match') : null;
+  const main = askOut || (filtered ? t('Showing: {what}', { what: all.join(' · ') }) : summary || '');
   return (
     <>
-      <div className="hello" id={askOut ? 'feedAnswer' : undefined}>
+      <div className="hello" id={askOut || filtered ? 'feedAnswer' : undefined}>
         <h2>{greeting()}</h2>
-        <p className={`hello-sum${askOut ? ' answer' : ''}`} aria-live="polite">{askOut || summary || ''}</p>
+        <p className={`hello-sum${askOut || filtered ? ' answer' : ''}`} aria-live="polite">{main}</p>
+        {filtered ? (
+          <p className="hello-count">
+            {askOut ? <span>{t('Showing: {what}', { what: all.join(' · ') })}</span> : null}
+            {count ? <em>{count}</em> : loading ? <em className="fh-wait"><span className="spin" />{t('Loading…')}</em> : null}
+          </p>
+        ) : null}
         <div className="hello-row">
           <button type="button" className={`tunebtn${tuneOpen ? ' on' : ''}`} onClick={toggleOpen} aria-expanded={tuneOpen}>
             <Icon name="sliders" />{t('Filters')}{active ? <em className="tunecount">{active}</em> : null}<Icon name={tuneOpen ? 'chevU' : 'chevD'} />
@@ -270,7 +275,7 @@ function Controls() {
           <span className="tlabel">{t('Mood')}</span>
           <div className="moodcards">
             {MOODS.map((m) => (
-              <button key={m.id} type="button" className={`moodcard${opts.mood === m.id ? ' on' : ''}`} style={{ '--tc': m.color }} onClick={() => applyMood(m.id)}>
+              <button key={m.id} type="button" className={`moodcard${opts.mood === m.id ? ' on' : ''}`} style={{ '--tc': m.color }} onClick={() => applyMood(m.id)} title={`${m.label}: ${m.hint}`}>
                 <span className="mc-ic"><Icon name={m.icon} /></span>
                 <strong>{m.label}</strong>
                 <small>{m.hint}</small>
@@ -498,8 +503,8 @@ export default function FeedView() {
 
   return (
     <section className="center" style={{ paddingTop: 0 }}>
-      <Controls />
-      <FeedHead total={total} loading={loading && !items.length} />
+      <Controls total={total} loading={loading && !items.length} />
+      <FeedHead />
       <div className="feed" style={items.length < 2 && !done ? { minHeight: '100vh' } : undefined}>{list}</div>
       {error ? <div className="empty">{error}</div> : null}
       {wider && items.length ? <div className="deeper"><span className="deeper-why">{t('Few exact matches left, now also showing close matches')}</span></div> : null}

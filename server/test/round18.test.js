@@ -8,7 +8,7 @@ const { upsertItem } = await import('../src/store.js');
 const { applyEvent, affinityMap, bump, changeParts } = await import('../src/profile.js');
 const { sourcesIn } = await import('../src/search.js');
 const { lanUrls } = await import('../src/lan.js');
-const { queueDislike, dislikeOf, dropReason } = await import('../src/dislike.js');
+const { queueDislike, dislikeOf, dropReason, confirmDislike } = await import('../src/dislike.js');
 
 let n = 0;
 const post = (tags) => upsertItem({ source: 'reddit', ext_id: `r18_${n++}`, title: `Post ${n}`, author: 'someone', community: 'r/test', format: 'image', tags, score: 10, created_utc: Math.round(Date.now() / 1000) - 3600, media: { kind: 'image', src: 'x' } }).id;
@@ -52,16 +52,21 @@ test('hiding a post leaves what you already like alone', () => {
   assert.ok(aff('clown makeup') < 0, 'what stays takes the blame');
 });
 
-test('the bigger model looks at a hidden post and only what you do not like counts against it', async () => {
+test('the bigger model looks at a hidden post, but only what you confirm counts against it', async () => {
   const id = post(['hairy chest', 'office']);
   queueDislike(id, 'less');
   for (let i = 0; i < 40 && dislikeOf(id).status !== 'done'; i++) await new Promise((r) => setTimeout(r, 50));
   const d = dislikeOf(id);
   assert.equal(d.status, 'done');
-  assert.deepEqual(d.reasons, ['soft lighting', 'fake moaning']);
+  assert.deepEqual(d.reasons, [], 'a guess never counts on its own');
+  assert.deepEqual(d.guesses, ['soft lighting', 'fake moaning']);
+  assert.ok(Math.abs(aff('soft lighting')) < 1e-6);
+  const c = confirmDislike(id, ['soft lighting']);
+  assert.deepEqual(c.reasons, ['soft lighting']);
+  assert.deepEqual(c.guesses, ['fake moaning']);
   assert.ok(aff('soft lighting') < 0);
   const after = dropReason(id, 'soft lighting');
-  assert.deepEqual(after.reasons, ['fake moaning']);
+  assert.deepEqual(after.reasons, []);
   assert.ok(Math.abs(aff('soft lighting')) < 1e-6);
 });
 

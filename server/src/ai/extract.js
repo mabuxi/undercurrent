@@ -100,9 +100,26 @@ function knownHandle(w) {
   return known.set.has(w);
 }
 
+// Hashtags (#BigBalls, #hairy_chest, #gayforpay): split into words so they match known tags, and kept as tags of
+// their own when they are real words. Noise tags people add to everything are left out.
+const HASH_NOISE = new Set(['fyp', 'foryou', 'for you', 'foryoupage', 'viral', 'trending', 'explore', 'onlyfans', 'of', 'fansly', 'link in bio', 'nsfw',
+  'nsfw content', 'porn', 'xxx', 'sex', 'hot', 'sexy', 'new', 'follow', 'follow me', 'like', 'likes', 'subscribe', 'dm', 'dm me', 'content', 'creator',
+  'model', 'onlyfans model', 'reddit', 'bluesky', 'adult', 'adult content', 'eighteen plus', 'free', 'promo', 'link', 'bio', 'repost', 'tbt', 'ootd']);
+export function hashtagsIn(text) {
+  const out = [];
+  for (const m of String(text || '').matchAll(/(?:^|[^\p{L}\p{N}&/])#([\p{L}][\p{L}\p{N}_]{1,40})/gu)) {
+    const words = m[1].replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2').replace(/(\p{L})(\d)/gu, '$1 $2').toLowerCase().trim().replace(/\s+/g, ' ');
+    if (!words || words.length < 3 || /^\d/.test(words) || words.split(' ').length > 4) continue;
+    if (HASH_NOISE.has(words) || HASH_NOISE.has(words.replace(/ /g, '')) || STOP.has(words) || /\d{2,}/.test(words)) continue;
+    if (!out.includes(words)) out.push(words);
+  }
+  return out;
+}
+
 export function extractFromText(title, body = '') {
   const lex = lexicon();
-  const toks = tokens(`${title || ''} ${String(body || '').slice(0, 1500)}`);
+  const hashes = hashtagsIn(`${title || ''}\n${String(body || '').slice(0, 1500)}`);
+  const toks = tokens(`${title || ''} ${String(body || '').slice(0, 1500)} ${hashes.join(' . ')}`);
   const tags = new Map();
   const people = new Set();
   const used = new Set();
@@ -125,6 +142,12 @@ export function extractFromText(title, body = '') {
       if (n > 1) for (let k = i; k < i + n; k++) used.add(k);
     }
   }
+  // A hashtag nobody has used here yet still says what the post is about, a little less surely than a known tag.
+  for (const h of hashes) {
+    const hit = lex.phrases.get(h) ?? lex.phrases.get(h.replace(/ /g, ''));
+    const name = normalizeTag(hit || h);
+    if (name && !tags.has(name) && !(h.split(' ').length === 1 && h.length < 4)) tags.set(name, hit ? 0.55 : 0.5);
+  }
   // A French title or text gives the same English tags as an English one would.
   const text = `${title || ''} ${String(body || '').slice(0, 1500)}`;
   if (detectLang(text, { min: 2 }) === 'fr') for (const tag of frenchTagsIn(text)) { const name = normalizeTag(tag); if (name && !tags.has(name)) tags.set(name, 0.45); }
@@ -144,7 +167,7 @@ export function extractInto(itemId, addTags) {
   return r;
 }
 
-export async function backfillExtraction(addTags, { version = 2 } = {}) {
+export async function backfillExtraction(addTags, { version = 3 } = {}) {
   const db = getDb();
   const done = Number(db.prepare("SELECT value FROM settings WHERE key = 'extractVersion'").get()?.value || 0);
   if (done >= version) return 0;

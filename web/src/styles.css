@@ -1659,3 +1659,52 @@ html.narrow .sb-chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
 html.narrow .sb-chips::-webkit-scrollbar{display:none}
 html.narrow .sb-chips>*{flex:none}
 .ptile .ptxt{position:absolute;inset:0;padding:10px 10px 24px;font-family:var(--display);font-size:15px;line-height:1.2;color:var(--text-2);overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;border-left:2px solid var(--accent)}
+
+/* 0.20.1: asking what you did not like */
+.dislike.ask{flex-direction:column;align-items:stretch;gap:8px;padding:10px 12px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line)}
+.post.gone .dislike.ask{width:min(560px,100%);text-align:left}
+.dislike .dq{font-family:var(--display);font-size:17px;color:var(--text)}
+.dpicks{display:flex;flex-wrap:wrap;gap:6px}
+.dpick{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line-2);color:var(--text-2);transition:background .15s,border-color .15s,color .15s}
+.dpick:hover{color:var(--text);border-color:rgba(224,112,112,.5)}
+.dpick.on{background:rgba(224,112,112,.16);border-color:rgba(224,112,112,.6);color:var(--text)}
+.dpick svg{width:12px;height:12px}
+.dpick.guess svg:first-child{color:#E8C66B}
+.dbtns{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.dthink{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-3)}
+.dchip.guess{background:rgba(232,198,107,.08);border-color:rgba(232,198,107,.35);border-style:dashed;gap:4px}
+.dchip.guess>svg{width:12px;height:12px;color:#E8C66B;margin-right:2px}
+.dverify{color:var(--text-3)}
+.verifylist{display:flex;flex-direction:column;gap:6px;padding-top:10px;border-top:1px solid var(--line)}
+.verifylist .wnote{margin:0}
+.schip-clear{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:4px;height:26px;padding:0 10px 0 8px;border-radius:999px;font-size:12px;font-weight:600;color:var(--text-3);border:1px dashed var(--line-2);flex:none}
+.schip-clear:hover{color:var(--text);border-color:var(--accent)}
+.schip-clear svg{width:12px;height:12px}
+html.narrow .sb-chips:not(:has(>:not(.schip-tune):not(.schip-clear))){display:none}
+.hello-count{margin:2px 0 0;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;font-size:13px;color:var(--text-2)}
+.hello-count em{font-style:normal;font-family:var(--mono);font-size:12px;color:var(--text-3)}
+
+/* 0.20.1: moods on one line, compact, filling the row with no gap at the end */
+.tline.tline-top{container-type:inline-size}
+/* Moods: six small tiles on one row, every row full so there is never a gap at the end (two rows of three on a
+   phone). Icon on top, the name under it; the hint shows when you point at one. With plenty of room they lie flat. */
+.moodcards{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;flex:1;min-width:0}
+.moodcard{flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px 4px 7px;border-radius:12px;min-width:0;text-align:center}
+.moodcard:hover{transform:none}
+.moodcard .mc-ic{width:24px;height:24px;border-radius:7px;margin:0;flex:none}
+.moodcard .mc-ic .i{width:14px;height:14px}
+.moodcard strong{font-size:12px;line-height:1.2;min-width:0;max-width:100%;overflow-wrap:anywhere}
+.moodcard small{display:none}
+@container (min-width:1000px){.moodcard{flex-direction:row;gap:8px;padding:7px 9px;text-align:left;justify-content:flex-start}.moodcard strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+@container (max-width:420px){.moodcards{grid-template-columns:repeat(3,minmax(0,1fr))}}
+html.narrow .moodcards{grid-template-columns:repeat(3,minmax(0,1fr))}
+
+/* The Filters button: the same shape as the picks next to it, not a fat pill */
+.tunebtn{border-radius:12px;padding:6px 12px 6px 10px;font-size:12.5px;gap:7px}
+.tunebtn .tunecount{min-width:17px;height:17px;border-radius:6px;font-size:10.5px}
+.nowchip{padding:5px 11px 5px 8px}
+/* 0.20.1: sub-tag chips in windows stay on one line (they were squeezed onto two lines into tall ovals) and button
+   chips are a little less round. The row scrolls sideways and fades out at the edge when there are more. */
+.chip.btn{white-space:nowrap;border-radius:9px;line-height:1.35}
+.chiprow.subs{gap:6px;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);padding-right:24px}
+.chiprow.subs>*{flex:none}

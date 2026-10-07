@@ -249,7 +249,7 @@ export function PerformerPanel({ name, itemId, onBlocked }) {
         <button type="button" className={`ghost-btn small ${d.followed ? '' : 'accent'}`} onClick={follow}><Icon name={d.followed ? 'check' : 'plus'} />{d.followed ? plain(t('Following [button state]')) : t('Follow everywhere')}</button>
         <button type="button" className="ghost-btn small" onClick={() => runSearch(`content from ${name}`).catch((e) => toast(e.message))}><Icon name="search" />{t('Look up {name}', { name })}</button>
         <BlockButton name={d.name} onBlock={async () => {
-          try { const r = await api('/creators/block', { method: 'POST', body: { kind: 'performer', name, itemId } }); toast(tn(r.hidden, 'Blocked {name}: {n} post hidden. The bigger model is looking at their posts to learn what you did not like.', 'Blocked {name}: {n} posts hidden. The bigger model is looking at their posts to learn what you did not like.', { name: d.name })); onBlocked?.(); } catch (e) { toast(e.message); }
+          try { const r = await api('/creators/block', { method: 'POST', body: { kind: 'performer', name, itemId } }); toast(tn(r.hidden, 'Blocked {name}: {n} post hidden. Pick what you did not like about them, or leave it.', 'Blocked {name}: {n} posts hidden. Pick what you did not like about them, or leave it.', { name: d.name })); onBlocked?.(); } catch (e) { toast(e.message); }
         }} />
       </div>
     </>
@@ -369,7 +369,7 @@ export function ProfilePanel({ item, onBlocked }) {
         {p.profileUrl ? <a className="ghost-btn small" href={p.profileUrl} target="_blank" rel="noreferrer noopener"><Icon name="open" />{t('Open on {source}', { source: SOURCE_NAME[item.source] || item.source })}</a> : null}
         {item.community && ['reddit', 'lemmy'].includes(item.source) ? <button type="button" className="ghost-btn small" onClick={followCommunity}><Icon name="plus" />{t('Add {name} as a source', { name: item.community })}</button> : null}
         <BlockButton name={p.name} onBlock={async () => {
-          try { const r = await api('/creators/block', { method: 'POST', body: { kind: 'author', source: item.source, name: p.name, itemId: item.id } }); toast(tn(r.hidden, 'Blocked {name}: {n} post hidden. The bigger model is looking at their posts to learn what you did not like.', 'Blocked {name}: {n} posts hidden. The bigger model is looking at their posts to learn what you did not like.', { name: p.name })); onBlocked?.(); } catch (e) { toast(e.message); }
+          try { const r = await api('/creators/block', { method: 'POST', body: { kind: 'author', source: item.source, name: p.name, itemId: item.id } }); toast(tn(r.hidden, 'Blocked {name}: {n} post hidden. Pick what you did not like about them, or leave it.', 'Blocked {name}: {n} posts hidden. Pick what you did not like about them, or leave it.', { name: p.name })); onBlocked?.(); } catch (e) { toast(e.message); }
         }} />
       </div>
       <p className="wnote">{t('Following checks RedGIFs, Bluesky and Reddit for the same name and follows them there too. Only their new posts show up, marked Following.')}</p>

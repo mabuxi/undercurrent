@@ -48,7 +48,7 @@ import { listProfiles, createProfile, renameProfile, setProfileColor, switchProf
 import { updateStatus, applyUpdate, job as updateJob, whatsNew, markSeen, changelog } from './update.js';
 import { lang, languageSet, setLanguage, LANGS, tr, trn, replyIn } from './i18n.js';
 import { kinkLabel, translateItem } from './translate.js';
-import { queueDislike, queueBlock, dislikeOf, dropReason, dislikedTags, forgiveTag } from './dislike.js';
+import { queueDislike, queueBlock, dislikeOf, dropReason, dislikedTags, forgiveTag, confirmDislike, skipDislike, dropGuess, guessesToVerify, verifyGuess } from './dislike.js';
 import { conceptLabel } from './vocab.js';
 import { conceptName as cName, knownVariants, familyOf } from './concepts.js';
 import { boostTags } from './profile.js';
@@ -321,6 +321,10 @@ api.post('/items/:id/less', wrap((req, res) => {
 // What the bigger model thinks you did not like in a post you hid or disliked, and taking one reason back.
 api.get('/items/:id/dislike', wrap((req, res) => res.json(dislikeOf(Number(req.params.id)))));
 api.delete('/items/:id/dislike/:reason', wrap((req, res) => res.json(dropReason(Number(req.params.id), String(req.params.reason)))));
+// Your answer to "what did you not like?": only what you pick counts. "Not sure" leaves any guess to verify later.
+api.post('/items/:id/dislike', wrap((req, res) => res.json(confirmDislike(Number(req.params.id), (req.body?.tags || []).map(String).slice(0, 12)))));
+api.post('/items/:id/dislike/skip', wrap((req, res) => res.json(skipDislike(Number(req.params.id)))));
+api.delete('/items/:id/dislike-guess/:tag', wrap((req, res) => res.json(dropGuess(Number(req.params.id), String(req.params.tag)))));
 
 api.post('/items/:id/retag', wrap(async (req, res) => {
   res.json(await tagItem(Number(req.params.id)));
@@ -525,8 +529,9 @@ api.get('/creators/blocked', wrap((req, res) => res.json({ blocked: listBlocked(
 api.delete('/creators/blocked/:id', wrap((req, res) => { const ok = unblockCreator(req.params.id); invalidatePool(); res.json({ ok }); }));
 
 // What you probably did not like, from the closer looks after hides, thumbs down and blocks.
-api.get('/memory/disliked', wrap((req, res) => res.json({ tags: dislikedTags(), blocked: listBlocked() })));
+api.get('/memory/disliked', wrap((req, res) => res.json({ tags: dislikedTags(), verify: guessesToVerify(), blocked: listBlocked() })));
 api.delete('/memory/disliked/:tag', wrap((req, res) => res.json({ ok: true, n: forgiveTag(req.params.tag) })));
+api.post('/memory/verify/:tag', wrap((req, res) => res.json({ ok: true, n: verifyGuess(req.params.tag, req.body?.ok !== false) })));
 
 api.get('/follows', wrap((req, res) => res.json({ follows: listFollows().map((f) => ({ ...f, target: followTarget(f) })) })));
 api.delete('/follows/:id', wrap((req, res) => { removeFollow(Number(req.params.id)); res.json({ ok: true }); }));
@@ -613,7 +618,7 @@ api.get('/windows', wrap((req, res) => {
 }));
 
 api.get('/map', wrap((req, res) => res.json(mapData())));
-api.get('/presets', wrap((req, res) => res.json({ presets: presets() })));
+api.get('/presets', wrap((req, res) => res.json({ presets: presets({ turn: Math.max(0, Number(req.query.turn) || 0) }) })));
 
 api.get('/journey', wrap((req, res) => {
   res.json(journey({ kink: req.query.kink, fantasy: req.query.fantasy, mode: req.query.mode || 'close' }));

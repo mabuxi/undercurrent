@@ -60,7 +60,7 @@ function rules() {
   return `Tags are lowercase, 1 to 4 words, specific, the words people use on porn sites.
 Only tag what this post's own title, site tags, text or images clearly say or show. Never guess: no place, outfit, act, position, body type or camera angle unless it is written or visible. A wrong tag is much worse than a missing one; when in doubt, leave it out. Tags are always plain English words, the way English porn sites tag, also when the post is written in French or another language ("pieds" is feet, "douche" is shower).
 When it is said or shown, cover: the people (how many, build, body hair, skin, hair, genitals and their details, tattoos), what they wear, what happens (acts and positions), fluids, where it is, how it is filmed, and the dynamic or scenario.
-The title is the strongest evidence: turn its meaningful words into tags. Never output words from these instructions.
+The title is the strongest evidence: turn every meaningful word and phrase in it into tags, and keep the site tags and hashtags that fit. Also tag what the title plainly means when any reader would be sure of it ("stepmom catches me" is stepmom and caught, "after the gym" is gym, "my first time with a guy" is first time and gay). When you are sure, more tags are better than fewer. Never output words from these instructions.
 Never use: porn, sex, video, hd, xxx, hot, sexy, nsfw, nude, female, male, erotic, the format, the duration, the site or community name.
 These tags are on almost every post, only use them when they are central here: ${overused().join(', ')}.
 people: real names of performers or creators written in the title or text. Never roles like client, boss, stepsister. Empty if none.
@@ -207,7 +207,7 @@ For every post return its id, 6 to 16 tags that the post really says or shows (m
     if (!x) { db.prepare("UPDATE items SET ai_status = CASE WHEN ai_status = 'pending' THEN 'retry' ELSE ai_status END WHERE id = ?").run(r.id); continue; }
     const people = realPeople(x.people, r);
     const tags = x.tags.map((t) => String(t).toLowerCase().trim()).filter((t) => !parroted(t, r) && !metaTag(t, r));
-    if (applyResult(r.id, cleanTags(tags, 16), people, !!x.minor_risk, x.scene)) ok++;
+    if (applyResult(r.id, cleanTags(tags, 24), people, !!x.minor_risk, x.scene)) ok++;
   }
   tagger.done += ok;
   tagger.lastBatch = { n: rows.length, ok, ms: Date.now() - started, at: Date.now(), model: fastModel() };
@@ -280,7 +280,7 @@ Give 8 to 20 tags, most specific first.
 ${rules()}`;
   const started = Date.now();
   const out = await chat({ kind: 'tag', system, user: describe(row), images: frames.length ? frames : undefined, schema: DEEP_SCHEMA, temperature: 0.25, model, numPredict: 1100, numCtx: frames.length > 2 ? 12288 : 8192, parallel: 1 });
-  const tags = cleanTags((out?.tags || []).map((t) => String(t).toLowerCase().trim()).filter((t) => !metaTag(t, row)), 20);
+  const tags = cleanTags((out?.tags || []).map((t) => String(t).toLowerCase().trim()).filter((t) => !metaTag(t, row)), 28);
   const ok = applyResult(id, tags, realPeople(out?.people, row), !!out?.minor_risk, out?.scene, { deep: true });
   if (ok && (Number.isFinite(Number(out?.men)) || Number.isFinite(Number(out?.women)))) setGender(id, { men: Math.max(0, Math.min(9, Number(out.men) | 0)), women: Math.max(0, Math.min(9, Number(out.women) | 0)), trans: !!out.trans }, frames.length ? 'vision' : 'ai');
   if (ok) {

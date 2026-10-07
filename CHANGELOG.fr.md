@@ -2,6 +2,31 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.20.1 · 8 octobre 2026
+
+### Ce que vous n’avez pas aimé
+- Après un pouce en bas, un masquage ou un blocage, la publication demande ce que vous n’avez pas aimé, avec ses tags comme choix (sans ceux que vous aimez). Seul ce que vous choisissez compte contre les publications semblables.
+- Un pouce en bas ne fait que demander. Pour un masquage ou un blocage, le grand modèle regarde aussi et sa supposition est marquée parmi les choix, mais une supposition ne compte jamais seule.
+- « Pas sûr », ou laisser la question : les suppositions attendent dans Mémoire, Pas aimé, sous À vérifier, jusqu’à ce que vous les confirmiez ou les retiriez.
+- Corrigé : les raisons choisies après un pouce en bas n’apparaissaient pas sous Pas aimé.
+
+### Recherche et filtres
+- Une recherche ou un filtre affiche « Affichage : … » et le nombre de publications qui correspondent à la place de la ligne « Ce soir, le fil penche vers… ». La phrase générique « publications de vos sources » disparaît ; seules les sources qui n’ont pas répondu et les notes de recherche restent écrites.
+- Nouvelle puce « Tout effacer » à côté des puces de recherche : efface la recherche et tous les filtres affichés en une fois.
+- Les suggestions En ce moment se renouvellent avec les fenêtres latérales, aussi quand vous remontez en haut, et passent à chaque fois par plus de ce qui vous correspond.
+
+### Vidéos
+- Un double clic sur un lecteur d’un autre site ne compte comme un j’aime que si les deux clics sont rapides (en 0,3 s).
+- Un double toucher sur une vidéo ne la met plus en pause : un toucher simple attend un instant avant de lancer ou de mettre en pause.
+
+### Apparence
+- Les humeurs sont de petites tuiles sur une seule ligne pleine (deux lignes pleines de trois sur téléphone), jamais avec un vide à la fin. L’indication s’affiche au survol.
+- Le bouton Filtres et les puces de sous-tags dans les fenêtres sont moins arrondis, et ces puces restent sur une ligne au lieu de devenir de grands ovales.
+
+### Tags
+- Plus de tags par publication quand c’est sûr : chaque mot qui compte dans le titre, les tags du site et les hashtags, et ce que le titre veut clairement dire (« stepmom catches me » donne stepmom et caught).
+- Les hashtags deviennent des tags, découpés en mots (#BigBalls donne big balls, #hairy_chest donne hairy chest), sans le bruit comme #fyp. Les publications déjà là les reçoivent aussi.
+
 ## 0.20.0 · 7 octobre 2026
 
 ### Filtres

@@ -19,9 +19,14 @@ function PerfAvatar({ p }) {
 const HAS_COMMENTS = new Set(['reddit', 'lemmy']);
 const AUTO_UP_HEAT = 2;
 
-// What the bigger model thinks you did not like in a post you hid or disliked. Each reason can be taken back.
+// Right after a hide, a thumbs down or a block: which tags did you not like? Only what you pick counts against future
+// posts. For a hide or a block the bigger model makes a guess too (marked with a spark), but a guess never counts
+// until you confirm it; unanswered guesses wait in Memory to verify.
 export function DislikeNote({ id, compact = false }) {
+  const { toast } = useApp();
   const [d, setD] = useState(null);
+  const [pick, setPick] = useState([]);
+  const [busy, setBusy] = useState(false);
   useEffect(() => {
     let alive = true;
     let n = 0;
@@ -35,23 +40,60 @@ export function DislikeNote({ id, compact = false }) {
         if ((r.status === 'waiting' || r.status === 'running') && n < 60) tm = setTimeout(poll, n < 5 ? 1500 : 3000);
       } catch { if (alive && n < 3) tm = setTimeout(poll, 3000); }
     };
-    tm = setTimeout(poll, 600);
+    tm = setTimeout(poll, 400);
     return () => { alive = false; clearTimeout(tm); };
   }, [id]);
-  async function drop(r) {
-    try { setD(await api(`/items/${id}/dislike/${encodeURIComponent(r)}`, { method: 'DELETE' })); } catch {}
+  async function send(path, body, method = 'POST') {
+    setBusy(true);
+    try { setD(await api(path, { method, body })); } catch (e) { toast(e.message); } finally { setBusy(false); }
   }
   if (!d || d.status === 'none') return null;
-  if (d.status === 'waiting' || d.status === 'running') return <p className={`dislike${compact ? ' compact' : ''}`}><span className="spin" />{t('Looking at what you did not like, leaving out what you already like…')}</p>;
+  const thinking = d.status === 'waiting' || d.status === 'running';
+  const asking = !d.answered && d.candidates.length >= 2;
+  const toggle = (tag) => setPick((cur) => (cur.includes(tag) ? cur.filter((x) => x !== tag) : [...cur, tag]));
+  if (asking) {
+    return (
+      <div className={`dislike ask${compact ? ' compact' : ''}`}>
+        <span className="dq">{d.kind === 'block' ? t('What did you not like about them?') : t('What did you not like?')}</span>
+        <div className="dpicks">
+          {d.candidates.map((tag) => (
+            <button type="button" key={tag} className={`dpick${pick.includes(tag) ? ' on' : ''}${d.guesses.includes(tag) ? ' guess' : ''}`} onClick={() => toggle(tag)} aria-pressed={pick.includes(tag)} title={d.guesses.includes(tag) ? t('The bigger model’s guess') : undefined}>
+              {d.guesses.includes(tag) ? <Icon name="why" /> : null}{tag}{pick.includes(tag) ? <Icon name="check" /> : null}
+            </button>
+          ))}
+        </div>
+        <div className="dbtns">
+          <button type="button" className="ghost-btn small accent" disabled={!pick.length || busy} onClick={() => send(`/items/${id}/dislike`, { tags: pick })}><Icon name="check" />{t('That was it')}</button>
+          <button type="button" className="ghost-btn small" disabled={busy} onClick={() => send(`/items/${id}/dislike/skip`, {})}><Icon name="x" />{t('Not sure')}</button>
+          {thinking ? <span className="dthink"><span className="spin" />{t('The bigger model is having a look too…')}</span> : null}
+        </div>
+        {d.kind !== 'down' ? <span className="wnote">{t('Only what you pick counts. If you leave it, the guesses wait in Memory for you to confirm.')}</span> : null}
+      </div>
+    );
+  }
+  if (!d.reasons.length && !d.guesses.length) {
+    return thinking ? <p className={`dislike${compact ? ' compact' : ''}`}><span className="spin" />{t('Looking at what you did not like, leaving out what you already like…')}</p> : null;
+  }
   return (
     <div className={`dislike${compact ? ' compact' : ''}`}>
-      {d.reasons?.length ? (
+      {d.reasons.length ? (
         <>
           <span>{t('Less of:')}</span>
-          {d.reasons.map((r) => <span key={r} className="dchip">{r}<button type="button" onClick={() => drop(r)} title={t('That was not it')} aria-label={t('That was not it: {tag}', { tag: r })}><Icon name="x" /></button></span>)}
+          {d.reasons.map((r) => <span key={r} className="dchip">{r}<button type="button" onClick={() => send(`/items/${id}/dislike/${encodeURIComponent(r)}`, undefined, 'DELETE')} title={t('That was not it')} aria-label={t('That was not it: {tag}', { tag: r })}><Icon name="x" /></button></span>)}
         </>
-      ) : <span>{t('Nothing clear stood out, so only the tags you do not already like count against it.')}</span>}
-      {d.note ? <em className="dnote">{d.note}</em> : null}
+      ) : null}
+      {d.guesses.length ? (
+        <>
+          <span className="dverify">{t('Guessed, not counted yet:')}</span>
+          {d.guesses.map((g) => (
+            <span key={g} className="dchip guess"><Icon name="why" />{g}
+              <button type="button" onClick={() => send(`/items/${id}/dislike`, { tags: [g] })} title={t('Yes, that was it')} aria-label={t('Yes, that was it: {tag}', { tag: g })}><Icon name="check" /></button>
+              <button type="button" onClick={() => send(`/items/${id}/dislike-guess/${encodeURIComponent(g)}`, undefined, 'DELETE')} title={t('That was not it')} aria-label={t('That was not it: {tag}', { tag: g })}><Icon name="x" /></button>
+            </span>
+          ))}
+        </>
+      ) : null}
+      {d.note && d.guesses.length ? <em className="dnote">{d.note}</em> : null}
     </div>
   );
 }
@@ -213,7 +255,7 @@ export default function Post({ item: initial, focus = false, onStrong }) {
     if (r.pass) { r.pass = false; return; }
     if (e.target.closest('a, input, select, textarea, .mutebtn, .linkbtn, .ghost-btn, .icon-btn, .play, .tbtn, .fsbox, .fsbtn')) return;
     const at = Date.now();
-    if (at - r.t < 330 && Math.abs(e.clientX - r.x) < 40 && Math.abs(e.clientY - r.y) < 40) {
+    if (at - r.t < 300 && Math.abs(e.clientX - r.x) < 40 && Math.abs(e.clientY - r.y) < 40) {
       clearTimeout(r.timer);
       r.t = 0;
       e.preventDefault();
@@ -230,6 +272,18 @@ export default function Post({ item: initial, focus = false, onStrong }) {
       e.stopPropagation();
       clearTimeout(r.timer);
       r.timer = setTimeout(() => { r.pass = true; btn.click(); }, 300);
+      return;
+    }
+    // A tap on a video pauses or plays it, but only once it is clear it was not the first tap of a double-tap, so
+    // liking never pauses the video. Taps on the player's own controls (the bar at the bottom) go straight through.
+    const v = e.target.closest('video');
+    if (v) {
+      const box = v.getBoundingClientRect();
+      if (v.controls && e.clientY > box.bottom - 56) return;
+      e.preventDefault();
+      e.stopPropagation();
+      clearTimeout(r.timer);
+      r.timer = setTimeout(() => { if (v.paused) v.play().catch(() => {}); else v.pause(); }, 300);
     }
   }
   useEffect(() => () => clearTimeout(tap.current.timer), []);
@@ -267,7 +321,7 @@ export default function Post({ item: initial, focus = false, onStrong }) {
     setTimeout(() => setGone(true), window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 720);
     try {
       await api(`/items/${item.id}/less`, { method: 'POST', body: {} });
-      toast(t('Hidden. The bigger model is looking at what you did not like in it.'));
+      toast(t('Hidden. Pick what you did not like, or leave it.'));
     } catch (e) { toast(e.message); }
   }
 
