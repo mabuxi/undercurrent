@@ -253,6 +253,8 @@ export default function Post({ item: initial, focus = false, onStrong }) {
   function onMediaClick(e) {
     const r = tap.current;
     if (r.pass) { r.pass = false; return; }
+    // Players from other sites have no double-tap like at all: every click there is for the player.
+    if (item.media?.kind === 'embed') return;
     if (e.target.closest('a, input, select, textarea, .mutebtn, .linkbtn, .ghost-btn, .icon-btn, .play, .tbtn, .fsbox, .fsbtn')) return;
     const at = Date.now();
     if (at - r.t < 300 && Math.abs(e.clientX - r.x) < 40 && Math.abs(e.clientY - r.y) < 40) {
@@ -447,7 +449,7 @@ export default function Post({ item: initial, focus = false, onStrong }) {
         </div>
       ) : null}
       {!isText ? <p className="ptitle"><Linkify text={trTitle.text || item.title} source={item.source} onPerson={openPerson} /><TranslateButton tr={trTitle} small /><TranslatedNote tr={trTitle} /></p> : null}
-      <div ref={mediaRef} className="pmedia" onClickCapture={onMediaClick}><PostFx fx={fx} /><HeatFx heat={heat} /><Media item={item} active={active} near={near} height={lastH.current} onPlay={() => strong('play')} onReady={() => setReady(true)} onPerson={openPerson} onLike={likeByTap} /></div>
+      <div ref={mediaRef} className="pmedia" onClickCapture={onMediaClick}><PostFx fx={fx} /><HeatFx heat={heat} /><Media item={item} active={active} near={near} height={lastH.current} onPlay={() => strong('play')} onReady={() => setReady(true)} onPerson={openPerson} onLike={item.media?.kind === 'embed' ? undefined : likeByTap} /></div>
       {!isText && item.body ? <p className="ptext caption"><Linkify text={trBody.text || item.body} source={item.source} onPerson={openPerson} /><TranslateButton tr={trBody} small /><TranslatedNote tr={trBody} /></p> : null}
       {item.aiSummary && !isText ? <p className="aisum">{item.aiSummary}</p> : null}
       <div className={`chipwrap${over && !allTags ? ' over' : ''}`}>

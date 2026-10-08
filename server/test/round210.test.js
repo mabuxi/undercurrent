@@ -87,6 +87,6 @@ test('ethnicities start with continents, a continent matches all of its countrie
 
 test('a fantasy story gets its risky twist only where someone could walk in', () => {
   const list = fantasyIdeas(['big tits', 'riding', 'public'], { gender: 'both' });
-  for (const f of list) if (/Storm cabin|Chalet/.test(f.name)) assert.ok(!/see you/.test(f.description), f.description);
-  assert.ok(list.some((f) => /see you/.test(f.description)));
+  for (const f of list) if (/Storm cabin|Chalet/.test(f.name)) assert.ok(!/close enough to see/.test(f.description), f.description);
+  assert.ok(list.some((f) => /close enough to see/.test(f.description)));
 });

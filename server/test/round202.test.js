@@ -44,7 +44,7 @@ test('the welcome steps have a Positions family instead of Cock, and those kinks
   assert.deepEqual(conceptsOf('reverse cowgirl'), ['reverse cowgirl']);
 });
 
-test('fantasy ideas are scenes with a place and an act, never the picks in a row', () => {
+test('fantasy ideas are one short explicit scene with a place and an act, never the picks in a row', () => {
   const list = fantasyIdeas(['muscle', 'shower', 'blowjob', 'riding'], { gender: 'men' });
   assert.ok(list.length >= 4);
   assert.equal(new Set(list.map((f) => f.name)).size, list.length, 'every idea has its own name');
@@ -54,6 +54,6 @@ test('fantasy ideas are scenes with a place and an act, never the picks in a row
     assert.ok(f.concepts.length >= 1);
   }
   assert.ok(list.some((f) => f.concepts.includes('shower') && /spa|shower/i.test(f.description)), 'the picked place shows up, as a setting that is not everyday');
-  assert.ok(list.every((f) => f.description.split(/[.!?]\s/).length >= 2), 'each is a short story of more than one sentence');
+  assert.ok(list.every((f) => f.description.split(' ').length <= 32 && f.description.split(/[.!?]\s/).length === 1), 'one short, direct sentence each');
   assert.equal(fantasyIdeas(['latino'], {}).length, 0, 'nothing to build a scene from: no idea');
 });

@@ -104,31 +104,49 @@ function Kinks({ families, picked, setPicked, male }) {
   const last = useRef(null);
   // Every pick brings its own related kinks: they are added in front of the earlier ones and stay, so the list keeps
   // growing as you click. What you pick leaves the list.
+  const [thinking, setThinking] = useState(null);
+  const extraFam = useRef(new Map());
+  const famOf = useMemo(() => { const m = new Map(); for (const f of families) for (const c of f.concepts) m.set(c.concept, f.key); return m; }, [families]);
+  const shownAll = () => [...families.flatMap((f) => f.concepts.map((c) => c.concept)), ...Object.values(extra).flat().map((c) => c.concept), ...sugg.map((x) => x.concept)];
+  // Every pick asks the local model for more (in that pick's family and in others), with what is on screen so it
+  // never repeats it. The family you clicked in shows that it is thinking.
   useEffect(() => {
     if (!picked.length) { setSugg([]); return undefined; }
     const focus = last.current;
-    const tm = setTimeout(() => api('/setup/suggest', { method: 'POST', body: { picked, focus, male } }).then((r) => {
-      setSugg((cur) => {
-        const fresh = (r.suggestions || []).filter((x) => !picked.includes(x.concept));
-        const added = fresh.filter((x) => !cur.some((c) => c.concept === x.concept));
-        const keep = cur.filter((x) => !picked.includes(x.concept));
-        return [...added, ...keep].slice(0, 80);
-      });
-    }).catch(() => {}), 200);
-    return () => clearTimeout(tm);
+    const fam = focus ? famOf.get(focus) || extraFam.current.get(focus) || null : null;
+    let alive = true;
+    const tm = setTimeout(() => {
+      if (fam) setThinking(fam);
+      api('/setup/suggest', { method: 'POST', body: { picked, focus, male, shown: shownAll() } }).then((r) => {
+        if (!alive) return;
+        setSugg((cur) => {
+          const fresh = (r.suggestions || []).filter((x) => !picked.includes(x.concept));
+          const added = fresh.filter((x) => !cur.some((c) => c.concept === x.concept));
+          const keep = cur.filter((x) => !picked.includes(x.concept));
+          return [...added, ...keep].slice(0, 120);
+        });
+      }).catch(() => {}).finally(() => { if (alive) setThinking(null); });
+    }, 200);
+    return () => { alive = false; clearTimeout(tm); };
   }, [picked.join('|'), male]); // eslint-disable-line react-hooks/exhaustive-deps
-  const toggle = (c) => {
-    if (picked.includes(c)) { setPicked(picked.filter((x) => x !== c)); last.current = null; }
-    else { last.current = c; setPicked([...picked, c]); }
+  const toggle = (c, meta = null) => {
+    if (picked.includes(c)) { setPicked(picked.filter((x) => x !== c)); last.current = null; return; }
+    // A kink the model came up with stays in its family once picked.
+    if (meta?.family && !famOf.has(c)) {
+      extraFam.current.set(c, meta.family);
+      setExtra((cur) => ({ ...cur, [meta.family]: [...(cur[meta.family] || []).filter((x) => x.concept !== c), { concept: c, name: meta.name, custom: true }] }));
+    }
+    last.current = c;
+    setPicked([...picked, c]);
   };
   const colorOf = useMemo(() => { const m = new Map(); for (const f of families) for (const c of [...f.concepts, ...(extra[f.key] || [])]) m.set(c.concept, f.color); return m; }, [families, extra]);
   const nameOf = useMemo(() => { const m = new Map(); for (const f of families) for (const c of [...f.concepts, ...(extra[f.key] || [])]) m.set(c.concept, c.name); for (const x of sugg) m.set(x.concept, x.name); return m; }, [families, extra, sugg]);
   async function generate(f, shown) {
     setGenBusy(f.key);
     try {
-      const r = await api('/setup/more', { method: 'POST', body: { family: f.key, picked, shown, male } });
-      const more = (r.more || []).filter((x) => !shown.includes(x.concept));
-      if (more.length) setExtra((cur) => ({ ...cur, [f.key]: [...(cur[f.key] || []), ...more] }));
+      const r = await api('/setup/more', { method: 'POST', body: { family: f.key, picked, shown: [...new Set([...shown, ...shownAll()])], male } });
+      const more = (r.more || []).filter((x) => !shown.includes(x.concept)).map((x) => ({ ...x, family: f.key }));
+      if (more.length) setSugg((cur) => [...more.filter((x) => !cur.some((c) => c.concept === x.concept)), ...cur]);
       setGenNone((cur) => ({ ...cur, [f.key]: !more.length }));
     } catch { setGenNone((cur) => ({ ...cur, [f.key]: true })); } finally { setGenBusy(null); }
   }
@@ -153,18 +171,20 @@ function Kinks({ families, picked, setPicked, male }) {
           // At least six you have not picked yet stay in view: picking from a family brings the next ones up.
           let count = Math.min(tops.length, 8);
           while (count < tops.length && tops.slice(0, count).filter((c) => !picked.includes(c.concept)).length < 6) count++;
-          const windowed = open === f.key ? tops : tops.slice(0, count);
+          // What you picked always stays in view, also a kink the AI added that would be past the first ones.
+          const windowed = open === f.key ? tops : tops.filter((c, i) => i < count || picked.includes(c.concept));
           const inView = new Set([...windowed.map((c) => c.concept), ...windowed.flatMap((c) => kidsOf(c).map((k) => k.concept))]);
           // Suggestions only bring up what is not on screen yet: hidden behind "more", or new to this family.
-          const sug = sugg.filter((x) => x.family === f.key && !picked.includes(x.concept) && !inView.has(x.concept)).slice(0, 5);
+          const sug = sugg.filter((x) => x.family === f.key && !picked.includes(x.concept) && !inView.has(x.concept)).slice(0, 6);
           const sugSet = new Set(sug.map((x) => x.concept));
           const hidden = tops.filter((c) => !inView.has(c.concept) && !sugSet.has(c.concept)).length;
           return (
             <section key={f.key} className={`ob-fam${sug.length ? ' has-sugg' : ''}`} style={{ '--c': f.color, '--i': fi }}>
               <header><span className="ob-famicon"><Icon name={FAMILY_ICON[f.key] || 'spark'} /></span><b>{f.name}</b>{n ? <em>{n}</em> : null}</header>
               <div className="ob-tiles">
+                {thinking === f.key ? <span className="ob-tile thinking" aria-live="polite"><span className="spinner inline" />{t('Thinking of more…')}</span> : null}
                 {sug.map((x) => (
-                  <button type="button" key={`s-${x.concept}`} className="ob-tile sugg" onClick={() => toggle(x.concept)} title={t('Goes well with that')}>
+                  <button type="button" key={`s-${x.concept}`} className={`ob-tile sugg${x.ai ? ' ai' : ''}`} onClick={() => toggle(x.concept, x)} title={x.ai ? t('Suggested by the local AI from your picks') : t('Goes well with that')}>
                     <Icon name="plus" />{x.name}
                   </button>
                 ))}
@@ -219,7 +239,9 @@ function Fantasies({ picked, chosen, setChosen, list, setList, gender }) {
       <div className="ob-fants">
         {(list || []).map((f) => (
           <button type="button" key={f.name} className={`ob-fant${has(f) ? ' on' : ''}`} onClick={() => setChosen(has(f) ? chosen.filter((x) => x.name !== f.name) : [...chosen, f])}>
-            <b>{f.name}</b><span>{f.description}</span>{has(f) ? <Icon name="check" /> : null}
+            <b>{f.name}</b><span>{f.description}</span>
+            {f.tags?.length ? <span className="ob-fanttags">{f.tags.map((x) => <em key={x}>{x}</em>)}</span> : null}
+            {has(f) ? <Icon name="check" /> : null}
           </button>
         ))}
       </div>

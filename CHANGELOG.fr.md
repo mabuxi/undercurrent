@@ -2,6 +2,21 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.21.1 · 8 octobre 2026
+
+### Premiers pas
+- Les suggestions viennent maintenant de l’IA locale : chaque choix lui en demande d’autres dans cette famille et dans d’autres qui vont avec, avec les kinks tout prêts comme exemples à ne pas répéter. Ce qu’elle renvoie est vérifié : un vrai kink dans une famille qui existe, rien de déjà affiché, rien de vague, rien sur l’âge, la famille, les animaux ou le non-consentement. La famille où vous avez cliqué montre quand elle réfléchit. Sans l’IA (encore en téléchargement, ou passée), les suggestions toutes prêtes sont utilisées.
+- « En générer plus » demande à l’IA d’autres kinks de cette famille de la même façon ; sans elle, le reste des kinks tout prêts de la famille.
+- Les kinks de l’IA retrouvent le contour en pointillés, aussi une fois ajoutés, jusqu’à ce que vous les choisissiez. Ce que vous choisissez reste toujours visible dans sa famille.
+- Les pays sous un continent n’ont plus le petit coin.
+- Les idées de fantasmes redeviennent une seule phrase courte et explicite, comme une description de scène plutôt qu’une histoire : un lieu précis, quelqu’un, l’acte et un frisson tiré de vos choix. Les kinks utilisés s’affichent dessous, ici et dans Mémoire. L’IA locale reçoit la même consigne.
+
+### Vidéos
+- Les lecteurs d’autres sites n’ont plus aucun j’aime au clic ou au double clic : chaque clic est pour le lecteur.
+
+### Coulisses
+- La construction des versions utilise les versions Node 24 de ses actions GitHub, GitHub n’avertit plus pour Node 20.
+
 ## 0.21.0 · 8 octobre 2026
 
 ### Barre de recherche

@@ -258,7 +258,7 @@ function thumbSrc(u, forceProxy) {
 // (that is what the "first click opens your browser" ads do) and cannot navigate this page away.
 const SANDBOX = 'allow-scripts allow-same-origin allow-presentation allow-forms';
 
-export function EmbedPlayer({ item, active, onPlay, onReady, onLike }) {
+export function EmbedPlayer({ item, active, onPlay, onReady }) {
   const [m, setM] = useState(item.media);
   const thumbs = (m.thumbs?.length ? m.thumbs : [m.poster]).filter(Boolean);
   const [i, setI] = useState(0);
@@ -266,39 +266,6 @@ export function EmbedPlayer({ item, active, onPlay, onReady, onLike }) {
   const [playing, setPlaying] = useState(false);
   const embedRef = useRef(null);
   useFar(embedRef, () => { if (playing) setPlaying(false); });
-  // A player from another site does not tell this page about clicks. When you click into it, this page loses
-  // focus, so two of those within a moment are a double-click: that likes the post, like a double-tap on a picture.
-  // Focus is handed back right after each click so the next one is noticed too.
-  const likeRef = useRef(onLike);
-  likeRef.current = onLike;
-  useEffect(() => {
-    if (!playing) return undefined;
-    // Some players take focus back by themselves right after a click (or when they start), which looked like a
-    // second click: focus changes within a moment of handing focus back are ignored, and only two real clicks
-    // between 0.09 and 0.32 seconds apart count, with the pointer over the player.
-    let last = 0;
-    let handedBack = 0;
-    let over = false;
-    const fr0 = () => embedRef.current?.querySelector('iframe');
-    const enter = () => { over = true; };
-    const leave = () => { over = false; last = 0; };
-    const box = embedRef.current;
-    box?.addEventListener('mouseenter', enter);
-    box?.addEventListener('mouseleave', leave);
-    const onBlur = () => setTimeout(() => {
-      const fr = fr0();
-      if (!fr || document.activeElement !== fr) return;
-      const at = Date.now();
-      const echo = at - handedBack < 55;
-      if (!echo && (over || !window.matchMedia?.('(hover: hover)').matches)) {
-        const gap = at - last;
-        if (last && gap > 90 && gap < 320) { last = 0; likeRef.current?.(); } else last = at;
-      }
-      setTimeout(() => { try { handedBack = Date.now(); embedRef.current?.focus({ preventScroll: true }); } catch {} }, 25);
-    }, 0);
-    window.addEventListener('blur', onBlur);
-    return () => { window.removeEventListener('blur', onBlur); box?.removeEventListener('mouseenter', enter); box?.removeEventListener('mouseleave', leave); };
-  }, [playing]);
   const [sandboxed, setSandboxed] = useState(true);
   const [proxyAll, setProxyAll] = useState(false);
   const [dead, setDead] = useState(false);
@@ -538,7 +505,7 @@ export function Media({ item, active, near = true, height, onPlay, onReady, onPe
   const m = item.media || {};
   useEffect(() => { if (m.kind === 'text' || !m.kind) onReady?.(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   if (!near && m.kind !== 'text') return <div className="media-sleep" style={{ height: height || 320 }} aria-hidden="true" />;
-  if (m.kind === 'embed') return <EmbedPlayer item={item} active={active} onPlay={onPlay} onReady={onReady} onLike={onLike} />;
+  if (m.kind === 'embed') return <EmbedPlayer item={item} active={active} onPlay={onPlay} onReady={onReady} />;
   if (m.kind === 'video' || m.kind === 'redgifs') return <VideoPlayer item={item} active={active} onPlay={onPlay} onReady={onReady} />;
   if (m.kind === 'gallery') return <Gallery item={item} onReady={onReady} />;
   if (m.kind === 'image') return <ImageMedia item={item} src={m.src} mid={m.mid} onReady={onReady} />;

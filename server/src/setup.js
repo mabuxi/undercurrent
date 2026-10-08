@@ -355,33 +355,77 @@ export function suggestFor(picked = [], focus = null, { male } = {}) {
   return [...score.entries()].sort((a, b) => b[1] - a[1]).slice(0, 40).map(([c]) => ({ concept: c, name: conceptLabel(c, lang(), conceptName(c)), family: familyOf(c), color: FAMILIES[familyOf(c)]?.color }));
 }
 
-// "Generate more" in one family: what is left of that family first, then what goes with your picks in the posts
-// here, then (when the local model runs) new ideas from it, all fitting who you want to see.
+// Suggestions in the welcome steps come from the local model: it gets what you picked, who you want to see, and
+// for every family the ready-made kinks as examples of the kind of thing that belongs there (examples to learn from,
+// never answers to repeat). What it sends back is checked: a real kink (no body part or setting word alone), in a
+// family that exists, nothing already on screen, nothing about age, family members, animals or non-consent.
+// Without the model (still downloading, or test mode) the ready-made suggestions are used.
+const BANNED = /\b(teen|teens|young|minor|child|kid|school|step|stepmom|stepdad|stepsister|stepbrother|sister|brother|mom|dad|son|daughter|family|incest|animal|dog|horse|rape|forced|non ?consent|drunk|asleep|sleeping|unconscious|loli|shota)\b/i;
+const VAGUE = new Set(['sex', 'porn', 'hot', 'sexy', 'nude', 'naked', 'body', 'people', 'man', 'woman', 'men', 'women', 'guy', 'girl', 'couple sex', 'fun', 'love', 'passion', 'romance', 'intimacy', 'pleasure', 'desire', 'fetish', 'kink', 'kinks']);
+const MOCK_AI = { ethnicity: ['nordic', 'mediterranean'], body: ['freckles', 'long legs', 'dimples'], positions: ['lotus position', 'piledriver', 'pretzel'], types: ['bodybuilder', 'nerd'], oral: ['ball sucking', 'snowballing'], sex: ['edging play', 'slow grind'], solo: ['mutual masturbation'], cum: ['cum play'], dynamic: ['praise', 'degradation'], clothing: ['fishnets', 'latex'], places: ['sauna', 'locker room'], scenarios: ['blind date', 'stranger'], group: ['orgy'], camera: ['mirror'], fluids: ['spit'], drawn: ['monster'] };
+
+function cleanAiKink(raw) {
+  const t = String(raw || '').toLowerCase().replace(/[^\p{L}\p{N}\s'-]/gu, ' ').replace(/\s+/g, ' ').trim();
+  if (!t || t.length < 3 || t.length > 32 || t.split(' ').length > 3 || BANNED.test(t) || VAGUE.has(t)) return null;
+  return t;
+}
+
+export async function aiKinks({ picked = [], focus = null, family = null, shown = [], male, count = 8 } = {}) {
+  const mode = genderModeOf(male);
+  const fam = family && FAMILIES[family] ? family : focus ? familyOf(focus) : null;
+  const skip = new Set([...picked, ...shown].map((x) => String(x).toLowerCase()));
+  // The ready-made ones are only examples for the model, so they are never sent back as its answers.
+  const examples = Object.entries(FAMILIES).map(([key, f]) => {
+    const list = ALL_CONCEPTS.filter((c) => familyOf(c) === key && !PARENT[c] && fitsGender(c, mode)).slice(0, 8).map((c) => conceptName(c).toLowerCase());
+    return { key, name: f.name, list };
+  }).filter((x) => x.list.length);
+  const exampleSet = new Set(examples.flatMap((x) => x.list));
+  const premade = focus ? suggestFor(picked, focus, { male }).slice(0, 8).map((x) => x.name.toLowerCase()) : [];
+  const who = { men: 'men only (gay)', women: 'women only (lesbian)', hetero: 'a man and a woman together (hetero)', 'lean-men': 'mostly men', 'lean-women': 'mostly women', any: 'anyone' }[mode];
+  let raw = null;
+  if (config.mock) {
+    const fams = fam ? [fam, ...Object.keys(FAMILIES).filter((k) => k !== fam)] : Object.keys(FAMILIES);
+    raw = { kinks: fams.flatMap((k) => (MOCK_AI[k] || []).map((name) => ({ name, family: k }))) };
+  } else if ((await health()).ok) {
+    const want = family ? `${count} new ones, all in the family "${fam}"` : fam ? `5 new ones in the family "${fam}" (the family of what they just picked) and 3 in other families that go with their picks` : `${count} new ones across the families`;
+    try {
+      raw = await Promise.race([chat({
+        kind: 'setup-kinks', model: fastModel(), temperature: 0.6, numPredict: 500,
+        schema: { type: 'object', properties: { kinks: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, family: { type: 'string' } }, required: ['name', 'family'] } } }, required: ['kinks'] },
+        system: `You suggest kinks to one adult setting up a private adult-content browser. A kink is a specific thing people are turned on by and look for, tagged the way porn sites tag it: a type of person, a body feature, an act, a position, a dynamic, a scenario, an outfit, a place. Never a vague word (sex, passion, intimacy), never a plain body part or colour on its own, never anything about age, family members, animals, sleep, alcohol or non-consent. Everyone is an adult.
+They want to see ${who}; only suggest what fits that.
+The families, each with examples of the kind of item that belongs there. The examples show the level and style only: never suggest an example itself.
+${examples.map((x) => `- ${x.key} (${x.name}): ${x.list.join(', ')}`).join('\n')}
+${premade.length ? `Ready-made ideas for what they just picked, also examples only, do not repeat: ${premade.join(', ')}.` : ''}
+Answer with ${want}. name: 1 to 3 lowercase English words. family: one of the family keys above, the one it really belongs to. Each must fit their picks and be clearly different from everything listed.`,
+        user: `They picked: ${picked.join(', ') || 'nothing yet'}${focus ? `\nJust picked: ${focus}` : ''}\nAlready on their screen (do not repeat): ${[...skip].slice(0, 120).join(', ')}`
+      }), new Promise((_, rej) => setTimeout(() => rej(new Error('slow')), 30000))]);
+    } catch { raw = null; }
+  }
+  const out = [];
+  for (const k of raw?.kinks || []) {
+    const name = cleanAiKink(k?.name);
+    if (!name) continue;
+    const known = conceptsOf(name)[0];
+    const concept = known && familyOf(known) ? known : name;
+    const f = familyOf(concept) || (FAMILIES[k.family] ? k.family : null);
+    if (!f || skip.has(concept) || skip.has(name) || exampleSet.has(name) || out.some((x) => x.concept === concept)) continue;
+    if (known && familyOf(known) && (!pickable(known) || !fitsGender(known, mode))) continue;
+    if (family && f !== fam) continue;
+    out.push({ concept, name: known && familyOf(known) ? conceptLabel(known, lang(), conceptName(known)) : name.charAt(0).toUpperCase() + name.slice(1), family: f, color: FAMILIES[f]?.color, ai: true, custom: !(known && familyOf(known)) });
+  }
+  return { items: out.slice(0, family ? count : 10), ai: !!raw };
+}
+
+// "Generate more" in one family: the local model first; without it, what is left of that family's ready-made kinks.
 export async function moreFor(family, { picked = [], shown = [], male } = {}) {
   if (!FAMILIES[family]) return [];
+  const r = await aiKinks({ picked, family, shown, male, count: 8 });
+  if (r.items.length) return r.items;
   const mode = genderModeOf(male);
   const skip = new Set([...picked, ...shown].map((x) => String(x).toLowerCase()));
-  const out = [];
-  const push = (c, custom = false) => {
-    const k = String(c || '').toLowerCase().trim();
-    if (!k || skip.has(k) || out.some((x) => x.concept === k) || (!custom && (!pickable(k) || !fitsGender(k, mode)))) return;
-    out.push({ concept: k, name: custom ? k.charAt(0).toUpperCase() + k.slice(1) : conceptLabel(k, lang(), conceptName(k)), custom, ...(GENDER_OF[k] ? { gender: GENDER_OF[k] } : {}) });
-  };
-  for (const c of ALL_CONCEPTS) if (familyOf(c) === family && (!PARENT[c] || picked.includes(PARENT[c]))) push(c);
-  for (const x of suggestFor(picked, null, { male })) if (x.family === family) push(x.concept);
-  if (out.length < 6 && !config.mock && (await health()).ok) {
-    try {
-      const who = { men: 'men only (gay)', women: 'women only (lesbian)', hetero: 'a man and a woman together', 'lean-men': 'mostly men', 'lean-women': 'mostly women', any: 'anyone' }[mode];
-      const r = await Promise.race([chat({
-        kind: 'summary', model: fastModel(), temperature: 0.7, numPredict: 300,
-        schema: { type: 'object', properties: { kinks: { type: 'array', items: { type: 'string' } } }, required: ['kinks'] },
-        system: `You suggest kinks for one adult setting up a private adult-content browser. Give 8 more items for the family "${FAMILIES[family].name}": short plain English tag names (1 to 3 words, lowercase), the way porn sites tag, specific, all adults, nothing about age, family members, animals or non-consent. They want to see ${who}. Fit their picks. Never repeat what they already see.`,
-        user: `Their picks: ${picked.join(', ') || 'none yet'}\nAlready shown: ${[...skip].slice(0, 80).join(', ')}`
-      }), new Promise((_, rej) => setTimeout(() => rej(new Error('slow')), 25000))]);
-      for (const k of r?.kinks || []) { const c = conceptsOf(String(k))[0] || String(k).toLowerCase(); if (familyOf(c) === family || !familyOf(c)) push(c, !familyOf(c)); }
-    } catch {}
-  }
-  return out.slice(0, 8);
+  return ALL_CONCEPTS.filter((c) => familyOf(c) === family && !skip.has(c) && pickable(c) && fitsGender(c, mode) && (!PARENT[c] || picked.includes(PARENT[c])))
+    .slice(0, 8).map((c) => ({ concept: c, name: conceptLabel(c, lang(), conceptName(c)), family, color: FAMILIES[family]?.color }));
 }
 
 // Sources in the order most people use them, for the last step.

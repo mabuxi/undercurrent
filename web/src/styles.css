@@ -1848,3 +1848,13 @@ html.narrow .sb-field input{height:100% !important}
 .ob-fants>.ob-fant:not(.skel){animation:obrise .5s cubic-bezier(.2,.8,.2,1) both}
 .ob-fants>.ob-fant:nth-child(2){animation-delay:.08s}.ob-fants>.ob-fant:nth-child(3){animation-delay:.16s}.ob-fants>.ob-fant:nth-child(4){animation-delay:.24s}.ob-fants>.ob-fant:nth-child(5){animation-delay:.32s}
 .ask .sbar .sb-field input,.ask .sbar .sb-field input:focus{background:none;border:0;box-shadow:none;outline:none;padding:0 2px}
+
+/* 0.21.1: countries under a continent without the corner mark; kinks from the local AI keep the dashed outline,
+   also once added to a family, until picked; a family shows when the AI is thinking of more for it. */
+.ob-tile.kid::before{content:none;display:none}
+.ob-tile.gen:not(.on){background:transparent;border:1px dashed color-mix(in srgb,var(--c) 60%,transparent);color:color-mix(in srgb,var(--c) 70%,white)}
+.ob-tile.thinking{cursor:default;background:transparent;border:1px dashed color-mix(in srgb,var(--c) 40%,transparent);color:var(--text-3);font-size:12px;animation:obpulse 1.4s ease-in-out infinite}
+@keyframes obpulse{0%,100%{opacity:.55}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.ob-tile.thinking{animation:none}}
+.ob-fanttags{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
+.ob-fanttags em{font-style:normal;font-size:11px;padding:2px 8px;border-radius:8px;background:rgba(246,195,91,.12);border:1px solid rgba(246,195,91,.25);color:#F6D58B}

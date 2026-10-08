@@ -43,7 +43,7 @@ import { performerInfo } from './sources/stars.js';
 import { tagsForItems, tagSpecificity } from './store.js';
 import { lustUrl, lustTest, TUBE_CDNS, tubeReferer } from './sources/lustpress.js';
 import { invalidatePool } from './searchstate.js';
-import { setupStatus, pullModels, installOllama, conceptCatalog, suggestFor, moreFor, SOURCE_ORDER, modelOptions, chooseModels } from './setup.js';
+import { setupStatus, pullModels, installOllama, conceptCatalog, suggestFor, moreFor, aiKinks, SOURCE_ORDER, modelOptions, chooseModels } from './setup.js';
 import { fantasyIdeas } from './fantasyideas.js';
 import { listProfiles, createProfile, renameProfile, setProfileColor, switchProfile, deleteProfile, backupProfile, restoreBackup, deleteBackup, revealInFinder } from './profiles.js';
 import { updateStatus, applyUpdate, job as updateJob, whatsNew, markSeen, changelog } from './update.js';
@@ -998,7 +998,16 @@ api.get('/setup/concepts', wrap((req, res) => {
   const mine = new Set(listKinks({ includeHidden: false }).filter((k) => !k.isGroup).flatMap((k) => k.concepts || []));
   res.json({ families: conceptCatalog({ male: req.query.male !== undefined ? Number(req.query.male) : undefined }), picked: [...mine] });
 }));
-api.post('/setup/suggest', wrap((req, res) => res.json({ suggestions: suggestFor((req.body?.picked || []).map(String).slice(0, 60), req.body?.focus ? String(req.body.focus) : null, { male: req.body?.male }) })));
+// Each pick asks the local model for more, in that pick's family and in others, with the ready-made suggestions as
+// its examples; the ready-made ones follow, so there is always something even without the model.
+api.post('/setup/suggest', wrap(async (req, res) => {
+  const picked = (req.body?.picked || []).map(String).slice(0, 60);
+  const focus = req.body?.focus ? String(req.body.focus) : null;
+  const premade = suggestFor(picked, focus, { male: req.body?.male });
+  const ai = focus ? await aiKinks({ picked, focus, shown: (req.body?.shown || []).map(String).slice(0, 300), male: req.body?.male }) : { items: [], ai: false };
+  const seen = new Set(ai.items.map((x) => x.concept));
+  res.json({ suggestions: [...ai.items, ...premade.filter((x) => !seen.has(x.concept))], ai: ai.ai });
+}));
 api.post('/setup/more', wrap(async (req, res) => res.json({ more: await moreFor(String(req.body?.family || ''), { picked: (req.body?.picked || []).map(String).slice(0, 60), shown: (req.body?.shown || []).map(String).slice(0, 300), male: req.body?.male }) })));
 api.get('/setup/sources', wrap((req, res) => {
   const st = providerState();
@@ -1015,12 +1024,12 @@ api.post('/setup/fantasies', wrap(async (req, res) => {
   if (!config.mock && (await health()).ok) {
     try {
       const out = await Promise.race([chat({
-        kind: 'summary', model: deepModel() || fastModel(), temperature: 0.85, numPredict: 1400,
+        kind: 'summary', model: deepModel() || fastModel(), temperature: 0.8, numPredict: 900,
         schema: { type: 'object', properties: { fantasies: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, description: { type: 'string' }, kinks: { type: 'array', items: { type: 'string' } } }, required: ['name', 'description', 'kinks'] } } }, required: ['fantasies'] },
-        system: `You suggest fantasies for one adult using a private adult-content browser. A fantasy is a mini story of two or three sentences, second person ("you"), that someone would daydream about: a specific setting that is hard to come by, who is there, what happens, and one twist that makes it thrilling. It must feel personal: build it from the few picks that fit together best, not from all of them, and let the twist come from their picks (public or getting caught means risk, a straight guy means he is crossing a line for the first time, a partner means someone watching). Never a list of the kinks, never "scenes where X and Y come together", never generic ("a muscular man in the shower"). Good example for someone who picked muscle, public and blowjob: "In a spa's shared showers, where anyone could walk in, a muscular stranger keeps holding your gaze. He drops to his knees anyway. Footsteps pass the door twice and he does not stop." Every fantasy in a set has its own setting, its own person and its own twist, so they are clearly different stories. Explicit is fine; everyone is a consenting adult; nothing about family members, age, animals or non-consent. Give 5. name: 2 to 4 words naming the scene, not the kinks. description: the mini story. kinks: the exact picked kink names it really uses (2 or 3), unchanged. ${replyIn()}`,
+        system: `You suggest fantasies for one adult using a private adult-content browser. A fantasy is ONE short, explicit sentence (at most 30 words, second person "you"), written like a porn scene description, not like a story: direct and dirty, no poetic language, no metaphors, no feelings. It names a specific setting that is hard to come by, who it is with, the sex act, and one thrill that comes from their picks (public or getting caught means risk, a straight guy means a first time, a partner means someone watching). Good example for someone who picked muscle, public and blowjob: "In a spa's shared steam shower where anyone could walk in, a muscular stranger drops to his knees and sucks you off." Use the two or three picks that fit together best, never all of them, never a list of the kinks. Every fantasy in a set has its own setting, person and act. Everyone is a consenting adult; nothing about family members, age, animals or non-consent. Give 5. name: 2 to 4 words naming the scene, not the kinks. description: the one sentence. kinks: the exact picked kink names it really uses (2 or 3), unchanged. ${replyIn()}`,
         user: `Picked kinks: ${names.join(', ')}`
       }), new Promise((_, rej) => setTimeout(() => rej(new Error('slow')), 30000))]);
-      list = (out?.fantasies || []).map((f) => ({ name: String(f.name || '').slice(0, 50), description: String(f.description || '').slice(0, 480), concepts: (f.kinks || []).map((k) => picked[names.findIndex((n) => n.toLowerCase() === String(k).toLowerCase())]).filter(Boolean) }))
+      list = (out?.fantasies || []).map((f) => ({ name: String(f.name || '').slice(0, 50), description: String(f.description || '').slice(0, 260), concepts: (f.kinks || []).map((k) => picked[names.findIndex((n) => n.toLowerCase() === String(k).toLowerCase())]).filter(Boolean) }))
         .filter((f) => f.name && f.concepts.length >= 2);
     } catch {}
   }
@@ -1031,7 +1040,8 @@ api.post('/setup/fantasies', wrap(async (req, res) => {
     const gender = Number.isFinite(male) ? (male >= 70 ? 'men' : male <= 30 ? 'women' : 'both') : 'both';
     for (const f of fantasyIdeas(picked, { gender, max: 5 })) if (list.length < 5 && !list.some((x) => x.name === f.name)) list.push(f);
   }
-  res.json({ fantasies: list.slice(0, 5), byAi });
+  // The kinks each idea uses, by name, shown under it.
+  res.json({ fantasies: list.slice(0, 5).map((f) => ({ ...f, tags: (f.concepts || []).map((c) => cName(c)) })), byAi });
 }));
 // Saves everything from the welcome steps at once.
 api.post('/setup/finish', wrap(async (req, res) => {

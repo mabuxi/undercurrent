@@ -3,6 +3,21 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.21.1 · 8 October 2026
+
+### Welcome steps
+- Suggestions come from the local AI now: every pick asks it for more in that family and in others that go with it, with the ready-made kinks as examples it must not repeat. What it sends back is checked: a real kink in a family that exists, nothing already on screen, nothing vague, nothing about age, family members, animals or non-consent. The family you clicked in shows when it is thinking. Without the AI (still downloading, or skipped), the ready-made suggestions are used.
+- "Generate more" asks the AI for more of that family the same way; without it, the rest of that family's ready-made kinks.
+- Kinks from the AI have the dashed outline again, also after being added, until you pick them. What you pick always stays in view in its family.
+- Countries under a continent no longer have the corner mark.
+- Fantasy ideas are one short, explicit sentence again, like a scene description instead of a story: a specific setting, someone, the act and a thrill from your picks. The kinks each idea uses show under it, here and in Memory. The local AI is told the same.
+
+### Videos
+- Players from other sites no longer have any like on click or double-click: every click there is for the player.
+
+### Under the hood
+- The release build uses the Node 24 versions of its GitHub actions, so GitHub no longer warns about Node 20.
+
 ## 0.21.0 · 8 October 2026
 
 ### Search bar

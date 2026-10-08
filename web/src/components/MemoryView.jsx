@@ -185,7 +185,8 @@ function FantasyIdeas({ onSaved }) {
             <div className="fantcard idea" key={sg.id}>
               <div className="fc-head"><strong>{sg.title}</strong><span className="fc-pct">{sg.confidence}%</span></div>
               <span className="wtext">{sg.body}</span>
-              <span className="mini-meta">{(sg.data.kinks || []).map((k) => k.name).concat(sg.data.tags || []).join(' · ')}{sg.data.why ? ` · ${sg.data.why}` : ''}</span>
+              <div className="fc-kinks">{(sg.data.kinks || []).map((k) => <span key={`k-${k.id || k.name}`} className="chip" style={{ '--c': k.color || '#F6C35B', '--c2': `color-mix(in srgb, ${k.color || '#F6C35B'} 16%, transparent)` }}>{k.name}</span>)}{(sg.data.tags || []).filter((x) => !(sg.data.kinks || []).some((k) => k.name.toLowerCase() === x)).map((x) => <span key={`t-${x}`} className="chip ghost">{x}</span>)}</div>
+              {sg.data.why ? <span className="mini-meta">{sg.data.why}</span> : null}
               <div className="memacts">
                 <button type="button" className="ghost-btn small accent" onClick={() => act(sg, 'save')}><Icon name="check" />{t('Save')}</button>
                 <button type="button" className="ghost-btn small" onClick={() => act(sg, 'dismiss')}><Icon name="less" />{t('Not for me')}</button>
