@@ -387,20 +387,26 @@ export async function aiKinks({ picked = [], focus = null, family = null, shown 
     const fams = fam ? [fam, ...Object.keys(FAMILIES).filter((k) => k !== fam)] : Object.keys(FAMILIES);
     raw = { kinks: fams.flatMap((k) => (MOCK_AI[k] || []).map((name) => ({ name, family: k }))) };
   } else if ((await health()).ok) {
-    const want = family ? `${count} new ones, all in the family "${fam}"` : fam ? `5 new ones in the family "${fam}" (the family of what they just picked) and 3 in other families that go with their picks` : `${count} new ones across the families`;
-    try {
-      raw = await Promise.race([chat({
-        kind: 'setup-kinks', model: fastModel(), temperature: 0.6, numPredict: 500,
-        schema: { type: 'object', properties: { kinks: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, family: { type: 'string' } }, required: ['name', 'family'] } } }, required: ['kinks'] },
-        system: `You suggest kinks to one adult setting up a private adult-content browser. A kink is a specific thing people are turned on by and look for, tagged the way porn sites tag it: a type of person, a body feature, an act, a position, a dynamic, a scenario, an outfit, a place. Never a vague word (sex, passion, intimacy), never a plain body part or colour on its own, never anything about age, family members, animals, sleep, alcohol or non-consent. Everyone is an adult.
+    const want = family ? `${count + 4} new ones, all in the family "${fam}"` : fam ? `8 new ones in the family "${fam}" (the family of what they just picked) and 4 in other families that go with their picks` : `${count + 4} new ones across the families`;
+    const ask = (extra = '', temperature = 0.75) => Promise.race([chat({
+      kind: 'setup-kinks', model: fastModel(), temperature, numPredict: 700,
+      schema: { type: 'object', properties: { kinks: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, family: { type: 'string' } }, required: ['name', 'family'] } } }, required: ['kinks'] },
+      system: `You suggest kinks to one adult setting up a private adult-content browser. A kink is a specific thing people are turned on by and look for, tagged the way porn sites tag it: a type of person, a body feature, an act, a position, a dynamic, a scenario, an outfit, a place. Never a vague word (sex, passion, intimacy), never a plain body part or colour on its own, never anything about age, family members, animals, sleep, alcohol or non-consent. Everyone is an adult.
 They want to see ${who}; only suggest what fits that.
 The families, each with examples of the kind of item that belongs there. The examples show the level and style only: never suggest an example itself.
 ${examples.map((x) => `- ${x.key} (${x.name}): ${x.list.join(', ')}`).join('\n')}
 ${premade.length ? `Ready-made ideas for what they just picked, also examples only, do not repeat: ${premade.join(', ')}.` : ''}
-Answer with ${want}. name: 1 to 3 lowercase English words. family: one of the family keys above, the one it really belongs to. Each must fit their picks and be clearly different from everything listed.`,
-        user: `They picked: ${picked.join(', ') || 'nothing yet'}${focus ? `\nJust picked: ${focus}` : ''}\nAlready on their screen (do not repeat): ${[...skip].slice(0, 120).join(', ')}`
-      }), new Promise((_, rej) => setTimeout(() => rej(new Error('slow')), 30000))]);
-    } catch { raw = null; }
+Answer with ${want}. name: 1 to 3 lowercase English words. family: one of the family keys above, the one it really belongs to. Each must fit their picks and be clearly different from everything listed.${extra}`,
+      user: `They picked: ${picked.join(', ') || 'nothing yet'}${focus ? `\nJust picked: ${focus}` : ''}\nAlready on their screen (do not repeat): ${[...skip].slice(0, 120).join(', ')}`
+    }), new Promise((_, rej) => setTimeout(() => rej(new Error('slow')), 45000))]);
+    try { raw = await ask(); } catch (e) { log('info', `Kink ideas: the model did not answer (${e.message})`); raw = null; }
+    // A small model often repeats what it was shown: once more, warmer, with what it repeated named as off limits.
+    const kept = (r) => (r?.kinks || []).filter((k) => { const n = cleanAiKink(k?.name); return n && !skip.has(n) && !exampleSet.has(n) && !skip.has(conceptsOf(n)[0] || ''); }).length;
+    if (raw && kept(raw) < 3) {
+      const again = (raw.kinks || []).map((k) => cleanAiKink(k?.name)).filter(Boolean);
+      try { const r2 = await ask(`\nThese were already given and do not count: ${again.join(', ')}. Think of other, more specific ones.`, 0.95); raw = { kinks: [...(raw.kinks || []), ...(r2?.kinks || [])] }; } catch {}
+    }
+    if (raw) log('info', `Kink ideas: ${raw.kinks?.length || 0} from the model, ${kept(raw)} new`);
   }
   const out = [];
   for (const k of raw?.kinks || []) {
@@ -414,7 +420,7 @@ Answer with ${want}. name: 1 to 3 lowercase English words. family: one of the fa
     if (family && f !== fam) continue;
     out.push({ concept, name: known && familyOf(known) ? conceptLabel(known, lang(), conceptName(known)) : name.charAt(0).toUpperCase() + name.slice(1), family: f, color: FAMILIES[f]?.color, ai: true, custom: !(known && familyOf(known)) });
   }
-  return { items: out.slice(0, family ? count : 10), ai: !!raw };
+  return { items: out.slice(0, family ? count : 12), ai: !!raw };
 }
 
 // "Generate more" in one family: the local model first; without it, what is left of that family's ready-made kinks.

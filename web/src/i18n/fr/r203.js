@@ -1,4 +1,6 @@
 export default {
+  'The local AI did not answer in time, so these are quick ideas from your picks.': 'L’IA locale n’a pas répondu à temps, voici donc des idées rapides tirées de vos choix.',
+  'Ask the AI again': 'Redemander à l’IA',
   'Thinking of more…': 'Je cherche d’autres idées…',
   'Suggested by the local AI from your picks': 'Proposé par l’IA locale à partir de vos choix',
   'Undercurrent runs AI models on this Mac with Ollama. They tag posts, look at pictures and power the assistant. Nothing is sent anywhere. The recommended models fit this Mac; choose others if you like. They download first; the next steps open once they run and answer.': 'Undercurrent fait tourner des modèles d’IA sur ce Mac avec Ollama. Ils taguent les publications, regardent les images et font fonctionner l’assistant. Rien n’est envoyé nulle part. Les modèles recommandés conviennent à ce Mac ; choisissez-en d’autres si vous voulez. Ils se téléchargent d’abord ; les étapes suivantes s’ouvrent dès qu’ils tournent et répondent.',

@@ -107,27 +107,29 @@ function Kinks({ families, picked, setPicked, male }) {
   const [thinking, setThinking] = useState(null);
   const extraFam = useRef(new Map());
   const famOf = useMemo(() => { const m = new Map(); for (const f of families) for (const c of f.concepts) m.set(c.concept, f.key); return m; }, [families]);
-  const shownAll = () => [...families.flatMap((f) => f.concepts.map((c) => c.concept)), ...Object.values(extra).flat().map((c) => c.concept), ...sugg.map((x) => x.concept)];
-  // Every pick asks the local model for more (in that pick's family and in others), with what is on screen so it
-  // never repeats it. The family you clicked in shows that it is thinking.
+  // What is on screen right now (not what is hidden behind "+ more"), so the AI does not repeat it but may still
+  // bring up a hidden one.
+  const visibleRef = useRef(new Set());
+  const shownAll = () => [...visibleRef.current, ...picked];
+  const reqId = useRef(0);
+  // Every pick asks the local model for more (in that pick's family and in others). Answers are always kept, also
+  // when you picked something else in the meantime; the family you clicked in shows that it is thinking.
   useEffect(() => {
     if (!picked.length) { setSugg([]); return undefined; }
     const focus = last.current;
     const fam = focus ? famOf.get(focus) || extraFam.current.get(focus) || null : null;
-    let alive = true;
     const tm = setTimeout(() => {
+      const id = ++reqId.current;
       if (fam) setThinking(fam);
       api('/setup/suggest', { method: 'POST', body: { picked, focus, male, shown: shownAll() } }).then((r) => {
-        if (!alive) return;
         setSugg((cur) => {
           const fresh = (r.suggestions || []).filter((x) => !picked.includes(x.concept));
           const added = fresh.filter((x) => !cur.some((c) => c.concept === x.concept));
-          const keep = cur.filter((x) => !picked.includes(x.concept));
-          return [...added, ...keep].slice(0, 120);
+          return [...added, ...cur].slice(0, 160);
         });
-      }).catch(() => {}).finally(() => { if (alive) setThinking(null); });
+      }).catch(() => {}).finally(() => { if (id === reqId.current) setThinking(null); });
     }, 200);
-    return () => { alive = false; clearTimeout(tm); };
+    return () => clearTimeout(tm);
   }, [picked.join('|'), male]); // eslint-disable-line react-hooks/exhaustive-deps
   const toggle = (c, meta = null) => {
     if (picked.includes(c)) { setPicked(picked.filter((x) => x !== c)); last.current = null; return; }
@@ -144,8 +146,8 @@ function Kinks({ families, picked, setPicked, male }) {
   async function generate(f, shown) {
     setGenBusy(f.key);
     try {
-      const r = await api('/setup/more', { method: 'POST', body: { family: f.key, picked, shown: [...new Set([...shown, ...shownAll()])], male } });
-      const more = (r.more || []).filter((x) => !shown.includes(x.concept)).map((x) => ({ ...x, family: f.key }));
+      const r = await api('/setup/more', { method: 'POST', body: { family: f.key, picked, shown: [...new Set([...shownAll(), ...sugg.filter((x) => x.family === f.key).map((x) => x.concept)])], male } });
+      const more = (r.more || []).filter((x) => !visibleRef.current.has(x.concept) && !picked.includes(x.concept)).map((x) => ({ ...x, family: f.key }));
       if (more.length) setSugg((cur) => [...more.filter((x) => !cur.some((c) => c.concept === x.concept)), ...cur]);
       setGenNone((cur) => ({ ...cur, [f.key]: !more.length }));
     } catch { setGenNone((cur) => ({ ...cur, [f.key]: true })); } finally { setGenBusy(null); }
@@ -162,6 +164,7 @@ function Kinks({ families, picked, setPicked, male }) {
         </div>
       ) : null}
       <div className="ob-fams">
+        {(visibleRef.current = new Set()) && null}
         {families.map((f, fi) => {
           const all = [...f.concepts, ...(extra[f.key] || []).filter((x) => !f.concepts.some((c) => c.concept === x.concept))];
           const n = all.filter((c) => picked.includes(c.concept)).length;
@@ -177,6 +180,7 @@ function Kinks({ families, picked, setPicked, male }) {
           // Suggestions only bring up what is not on screen yet: hidden behind "more", or new to this family.
           const sug = sugg.filter((x) => x.family === f.key && !picked.includes(x.concept) && !inView.has(x.concept)).slice(0, 6);
           const sugSet = new Set(sug.map((x) => x.concept));
+          for (const c of [...inView, ...sugSet]) visibleRef.current.add(c);
           const hidden = tops.filter((c) => !inView.has(c.concept) && !sugSet.has(c.concept)).length;
           return (
             <section key={f.key} className={`ob-fam${sug.length ? ' has-sugg' : ''}`} style={{ '--c': f.color, '--i': fi }}>
@@ -217,11 +221,24 @@ function Kinks({ families, picked, setPicked, male }) {
 
 function Fantasies({ picked, chosen, setChosen, list, setList, gender }) {
   const [loading, setLoading] = useState(false);
+  const [byAi, setByAi] = useState(true);
   const [own, setOwn] = useState({ name: '', description: '' });
+  // The local model may need a while (a big model has to load first), so the ideas are written in the background
+  // and this step checks every two seconds.
+  async function write() {
+    setLoading(true);
+    try {
+      const { job } = await api('/setup/fantasies', { method: 'POST', body: { picked, male: gender?.male } });
+      for (let i = 0; i < 150; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const r = await api(`/setup/fantasies/${job}`);
+        if (r.done) { setList(r.fantasies || []); setByAi(!!r.byAi); break; }
+      }
+    } catch { setList((cur) => cur || []); setByAi(false); } finally { setLoading(false); }
+  }
   useEffect(() => {
     if (list || picked.length < 2) return;
-    setLoading(true);
-    api('/setup/fantasies', { method: 'POST', body: { picked, male: gender?.male } }).then((r) => setList(r.fantasies)).catch(() => setList([])).finally(() => setLoading(false));
+    write();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const has = (f) => chosen.some((x) => x.name === f.name);
   return (
@@ -232,9 +249,12 @@ function Fantasies({ picked, chosen, setChosen, list, setList, gender }) {
       {picked.length < 2 ? <p className="ob-note">{t('Pick at least two kinks to get fantasy ideas, or write your own below.')}</p> : null}
       {loading ? (
         <div className="ob-writing" role="status" aria-live="polite">
-          <p className="ob-writing-l"><span className="ob-quill"><Icon name="edit" /></span>{t('Writing a few stories from your picks')}<span className="ob-dots3"><i /><i /><i /></span></p>
+          <p className="ob-writing-l"><span className="ob-quill"><Icon name="nib" /></span>{t('Writing a few stories from your picks')}<span className="ob-dots3"><i /><i /><i /></span></p>
           <div className="ob-fants">{[0, 1, 2].map((i) => <div key={i} className="ob-fant skel" style={{ '--i': i }}><b /><span /><span /><span className="short" /></div>)}</div>
         </div>
+      ) : null}
+      {!loading && list?.length && !byAi ? (
+        <p className="ob-note ob-quick"><Icon name="why" />{t('The local AI did not answer in time, so these are quick ideas from your picks.')} <button type="button" className="ob-skiplink" onClick={write}>{t('Ask the AI again')}</button></p>
       ) : null}
       <div className="ob-fants">
         {(list || []).map((f) => (

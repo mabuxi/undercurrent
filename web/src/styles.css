@@ -1858,3 +1858,5 @@ html.narrow .sb-field input{height:100% !important}
 @media (prefers-reduced-motion:reduce){.ob-tile.thinking{animation:none}}
 .ob-fanttags{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
 .ob-fanttags em{font-style:normal;font-size:11px;padding:2px 8px;border-radius:8px;background:rgba(246,195,91,.12);border:1px solid rgba(246,195,91,.25);color:#F6D58B}
+.ob-quick{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.ob-quick .i{width:14px;height:14px;color:var(--accent)}

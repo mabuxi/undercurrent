@@ -2,6 +2,15 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.21.2 · 8 octobre 2026
+
+### Premiers pas
+- Idées de fantasmes : le grand modèle local avait souvent besoin de plus que ses 30 secondes (il doit d’abord se charger), donc les idées de secours, toutes semblables, s’affichaient. Il a maintenant 100 secondes, puis le modèle rapide prend le relais, et les idées s’écrivent en arrière-plan pendant l’animation de la plume. Si l’IA ne répond toujours pas, une ligne le dit, avec « Redemander à l’IA ».
+- Les kinks de chaque idée de l’IA sont reconnus plus souplement (aussi en français, ou seulement cités dans la phrase), les bonnes idées ne sont plus jetées.
+- Les idées de secours varient davantage : d’autres actes qui vont avec les vôtres (seulement ceux qui correspondent à qui vous voulez voir), et deux façons de dire les plus courants.
+- Suggestions de kinks : l’IA avait pour consigne d’éviter tout ce qui existait dans chaque famille, même ce qui était caché derrière « + plus », donc la plupart de ses réponses étaient écartées. Seul ce qui est à l’écran compte maintenant ; on lui en demande plus, et une seconde fois quand elle se répète. Les réponses qui arrivent après un autre choix sont gardées.
+- L’animation d’écriture a une plume au lieu du crayon de modification.
+
 ## 0.21.1 · 8 octobre 2026
 
 ### Premiers pas

@@ -3,6 +3,15 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.21.2 · 8 October 2026
+
+### Welcome steps
+- Fantasy ideas: the bigger local model often needed more than the 30 seconds it had (it has to load first), so the quick fallback ideas showed instead, which all looked alike. It now gets 100 seconds, then the quicker model gets a turn, and the ideas are written in the background while the pen animation runs. When the AI still does not answer, a line says so, with "Ask the AI again".
+- The kinks each AI idea uses are matched more loosely (also in French, or only named in the sentence), so good ideas are no longer thrown away.
+- The quick fallback ideas vary more: different acts that go with yours (only ones that fit who you want to see), and two ways of saying the common ones.
+- Kink suggestions: the AI was told everything in every family was off limits, also what was hidden behind "+ more", so most of its answers were dropped. Now only what is on screen counts as already shown; it is asked for more, and asked again once when it repeats itself. Answers that arrive after you picked something else are kept instead of dropped.
+- The writing animation has a pen nib instead of the edit pencil.
+
 ## 0.21.1 · 8 October 2026
 
 ### Welcome steps

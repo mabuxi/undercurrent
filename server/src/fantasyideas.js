@@ -1,4 +1,5 @@
 import { lang } from './i18n.js';
+import { GENDER_OF } from './concepts.js';
 
 // Fantasy ideas without the local model (it may still be downloading during the welcome steps): short stories built
 // from what you picked, never the picks in a row. Each has a specific setting that is not easy to come by, someone,
@@ -59,7 +60,7 @@ const ACTS = {
   kissing: { en: 'pushes you against the wall and makes out with you', fr: 'vous plaque contre le mur et vous embrasse' },
   anal: { en: 'bends over and takes it in the ass', fr: 'se penche et se fait prendre le cul' },
   doggystyle: { en: 'bends over and gets fucked hard from behind', fr: 'se penche et se fait prendre fort par derrière' },
-  missionary: { en: 'pulls you on top and lets you fuck {p} deep', fr: 'vous attire dessus et se fait prendre profond' },
+  missionary: { en: 'pulls you on top and lets you fuck {o} deep', fr: 'vous attire dessus et se fait prendre profond' },
   riding: { en: 'climbs on and rides you hard', fr: 'monte sur vous et vous chevauche fort' },
   'reverse cowgirl': { en: 'rides you facing away', fr: 'vous chevauche de dos' },
   'standing sex': { en: 'pins you against the wall and fucks you', fr: 'vous plaque contre le mur et vous baise' },
@@ -78,6 +79,23 @@ const ACTS = {
   masturbation: { en: 'watches you jerk off', fr: 'vous regarde vous branler' },
   edging: { en: 'keeps you on the edge until you beg', fr: 'vous garde au bord jusqu’à ce que vous suppliiez' },
   massage: { en: 'turns the massage into sex', fr: 'transforme le massage en baise' }
+};
+// A second way to say the most common acts, so ideas do not all read the same.
+const ACTS2 = {
+  blowjob: { en: 'sucks you off right there', fr: 'vous suce sur place' },
+  'pussy licking': { en: 'goes down on you and does not stop', fr: 'descend entre vos cuisses et ne s’arrête plus' },
+  riding: { en: 'straddles you and rides you slow, then hard', fr: 'vous chevauche lentement, puis fort' },
+  anal: { en: 'begs you to fuck {p} ass', fr: 'vous supplie de lui prendre le cul' },
+  doggystyle: { en: 'gets on all fours for you', fr: 'se met à quatre pattes pour vous' },
+  kissing: { en: 'kisses you hard and pulls you closer', fr: 'vous embrasse fort et vous attire contre lui' },
+  handjob: { en: 'strokes you until you can’t hold it', fr: 'vous branle jusqu’à ce que vous ne teniez plus' }
+};
+// Acts that go with one you picked, so a single pick still gives different ideas. Only ones that fit who you want to see.
+const NEAR_ACTS = {
+  blowjob: ['deepthroat', 'sixty nine', 'rimming', 'sloppy'], deepthroat: ['blowjob', 'face fucking'], 'pussy licking': ['facesitting', 'fingering', 'scissoring', 'sixty nine'],
+  riding: ['reverse cowgirl', 'missionary', 'doggystyle'], anal: ['doggystyle', 'prone bone', 'rimming'], doggystyle: ['prone bone', 'anal', 'standing sex'],
+  missionary: ['mating press', 'spooning', 'kissing'], scissoring: ['pussy licking', 'facesitting', 'strap on'], bareback: ['breeding', 'doggystyle', 'missionary'],
+  handjob: ['edging', 'blowjob'], kissing: ['missionary', 'spooning'], rimming: ['anal', 'facesitting'], facesitting: ['pussy licking', 'rimming']
 };
 const FINISH = {
   creampie: { en: 'until you cum inside', fr: 'jusqu’à ce que vous jouissiez dedans' }, facial: { en: 'until you cum on {p} face', fr: 'jusqu’à ce que vous lui jouissiez sur le visage' },
@@ -118,7 +136,9 @@ export function fantasyIdeas(picked = [], { gender = 'both', max = 5 } = {}) {
   const risky = picked.some((c) => RISKY.includes(c));
   // Your places first, then a few settings that are hard to come by, so one picked place does not make every story the same.
   const allPlaces = [...places.map((k) => ({ key: k, open: true, en: PLACES[k].en[risky ? 1 : 0], fr: PLACES[k].fr[risky ? 1 : 0] })), ...DEFAULT_PLACES];
-  const actList = acts.length ? acts : ['kissing'];
+  const fitsWho = (c) => { const g = GENDER_OF[c]; return !g || (gender === 'men' ? g === 'm' : gender === 'women' ? g === 'w' : true); };
+  const near = acts.length < 3 ? [...new Set(acts.flatMap((a) => NEAR_ACTS[a] || []))].filter((a) => ACTS[a] && !acts.includes(a) && fitsWho(a)).slice(0, 3 - acts.length + 1) : [];
+  const actList = acts.length ? [...acts, ...near] : ['kissing'];
   // Every place with every act, in an order where each story changes both the place and the act when it can.
   const combos = allPlaces.flatMap((p, pi) => actList.map((a, ai) => ({ place: p, actKey: a, pi, ai })));
   const order = [];
@@ -127,7 +147,8 @@ export function fantasyIdeas(picked = [], { gender = 'both', max = 5 } = {}) {
   while (order.length < combos.length) {
     const free = combos.filter((c) => !used.has(c));
     const placeUses = (pi) => order.filter((c) => c.pi === pi).length;
-    free.sort((x, y) => ((last && (x.pi === last.pi || x.ai === last.ai)) - (last && (y.pi === last.pi || y.ai === last.ai))) || placeUses(x.pi) - placeUses(y.pi) || x.pi - y.pi || x.ai - y.ai);
+    const actUses = (ai) => order.filter((c) => c.ai === ai).length;
+    free.sort((x, y) => ((last && (x.pi === last.pi || x.ai === last.ai)) - (last && (y.pi === last.pi || y.ai === last.ai))) || actUses(x.ai) - actUses(y.ai) || placeUses(x.pi) - placeUses(y.pi) || x.pi - y.pi || x.ai - y.ai);
     last = free[0];
     used.add(last);
     order.push(last);
@@ -146,7 +167,8 @@ export function fantasyIdeas(picked = [], { gender = 'both', max = 5 } = {}) {
     const extra = extras.length ? extras[i % extras.length] : null;
     const fitting = thrills.filter((x) => !RISKY.includes(x) || place.key || place.open);
     const thrill = fitting.length ? fitting[i % fitting.length] : null;
-    let text = `${cap(place[L][0])}, ${w[L]}${extra?.t === 'wear' ? ` ${WEARS[extra.k][L]}` : ''} ${fill(ACTS[actKey][L])}`;
+    const phrase = ACTS2[actKey] && out.some((f) => f.concepts.includes(actKey)) ? ACTS2[actKey][L] : ACTS[actKey][L];
+    let text = `${cap(place[L][0])}, ${w[L]}${extra?.t === 'wear' ? ` ${WEARS[extra.k][L]}` : ''} ${fill(phrase)}`;
     if (extra?.t === 'fin') text += ` ${fill(FINISH[extra.k][L])}`;
     if (thrill) text += `, ${fill(THRILL[thrill][L])}`;
     const concepts = [...new Set([place.key || null, whoKey, acts.length ? actKey : null, extra?.k || null, thrill].filter(Boolean))];

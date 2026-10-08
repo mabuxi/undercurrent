@@ -1016,22 +1016,59 @@ api.get('/setup/sources', wrap((req, res) => {
     .sort((a, b) => order(a.id) - order(b.id)) });
 }));
 // A few fantasies from what you picked: written by the local model when it is ready, simple pairings otherwise.
+// Writing the ideas can take a while with a big model, so it runs as a job the page asks about every few seconds.
+const FANT_JOBS = new Map();
 api.post('/setup/fantasies', wrap(async (req, res) => {
+  const id = `f${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const job = { done: false, result: null };
+  FANT_JOBS.set(id, job);
+  for (const [k] of [...FANT_JOBS].slice(0, -20)) FANT_JOBS.delete(k);
+  setupFantasies(req.body || {}).then((r) => { job.result = r; }).catch(() => { job.result = { fantasies: [], byAi: false }; }).finally(() => { job.done = true; });
+  res.json({ job: id });
+}));
+api.get('/setup/fantasies/:id', wrap((req, res) => {
+  const job = FANT_JOBS.get(req.params.id);
+  if (!job) return res.status(404).json({ error: tr('Not found') });
+  res.json(job.done ? { done: true, ...job.result } : { done: false });
+}));
+async function setupFantasies(body) {
+  const req = { body };
+  const res = { json: (x) => x };
   const picked = (req.body?.picked || []).map(String).filter(Boolean).slice(0, 12);
   if (picked.length < 2) return res.json({ fantasies: [] });
   const names = picked.map(cName);
   let list = [];
+  // The kinks an idea uses, matched loosely: the model may write them in French, in another spelling, or only in the
+  // sentence itself.
+  const labels = picked.map((c) => [c, ...knownVariants(c), cName(c), conceptLabel(c, 'fr', '')].filter(Boolean).map((x) => String(x).toLowerCase()));
+  const matchKinks = (f) => {
+    const hits = new Set();
+    for (const k of f.kinks || []) {
+      const v = String(k).toLowerCase().trim();
+      const i = labels.findIndex((l) => l.includes(v) || l.some((x) => x.length > 3 && (v.includes(x) || x.includes(v))));
+      if (i >= 0) hits.add(picked[i]);
+    }
+    const text = ` ${String(f.description || '').toLowerCase()} `;
+    labels.forEach((l, i) => { if (l.some((x) => x.length > 3 && text.includes(x))) hits.add(picked[i]); });
+    return [...hits];
+  };
   if (!config.mock && (await health()).ok) {
-    try {
-      const out = await Promise.race([chat({
-        kind: 'summary', model: deepModel() || fastModel(), temperature: 0.8, numPredict: 900,
-        schema: { type: 'object', properties: { fantasies: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, description: { type: 'string' }, kinks: { type: 'array', items: { type: 'string' } } }, required: ['name', 'description', 'kinks'] } } }, required: ['fantasies'] },
-        system: `You suggest fantasies for one adult using a private adult-content browser. A fantasy is ONE short, explicit sentence (at most 30 words, second person "you"), written like a porn scene description, not like a story: direct and dirty, no poetic language, no metaphors, no feelings. It names a specific setting that is hard to come by, who it is with, the sex act, and one thrill that comes from their picks (public or getting caught means risk, a straight guy means a first time, a partner means someone watching). Good example for someone who picked muscle, public and blowjob: "In a spa's shared steam shower where anyone could walk in, a muscular stranger drops to his knees and sucks you off." Use the two or three picks that fit together best, never all of them, never a list of the kinks. Every fantasy in a set has its own setting, person and act. Everyone is a consenting adult; nothing about family members, age, animals or non-consent. Give 5. name: 2 to 4 words naming the scene, not the kinks. description: the one sentence. kinks: the exact picked kink names it really uses (2 or 3), unchanged. ${replyIn()}`,
-        user: `Picked kinks: ${names.join(', ')}`
-      }), new Promise((_, rej) => setTimeout(() => rej(new Error('slow')), 30000))]);
-      list = (out?.fantasies || []).map((f) => ({ name: String(f.name || '').slice(0, 50), description: String(f.description || '').slice(0, 260), concepts: (f.kinks || []).map((k) => picked[names.findIndex((n) => n.toLowerCase() === String(k).toLowerCase())]).filter(Boolean) }))
-        .filter((f) => f.name && f.concepts.length >= 2);
-    } catch {}
+    // The bigger model writes better, but it may need a while to load: it gets 100 seconds, then the quick model 45.
+    const models = [...new Set([deepModel(), fastModel()].filter(Boolean))];
+    for (const [i, model] of models.entries()) {
+      try {
+        const out = await Promise.race([chat({
+          kind: 'summary', model, temperature: 0.85, numPredict: 700,
+          schema: { type: 'object', properties: { fantasies: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, description: { type: 'string' }, kinks: { type: 'array', items: { type: 'string' } } }, required: ['name', 'description', 'kinks'] } } }, required: ['fantasies'] },
+          system: `You suggest fantasies for one adult using a private adult-content browser. A fantasy is ONE short, explicit sentence (at most 30 words, second person "you"), written like a porn scene description, not like a story: direct and dirty, no poetic language, no metaphors, no feelings. It names a specific setting that is hard to come by, who it is with, the sex act, and one thrill that comes from their picks (public or getting caught means risk, a straight guy means a first time, a partner means someone watching). Good example for someone who picked muscle, public and blowjob: "In a spa's shared steam shower where anyone could walk in, a muscular stranger drops to his knees and sucks you off." Use the two or three picks that fit together best, never all of them, never a list of the kinks. Every fantasy in a set has its own setting, person and act. Everyone is a consenting adult; nothing about family members, age, animals or non-consent. Give 5. name: 2 to 4 words naming the scene, not the kinks. description: the one sentence. kinks: the exact picked kink names it really uses (2 or 3), unchanged. ${replyIn()}`,
+          user: `Picked kinks: ${names.join(', ')}`
+        }), new Promise((_, rej) => setTimeout(() => rej(new Error('slow')), i === 0 && models.length > 1 ? 100000 : 45000))]);
+        list = (out?.fantasies || []).map((f) => ({ name: String(f.name || '').slice(0, 50), description: String(f.description || '').replace(/\s*[—–]\s*/g, ', ').slice(0, 260), concepts: matchKinks(f) }))
+          .filter((f) => f.name && f.description.split(/\s+/).length >= 6 && f.concepts.length >= 1);
+        log('info', `Fantasy ideas: ${out?.fantasies?.length || 0} from ${model}, ${list.length} kept`);
+        if (list.length >= 3) break;
+      } catch (e) { log('info', `Fantasy ideas: ${model} did not answer (${e.message})`); }
+    }
   }
   const byAi = list.length > 0;
   // Without the model (or too few from it): scenarios written from your picks, never just the picks in a row.
@@ -1041,8 +1078,8 @@ api.post('/setup/fantasies', wrap(async (req, res) => {
     for (const f of fantasyIdeas(picked, { gender, max: 5 })) if (list.length < 5 && !list.some((x) => x.name === f.name)) list.push(f);
   }
   // The kinks each idea uses, by name, shown under it.
-  res.json({ fantasies: list.slice(0, 5).map((f) => ({ ...f, tags: (f.concepts || []).map((c) => cName(c)) })), byAi });
-}));
+  return res.json({ fantasies: list.slice(0, 5).map((f) => ({ ...f, tags: (f.concepts || []).map((c) => cName(c)) })), byAi });
+}
 // Saves everything from the welcome steps at once.
 api.post('/setup/finish', wrap(async (req, res) => {
   const b = req.body || {};
