@@ -4,6 +4,11 @@
 
 // Kink names (one per concept) and family names.
 export const KINK_FR = {
+  european: 'Européens / Blancs', latino: 'Latinos / Latinas', black: 'Noirs / Africains', arab: 'Moyen-Orient / Arabes', indian: 'Asie du Sud / Indiens',
+  scandinavian: 'Scandinaves', 'eastern european': 'Europe de l’Est', british: 'Britanniques', french: 'Français', german: 'Allemands', italian: 'Italiens', spanish: 'Espagnols',
+  ebony: 'Ebony', african: 'Africains', caribbean: 'Caribéens', japanese: 'Japonais', korean: 'Coréens', chinese: 'Chinois', thai: 'Thaïlandais', filipino: 'Philippins', vietnamese: 'Vietnamiens',
+  brazilian: 'Brésiliens', colombian: 'Colombiens', mexican: 'Mexicains', 'puerto rican': 'Portoricains', turkish: 'Turcs', persian: 'Perses / Iraniens', moroccan: 'Marocains', pakistani: 'Pakistanais', bengali: 'Bengalis',
+  'girl next door': 'Fille d’à côté', cougar: 'Cougar', tomboy: 'Garçon manqué', 'alt girl': 'Fille alternative', otter: 'Loutre', hunk: 'Beau mec', couple: 'Couple', swingers: 'Échangistes', hotwife: 'Hotwife', mmf: 'HHF', ffm: 'FFH',
   'big cock': 'Grosse bite', bwc: 'Grosse bite blanche', bbc: 'Grosse bite noire', veiny: 'Veineuse', 'huge load': 'Grosse giclée',
   cumshot: 'Éjaculation', precum: 'Liquide pré-séminal', dripping: 'Ça coule', creampie: 'Creampie', facial: 'Faciale', swallow: 'Avaler',
   bukkake: 'Bukkake', masturbation: 'Masturbation', gooning: 'Gooning', edging: 'Edging', 'ruined orgasm': 'Orgasme ruiné', solo: 'Solo',
@@ -13,7 +18,7 @@ export const KINK_FR = {
   'hairy chest': 'Torse poilu', beard: 'Barbe', smooth: 'Imberbes', chubby: 'Enrobés', thighs: 'Cuisses', feet: 'Pieds', armpits: 'Aisselles',
   tattoo: 'Tatouages', piercing: 'Piercings', 'bubble butt': 'Fesses rebondies', 'big balls': 'Grosses couilles', uncut: 'Non circoncis',
   cut: 'Circoncis', twink: 'Minets', daddy: 'Daddy', jock: 'Sportifs', bear: 'Bears', femboy: 'Femboy', '18 25': 'Jeunes adultes 18+',
-  mature: 'Matures', milf: 'MILF', trans: 'Trans', latino: 'Latinos', asian: 'Asiatiques', black: 'Blacks', arab: 'Arabes', indian: 'Indiens',
+  mature: 'Matures', milf: 'MILF', trans: 'Trans', asian: 'Asiatiques',
   interracial: 'Interracial', jockstrap: 'Jockstrap', underwear: 'Sous-vêtements', socks: 'Chaussettes', lingerie: 'Lingerie', jeans: 'Jean',
   shorts: 'Short', uniform: 'Uniforme', bulge: 'Bosse', shower: 'Douche', public: 'En public', outdoor: 'En plein air', office: 'Bureau',
   gym: 'Salle de sport', car: 'Voiture', hotel: 'Hôtel', massage: 'Massage', 'step family': 'Belle-famille', cheating: 'Infidélité',

@@ -1,4 +1,6 @@
 import { getDb, now } from './db.js';
+import { isSourceName } from './sourcenames.js';
+import { sessionCount } from './sessions.js';
 import { hydrate, tagsForItems, lengthCat, followed, tagSpecificity, relatedTags } from './store.js';
 import { providerState } from './sources/providers.js';
 import { config } from './config.js';
@@ -38,7 +40,8 @@ export function scoreItem(item, tags, aff, fol, t = now(), spec = tagSpecificity
   const tagPart = den ? num / (den + 0.4) : 0;
   const familiarity = den ? known / den : 0;
   const src = [];
-  if (item.community) src.push(tagValue(aff.get(`c:${item.community.toLowerCase()}`)));
+  const comm = item.community && !isSourceName(item.community) ? item.community : null;
+  if (comm) src.push(tagValue(aff.get(`c:${comm.toLowerCase()}`)));
   if (item.author) src.push(tagValue(aff.get(`a:${item.source}:${String(item.author).toLowerCase()}`)));
   src.push(tagValue(aff.get(`f:${item.format}`)));
   src.push(tagValue(aff.get(`s:${item.source}`)));
@@ -53,7 +56,7 @@ export function scoreItem(item, tags, aff, fol, t = now(), spec = tagSpecificity
   const match = Math.round(100 / (1 + Math.exp(-(raw - 0.15) * 3.4)));
   contrib.sort((a, b) => b.value - a.value);
   const srcBits = [
-    item.community ? { what: 'community', name: item.community, v: tagValue(aff.get(`c:${item.community.toLowerCase()}`)) } : null,
+    comm ? { what: 'community', name: comm, v: tagValue(aff.get(`c:${comm.toLowerCase()}`)) } : null,
     item.author ? { what: 'author', name: item.author, v: tagValue(aff.get(`a:${item.source}:${String(item.author).toLowerCase()}`)) } : null
   ].filter(Boolean);
   return { raw, match: Math.max(1, Math.min(99, match)), familiarity, followed: !!isFollowed, followNew, contrib, tagPart, srcPart, srcBits, pop };
@@ -199,7 +202,15 @@ export function qualityBoost(x) {
   return 0.16 * (x.q - 0.5) + 0.14 * (x.vel - 0.5) - (x.q < 0.15 && x.s.tagPart < 0.25 ? 0.12 : 0);
 }
 
-export function buildFeed(filters = {}, { exclude = [], limit = 12, mix = 15 } = {}) {
+const FOLLOW_SERVED = { session: -1, by: new Map() };
+function followServedNow() {
+  const n = sessionCount();
+  if (FOLLOW_SERVED.session !== n) { FOLLOW_SERVED.session = n; FOLLOW_SERVED.by = new Map(); }
+  return FOLLOW_SERVED.by;
+}
+const followKey = (it) => (it.author ? `a:${it.source}:${String(it.author).toLowerCase()}` : it.community && !isSourceName(it.community) ? `c:${it.community.toLowerCase()}` : null);
+
+export function buildFeed(filters = {}, { exclude = [], limit = 12, mix = 15, capFollows = false } = {}) {
   const t = now();
   const f = { ...(filters || {}) };
   const sq = f.search ? getSearchSpec(f.search) : null;
@@ -350,6 +361,27 @@ export function buildFeed(filters = {}, { exclude = [], limit = 12, mix = 15 } =
     scored.length = 0;
     scored.push(...keep);
   }
+  // Someone you follow posting a lot never floods the feed: per session, their most popular post you have not seen,
+  // or two when you like their posts.
+  if (capFollows) {
+    const served = followServedNow();
+    const groups = new Map();
+    for (const x of scored) {
+      if (!x.s.followed) continue;
+      const k = followKey(x.it);
+      if (!k) continue;
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(x);
+    }
+    const drop = new Set();
+    for (const [k, list] of groups) {
+      const liked = (aff.get(k)?.long || 0) >= 0.3;
+      const room = Math.max(0, (liked ? 2 : 1) - (served.get(k)?.size || 0));
+      list.sort((a, b) => popOf(b.it) - popOf(a.it) || b.value - a.value);
+      for (const x of list.slice(room)) drop.add(x);
+    }
+    if (drop.size) for (let i = scored.length - 1; i >= 0; i--) if (drop.has(scored[i])) scored.splice(i, 1);
+  }
   const onlyNew = !!f.onlyNew;
   const followPool = f.following || f.author || f.community ? [] : scored.filter((x) => x.s.followNew).sort((a, b) => (b.it.created || 0) - (a.it.created || 0));
   // Popular right now: posts that are taking off on their source and fit you, mixed in about every fifth post so
@@ -358,10 +390,14 @@ export function buildFeed(filters = {}, { exclude = [], limit = 12, mix = 15 } =
   for (const x of scored) { if (!bySrc.has(x.it.source)) bySrc.set(x.it.source, []); bySrc.get(x.it.source).push(x.it.score || 0); }
   const p90 = new Map([...bySrc].map(([k, v]) => { v.sort((a, b) => a - b); return [k, v[Math.floor(v.length * 0.9)] || 0]; }));
   const noPopular = f.following || f.author || f.community || f.saved;
-  const popularPool = noPopular ? [] : scored.filter((x) => (x.qKnown
-    ? x.vel >= 0.8 && x.q >= 0.5 && x.s.match >= 45
-    : (x.it.score || 0) >= (p90.get(x.it.source) || 0) && (x.it.score || 0) > 0 && x.s.match >= 50))
-    .sort((a, b) => ((b.qKnown ? b.vel : 0.5) + b.value) - ((a.qKnown ? a.vel : 0.5) + a.value));
+  // Popular posts still have to fit you as well as your usual posts do: at least as good a match as most of what is
+  // here, with tags you like, and then the ones with the most attention first.
+  const matches = scored.map((x) => x.s.match).sort((a, b) => a - b);
+  const fitBar = Math.max(60, matches[Math.floor(matches.length * 0.6)] || 0);
+  const popularPool = noPopular ? [] : scored.filter((x) => x.s.match >= fitBar && x.s.tagPart > 0.05 && (x.qKnown
+    ? x.vel >= 0.8 && x.q >= 0.5
+    : (x.it.score || 0) >= (p90.get(x.it.source) || 0) && (x.it.score || 0) > 0))
+    .sort((a, b) => (b.value + 0.35 * (b.qKnown ? b.vel : 0.5)) - (a.value + 0.35 * (a.qKnown ? a.vel : 0.5)));
   let pi = 0;
   let fi = 0;
   let knownTags = 0;
@@ -428,6 +464,16 @@ export function buildFeed(filters = {}, { exclude = [], limit = 12, mix = 15 } =
     if (!next) next = pickMain();
     if (!next) break;
     out.push({ ...next, label: label || (onlyNew ? 'discovery' : next.s.followed ? 'following' : 'foryou') });
+  }
+  if (capFollows) {
+    const served = followServedNow();
+    for (const x of out) {
+      if (!x.s.followed) continue;
+      const k = followKey(x.it);
+      if (!k) continue;
+      if (!served.has(k)) served.set(k, new Set());
+      served.get(k).add(x.it.id);
+    }
   }
   const collections = f.saved || f.author || f.noCollections ? new Map() : collect(out, mainPool, used, spec2);
   return { items: out.map((x) => (collections.has(x.it.id) ? presentCollection(x, collections.get(x.it.id)) : present(x))), total: scored.length };

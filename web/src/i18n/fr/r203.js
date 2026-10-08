@@ -1,0 +1,22 @@
+export default {
+  'Undercurrent runs AI models on this Mac with Ollama. They tag posts, look at pictures and power the assistant. Nothing is sent anywhere. The recommended models fit this Mac; choose others if you like. They download first; the next steps open once they run and answer.': 'Undercurrent fait tourner des modèles d’IA sur ce Mac avec Ollama. Ils taguent les publications, regardent les images et font fonctionner l’assistant. Rien n’est envoyé nulle part. Les modèles recommandés conviennent à ce Mac ; choisissez-en d’autres si vous voulez. Ils se téléchargent d’abord ; les étapes suivantes s’ouvrent dès qu’ils tournent et répondent.',
+  'Ready to use': 'Prêt à l’emploi',
+  'The models are downloaded, running and answering.': 'Les modèles sont téléchargés, lancés et répondent.',
+  'Asking the models a test question…': 'Question test posée aux modèles…',
+  'A model did not answer: {error}': 'Un modèle n’a pas répondu : {error}',
+  'Checking that they run…': 'Vérification qu’ils tournent…',
+  'Downloading the models. The next step opens when they are in and answer.': 'Téléchargement des modèles. L’étape suivante s’ouvre quand ils sont là et répondent.',
+  'Download the models to go on. This can take a while the first time.': 'Téléchargez les modèles pour continuer. La première fois, cela peut prendre un moment.',
+  'More like this, from who you want to see and what you picked': 'Plus dans ce genre, selon qui vous voulez voir et ce que vous avez choisi',
+  'Nothing more for now': 'Rien de plus pour l’instant',
+  'Generate more': 'En générer plus',
+  'Writing a few stories from your picks': 'Écriture de quelques histoires à partir de vos choix',
+  'Continue without the AI for now': 'Continuer sans l’IA pour l’instant',
+  'Download the models': 'Télécharger les modèles',
+  'Downloading…': 'Téléchargement…',
+  'Search {name}': 'Rechercher {name}',
+  '{tag} taken off this post. The tagger will use it more carefully.': '{tag} retiré de cette publication. Le tagueur l’utilisera avec plus de prudence.',
+  'Take {tag} off this post': 'Retirer {tag} de cette publication',
+  'Does not fit: take it off': 'Ne correspond pas : le retirer',
+  'Search or ask…': 'Rechercher ou demander…'
+};

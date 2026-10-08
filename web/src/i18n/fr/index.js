@@ -7,7 +7,8 @@ import r18 from './r18.js';
 import r19 from './r19.js';
 import r20 from './r20.js';
 import r201 from './r201.js';
+import r203 from './r203.js';
 
 // Every part of the interface has its own file of French texts; they are merged here.
-const fr = Object.assign({}, core, settings, feed, post, map, r18, r19, r20, r201);
+const fr = Object.assign({}, core, settings, feed, post, map, r18, r19, r20, r201, r203);
 export default fr;

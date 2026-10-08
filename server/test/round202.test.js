@@ -53,6 +53,7 @@ test('fantasy ideas are scenes with a place and an act, never the picks in a row
     assert.ok(f.description.split(' ').length >= 8, f.description);
     assert.ok(f.concepts.length >= 1);
   }
-  assert.ok(list.some((f) => f.concepts.includes('shower') && /shower/i.test(f.description)));
+  assert.ok(list.some((f) => f.concepts.includes('shower') && /spa|shower/i.test(f.description)), 'the picked place shows up, as a setting that is not everyday');
+  assert.ok(list.every((f) => f.description.split(/[.!?]\s/).length >= 2), 'each is a short story of more than one sentence');
   assert.equal(fantasyIdeas(['latino'], {}).length, 0, 'nothing to build a scene from: no idea');
 });

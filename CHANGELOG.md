@@ -3,6 +3,33 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.21.0 · 8 October 2026
+
+### Search bar
+- What the feed is showing (filters and search tags) sits inside the search bar, before what you type, on as many lines as it needs. The × clears all of it. On a phone they stay under the bar.
+- The "Clear all" chip is gone: the × does the same.
+- What a search did is one summary line: what was searched for and where ("Searched for “hairy chest” on Pornhub and RedGIFs"), with how much was found. Point at the bar, or type in it, and every step folds out.
+
+### Feed
+- Someone you follow who posts a lot no longer floods the feed: per session you get their most popular post you have not seen, or two when you like their posts.
+- Popular posts have to fit you at least as well as most of your feed; attention only decides between those.
+- A source's own name (Pornhub, RedTube and so on, used when a post has no uploader) is never treated as a creator or community: not in the Right now picks, not in what you like.
+- Posts marked [OC], (OC), [OG], (OG), "OC:" or "OG:", or with an OC tag, get the Original content badge at the top right, and the marker is taken out of the title and tags. Posts already here get it too.
+
+### Posts
+- Point at a tag on a post and an × appears: take off a tag that does not fit. It stays off that post, stops counting for your taste from it, and the tagger is told so it uses that tag more carefully.
+- Players from other sites: a like needs two quick clicks; a player taking focus by itself no longer counts as one.
+- Profiles of creators and performers have "Search {name}" with a magnifier, instead of "Only this creator in the feed". "Add … as a source" is gone: following someone already does that.
+
+### Welcome steps
+- The first step shows the Undercurrent icon.
+- The local AI step waits until the models are downloaded, running and answer a test question before the kinks. "Continue without the AI for now" stays there for a long first download.
+- Kinks follow who you want to see: for hetero, women's, men's and couples' types side by side (MILF, couple, hotwife, girl next door, cougar...); for men only no women's or couples' ones; for women only no men's ones.
+- Ethnicities start with continents, European / White included; pick one and its countries and regions show up under it. A continent's kink matches all of them.
+- Suggestions only bring up kinks that are not on screen yet, a few per click, also in other families. Each family keeps at least six you have not picked in view, so picking brings the next ones up.
+- Every family ends with "Generate more": more of that family from who you want to see and what you picked, from the local model when it runs.
+- Fantasy ideas are mini stories now: a setting that is hard to come by, someone, what happens, and a twist that only comes from your picks (public means someone could see, a straight guy crosses a line). Each idea is its own story, using a few of your picks, not all of them. The same goes for fantasy ideas in the app. While they are being written, a pen and cards fill in.
+
 ## 0.20.2 · 8 October 2026
 
 ### Feed

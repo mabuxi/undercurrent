@@ -273,16 +273,31 @@ export function EmbedPlayer({ item, active, onPlay, onReady, onLike }) {
   likeRef.current = onLike;
   useEffect(() => {
     if (!playing) return undefined;
+    // Some players take focus back by themselves right after a click (or when they start), which looked like a
+    // second click: focus changes within a moment of handing focus back are ignored, and only two real clicks
+    // between 0.09 and 0.32 seconds apart count, with the pointer over the player.
     let last = 0;
+    let handedBack = 0;
+    let over = false;
+    const fr0 = () => embedRef.current?.querySelector('iframe');
+    const enter = () => { over = true; };
+    const leave = () => { over = false; last = 0; };
+    const box = embedRef.current;
+    box?.addEventListener('mouseenter', enter);
+    box?.addEventListener('mouseleave', leave);
     const onBlur = () => setTimeout(() => {
-      const fr = embedRef.current?.querySelector('iframe');
+      const fr = fr0();
       if (!fr || document.activeElement !== fr) return;
       const at = Date.now();
-      if (at - last < 300) { last = 0; likeRef.current?.(); } else last = at;
-      setTimeout(() => { try { embedRef.current?.focus({ preventScroll: true }); } catch {} }, 30);
+      const echo = at - handedBack < 55;
+      if (!echo && (over || !window.matchMedia?.('(hover: hover)').matches)) {
+        const gap = at - last;
+        if (last && gap > 90 && gap < 320) { last = 0; likeRef.current?.(); } else last = at;
+      }
+      setTimeout(() => { try { handedBack = Date.now(); embedRef.current?.focus({ preventScroll: true }); } catch {} }, 25);
     }, 0);
     window.addEventListener('blur', onBlur);
-    return () => window.removeEventListener('blur', onBlur);
+    return () => { window.removeEventListener('blur', onBlur); box?.removeEventListener('mouseenter', enter); box?.removeEventListener('mouseleave', leave); };
   }, [playing]);
   const [sandboxed, setSandboxed] = useState(true);
   const [proxyAll, setProxyAll] = useState(false);

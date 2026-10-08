@@ -309,7 +309,12 @@ async function searchProviders(job, terms, { page = 1 } = {}) {
   const on = (id) => (named ? named.has(id) : true) && (config.mock ? id === 'redgifs' || id === 'pornhub' || !!named : !!st[id]?.enabled);
   const found = { communities: new Map(), users: new Map(), performers: new Map() };
   const tasks = [];
+  // What was searched and where, for the one-line summary at the top.
+  job.searched = job.searched || { terms: [], sources: [] };
+  for (const t of terms) if (t && !job.searched.terms.includes(t)) job.searched.terms.push(t);
   const run = (key, label, fn) => tasks.push((async () => {
+    const src = key.replace(/-\d+$/, '');
+    if (PROVIDERS[src] && !job.searched.sources.includes(src)) job.searched.sources.push(src);
     step(job, key, label);
     try {
       const r = await withTimeout(fn(), 30000);
@@ -1126,12 +1131,24 @@ function summaryFor(job) {
   return extra || null;
 }
 
+const andList = (list) => (list.length <= 1 ? list.join('') : tr('{a} and {b}', { a: list.slice(0, -1).join(', '), b: list[list.length - 1] }));
+// One line that says what the search did: what was searched for, where, and how much was found.
+function summaryLine(j) {
+  const terms = (j.searched?.terms || []).slice(0, 3).map((x) => `“${x}”`);
+  const srcs = (j.searched?.sources || []).map((id) => PROVIDERS[id]?.label || id);
+  const running = !j.done;
+  if (j.person && !terms.length) return running ? tr('Looking up {name}', { name: j.person.display }) : tr('Looked up {name}', { name: j.person.display });
+  if (!terms.length) return null;
+  const where = srcs.length ? (srcs.length > 4 ? tr(' on {list} and {n} more', { list: srcs.slice(0, 3).join(', '), n: srcs.length - 3 }) : tr(' on {list}', { list: andList(srcs) })) : '';
+  return running ? tr('Searching for {terms}{where}', { terms: andList(terms), where }) : tr('Searched for {terms}{where}', { terms: andList(terms), where });
+}
+
 export function jobView(id) {
   const j = JOBS.get(String(id));
   if (!j) return null;
   return {
     id: j.id, q: j.q, mode: j.mode, rev: j.rev, done: j.done, error: j.error, answer: j.answer, notes: j.notes, chips: j.chips, person: j.person,
-    filter: j.filter ? { ...j.filter, ...(j.spec.sources?.length ? { sources: j.spec.sources, sourcesLabel: sourceLabels(j.spec.sources).join(', ') } : {}) } : null, client: j.client, sources: j.sources, profiles: j.profiles, found: j.found, added: j.added, steps: j.steps.map((s) => ({ key: s.key, label: s.label, state: s.state, detail: s.detail }))
+    filter: j.filter ? { ...j.filter, ...(j.spec.sources?.length ? { sources: j.spec.sources, sourcesLabel: sourceLabels(j.spec.sources).join(', ') } : {}) } : null, client: j.client, sources: j.sources, profiles: j.profiles, found: j.found, added: j.added, summary: summaryLine(j), steps: j.steps.map((s) => ({ key: s.key, label: s.label, state: s.state, detail: s.detail }))
   };
 }
 

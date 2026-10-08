@@ -1,4 +1,10 @@
 export default {
+  'Looking up {name}': 'Recherche de {name}',
+  'Looked up {name}': '{name} recherché',
+  ' on {list} and {n} more': ' sur {list} et {n} autres',
+  ' on {list}': ' sur {list}',
+  'Searching for {terms}{where}': 'Recherche de {terms}{where}',
+  'Searched for {terms}{where}': 'Recherche de {terms}{where} terminée',
   'Translation needs the local AI. Start Ollama and try again.': 'La traduction a besoin de l’IA locale. Lancez Ollama et réessayez.',
   'Nothing to translate.': 'Rien à traduire.',
   'Post not found.': 'Publication introuvable.',

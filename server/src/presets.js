@@ -3,6 +3,7 @@ import { affinityMap, topTags } from './profile.js';
 import { kinkableTag, displayTag } from './tagquality.js';
 import { getDb } from './db.js';
 import { tr } from './i18n.js';
+import { isSourceName } from './sourcenames.js';
 
 // "Right now": what you are into at the moment, as quick picks. Never tied to a kind of post (that is what the
 // format chips are for), and each pick says what it is: a kink, a tag, a pair, a person, a creator or a fantasy.
@@ -24,6 +25,7 @@ export function presets({ turn = 0 } = {}) {
   let creator = null;
   for (const [k, v] of aff) {
     if (!(k.startsWith('c:') || k.startsWith('a:'))) continue;
+    if (isSourceName(k.startsWith('c:') ? k.slice(2) : k.split(':').slice(2).join(':'))) continue;
     const s = (v.short || 0) + 0.3 * (v.lately || 0);
     if (s > 0.3 && (!creator || s > creator.s)) creator = { k, s };
   }

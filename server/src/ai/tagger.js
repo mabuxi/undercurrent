@@ -56,13 +56,17 @@ function overused() {
   return tagSpecificity().overused.slice(0, 35);
 }
 
+function wrongTags() {
+  return Object.entries(getSetting('wrongTags', {}) || {}).filter(([, n]) => n >= 1).sort((a, b) => b[1] - a[1]).slice(0, 25).map(([t]) => t);
+}
+
 function rules() {
   return `Tags are lowercase, 1 to 4 words, specific, the words people use on porn sites.
 Only tag what this post's own title, site tags, text or images clearly say or show. Never guess: no place, outfit, act, position, body type or camera angle unless it is written or visible. A wrong tag is much worse than a missing one; when in doubt, leave it out. Tags are always plain English words, the way English porn sites tag, also when the post is written in French or another language ("pieds" is feet, "douche" is shower).
 When it is said or shown, cover: the people (how many, build, body hair, skin, hair, genitals and their details, tattoos), what they wear, what happens (acts and positions), fluids, where it is, how it is filmed, and the dynamic or scenario.
 The title is the strongest evidence: turn every meaningful word and phrase in it into tags, and keep the site tags and hashtags that fit. Also tag what the title plainly means when any reader would be sure of it ("stepmom catches me" is stepmom and caught, "after the gym" is gym, "my first time with a guy" is first time and gay). When you are sure, more tags are better than fewer. Never output words from these instructions.
 Never use: porn, sex, video, hd, xxx, hot, sexy, nsfw, nude, female, male, erotic, the format, the duration, the site or community name.
-These tags are on almost every post, only use them when they are central here: ${overused().join(', ')}.
+These tags are on almost every post, only use them when they are central here: ${overused().join(', ')}.${wrongTags().length ? `\nPeople took these off posts where they did not fit; use them only when they are clearly said or shown: ${wrongTags().join(', ')}.` : ''}
 people: real names of performers or creators written in the title or text. Never roles like client, boss, stepsister. Empty if none.
 men and women: how many men and how many women are in it or clearly involved (a hand, a voice or a POV camera counts). 0 when there are none. Judge from the image first, then the title and tags.
 trans: true only when a trans person is in it (said in the title or tags, or clearly visible).
@@ -70,7 +74,7 @@ minor_risk: true only if anything suggests someone under 18 (stated ages under 1
 }
 
 export const ECHO = ['what they wear', 'the act', 'the position', 'the setting', 'the camera angle', 'camera angle', 'the people', 'act', 'genitals', 'grooming', 'build', 'skin', 'hair colour', 'hair color', 'body type', 'what happens', 'the scene'];
-const META = new Set([...ECHO, 'scene', 'scenario', 'scenarios', 'roleplay scenario', 'positions', 'position', 'body', 'bodies', 'outfit', 'outfits', 'prop', 'props', 'camera style', 'camera', 'dynamic', 'mood', 'setting', 'acts', 'people', 'tags', 'tag', 'long video', 'short clip', 'photo', 'photo set', 'gif', 'written story', 'discussion thread', 'clip', 'unnamed', 'none', 'client', 'looks', 'specific', 'niche', 'explicit']);
+const META = new Set([...ECHO, 'oc', 'og', 'original content', 'scene', 'scenario', 'scenarios', 'roleplay scenario', 'positions', 'position', 'body', 'bodies', 'outfit', 'outfits', 'prop', 'props', 'camera style', 'camera', 'dynamic', 'mood', 'setting', 'acts', 'people', 'tags', 'tag', 'long video', 'short clip', 'photo', 'photo set', 'gif', 'written story', 'discussion thread', 'clip', 'unnamed', 'none', 'client', 'looks', 'specific', 'niche', 'explicit']);
 
 function metaTag(t, row) {
   if (META.has(t) || META.has(t.replace(/-/g, ' '))) return true;

@@ -5,6 +5,7 @@ import { Icon } from '../icons.jsx';
 import { useActivity } from '../activity.js';
 import { t, tn, getLang } from '../i18n.js';
 import { PhoneModal } from './Phone.jsx';
+import { useNarrow } from './FeedView.jsx';
 
 const LOADED = Date.now();
 
@@ -47,6 +48,9 @@ export default function TopBar() {
   const [phone, setPhone] = useState(false);
   const [stepsOpen, setStepsOpen] = useState(false);
   const [stepsFull, setStepsFull] = useState(false);
+  const [barHover, setBarHover] = useState(false);
+  const [typing, setTyping] = useState(false);
+  const narrow = useNarrow();
   const hideTimer = useRef(null);
   const stepTimer = useRef(null);
   const headRef = useRef(null);
@@ -73,11 +77,6 @@ export default function TopBar() {
   const activeNow = !!search && !!filters.search && filters.search === search.id;
   useEffect(() => { if (!filters.search && search) setQ(''); }, [filters.search]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function clearAll() {
-    setQ('');
-    clearSearch();
-    document.getElementById('askIn')?.focus();
-  }
 
   // The list of steps stays open while a search runs and folds away a few seconds after it is done.
   const running = !!search && !search.done;
@@ -97,6 +96,7 @@ export default function TopBar() {
   }
 
   async function submit(e) {
+    setTyping(false);
     e.preventDefault();
     const text = q.trim();
     if (!text) { setAskOut(t('Type what you want to see, or tell it what to do.')); return; }
@@ -126,9 +126,27 @@ export default function TopBar() {
   const nRun = steps.filter((s) => s.state === 'run').length + acts.filter((a) => a.state === 'run').length;
   const activeSearch = search && filters.search === search.id;
   const chips = activeSearch ? search.chips || [] : [];
-  const shownSteps = stepsOpen ? steps : [];
+  const shownSteps = stepsOpen || ((barHover || typing) && steps.length && search?.done) ? steps : [];
   // Background loading (the feed fetching more while you scroll) stays in the small pill and never pushes a list open.
   const others = acts.filter((a) => !steps.some((s) => s.key === a.key) && (!a.quiet || stepsOpen));
+
+  // What the feed is showing (filters) and what the search looks for. On a Mac they sit inside the search bar,
+  // before what you type; on a phone under it.
+  const chipRow = (() => {
+      // What the feed is showing (filters) and what the search looks for, in one row with one look.
+      const list = crumbList(filters, { kinks, fantasies }).filter(([k]) => !(k === 'search' && activeNow) && !(k === 'sources' && chips.some((c) => c.kind === 'source')));
+      const mood = opts?.mood ? MOODS.find((m) => m.id === opts.mood) : null;
+      if (mood) for (const k of Object.keys(mood.filters || {})) { const i = list.findIndex(([x]) => x === k); if (i >= 0) list.splice(i, 1); }
+      if (!list.length && !mood && !chips.length) return null;
+      return (
+        <div className="sb-chips" aria-label={t('What the feed is showing')}>
+          {mood ? <span className="schip schip-filter"><span>{t('Mood: {mood}', { mood: mood.label })}</span><button type="button" onClick={() => clearFilter('mood')} aria-label={t('Remove the {mood} mood', { mood: mood.label })}><Icon name="x" /></button></span> : null}
+          {list.map(([k, label]) => <span key={k} className={`schip schip-filter${k.startsWith('tag:') ? ' schip-tag' : ''}${['formats', 'window', 'noTune'].includes(k) ? ' schip-tune' : ''}`}><span>{label}</span><button type="button" onClick={() => clearFilter(k)} aria-label={t('Remove {name}', { name: label })}><Icon name="x" /></button></span>)}
+          {chips.map((c) => <Chip key={`${c.kind}:${c.value}`} c={c} onRemove={editChip} />)}
+        </div>
+      );
+  })();
+  const hasChips = !!chipRow;
 
   return (
     <header className="top" ref={headRef}>
@@ -136,7 +154,7 @@ export default function TopBar() {
         <h1>Undercurrent</h1>
       </button>
       <div className="askwrap">
-        <form className="ask" onSubmit={submit} role="search">
+        <form className="ask" onSubmit={submit} role="search" onMouseEnter={() => setBarHover(true)} onMouseLeave={() => setBarHover(false)}>
           <div className="statusdot-wrap" onMouseEnter={show} onMouseLeave={hide}>
             <button type="button" className={`statusdot${status ? (ok ? ' ok' : ' off') : ''}${status?.mock ? ' mock' : ''}`} onClick={() => { if (pinned) { setPinned(false); setOpen(false); } else { setPinned(true); setOpen(true); } }} aria-expanded={open} aria-controls="statusPop" title={ok ? (status?.mock ? t('Local model (test)') : t('Local model ready')) : t('Local model offline')} aria-label={t('What runs on this Mac')}>
               <i />
@@ -161,7 +179,10 @@ export default function TopBar() {
           </div>
           <div className={`sbar${busy ? ' working' : ''}`}>
             <Icon name="search" />
-            <input id="askIn" type="text" autoComplete="off" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('Search or ask: hairy muscle daddy · woman with big tits · content from a creator · remove a kink and show me more…')} aria-label={t('Search or tell the assistant what to do')} />
+            <div className={`sb-field${!narrow && hasChips ? ' has-chips' : ''}`}>
+              {!narrow ? chipRow : null}
+              <input id="askIn" type="text" autoComplete="off" value={q} onChange={(e) => { setQ(e.target.value); setTyping(!!e.target.value); }} onBlur={() => setTyping(false)} placeholder={!narrow && hasChips ? t('Search or ask…') : t('Search or ask: hairy muscle daddy · woman with big tits · content from a creator · remove a kink and show me more…')} aria-label={t('Search or tell the assistant what to do')} />
+            </div>
             {busy ? (
               <button type="button" className="sb-now" onClick={() => setStepsOpen((x) => !x)} aria-live="polite" title={t('Show every step')}>
                 <span className="spin" aria-hidden="true" /><span className="sb-now-l">{busy.label}</span>{nRun > 1 ? <span className="sb-n">+{nRun - 1}</span> : null}
@@ -175,39 +196,28 @@ export default function TopBar() {
               <Icon name="brain" />
             </button>
           </div>
-          {activeNow && q.trim() === (search.q || '').trim() ? (
-            <button className="btn-clear" type="button" onClick={clearAll} aria-label={t('Clear the search and go back to the feed')} title={t('Clear the search and go back to the feed')}><Icon name="x" /></button>
+          {(activeNow && q.trim() === (search.q || '').trim()) || (!q.trim() && hasChips) ? (
+            <button className="btn-clear" type="button" onClick={() => { setQ(''); clearEverything(!narrow); document.getElementById('askIn')?.focus(); }} aria-label={t('Clear the search and every filter shown here')} title={t('Clear the search and every filter shown here')}><Icon name="x" /></button>
           ) : (
             <button className="btn-accent" type="submit" disabled={running} aria-label={t('Search')}><span className="btn-l">{running ? t('Working') : t('Search')}</span><span className="btn-ic" aria-hidden="true">{running ? <span className="spin" /> : <Icon name="go" />}</span></button>
           )}
+          {shownSteps.length || others.length ? (() => {
+            // Only the latest line shows; pointing at it (or tapping it) folds the earlier steps out above it.
+            const all = [...shownSteps, ...others];
+            // The one line is a summary of the whole search when there is one: what was searched for and where.
+            const sum = shownSteps.length && search?.summary ? { key: 'summary', label: search.summary, state: search.done ? 'done' : 'run', detail: search.done && search.found ? tn(search.found, '{n} found', '{n} found') : null } : null;
+            const latest = sum || [...all].reverse().find((x) => x.state === 'run') || all[all.length - 1];
+            const older = sum ? all : all.filter((x) => x !== latest);
+            const full = stepsFull || barHover || typing;
+            return (
+              <div className={`sb-steps${full ? ' open' : ''}${older.length ? ' has-older' : ''}`} aria-label={t('What is happening')} onMouseEnter={() => setStepsFull(true)} onMouseLeave={() => setStepsFull(false)} onClick={() => setStepsFull((x) => !x)}>
+                {older.length ? <div className="sb-older"><ul>{older.map((x) => <Step key={x.key} s={x} />)}</ul></div> : null}
+                <ul className="sb-latest"><Step key={latest.key} s={latest} />{older.length ? <li className="sb-more" aria-hidden="true">{full ? <Icon name="chevU" /> : <>+{older.length}<Icon name="chevD" /></>}</li> : null}</ul>
+              </div>
+            );
+          })() : null}
         </form>
-        {shownSteps.length || others.length ? (() => {
-          // Only the latest line shows; pointing at it (or tapping it) folds the earlier steps out above it.
-          const all = [...shownSteps, ...others];
-          const latest = [...all].reverse().find((x) => x.state === 'run') || all[all.length - 1];
-          const older = all.filter((x) => x !== latest);
-          return (
-            <div className={`sb-steps${stepsFull ? ' open' : ''}${older.length ? ' has-older' : ''}`} aria-label={t('What is happening')} onMouseEnter={() => setStepsFull(true)} onMouseLeave={() => setStepsFull(false)} onClick={() => setStepsFull((x) => !x)}>
-              {older.length ? <div className="sb-older"><ul>{older.map((x) => <Step key={x.key} s={x} />)}</ul></div> : null}
-              <ul className="sb-latest"><Step key={latest.key} s={latest} />{older.length ? <li className="sb-more" aria-hidden="true">{stepsFull ? <Icon name="chevU" /> : <>+{older.length}<Icon name="chevD" /></>}</li> : null}</ul>
-            </div>
-          );
-        })() : null}
-        {(() => {
-          // What the feed is showing (filters) and what the search looks for, in one row with one look.
-          const list = crumbList(filters, { kinks, fantasies }).filter(([k]) => !(k === 'search' && activeNow) && !(k === 'sources' && chips.some((c) => c.kind === 'source')));
-          const mood = opts?.mood ? MOODS.find((m) => m.id === opts.mood) : null;
-          if (mood) for (const k of Object.keys(mood.filters || {})) { const i = list.findIndex(([x]) => x === k); if (i >= 0) list.splice(i, 1); }
-          if (!list.length && !mood && !chips.length) return null;
-          return (
-            <div className="sb-chips" aria-label={t('What the feed is showing')}>
-              {mood ? <span className="schip schip-filter"><span>{t('Mood: {mood}', { mood: mood.label })}</span><button type="button" onClick={() => clearFilter('mood')} aria-label={t('Remove the {mood} mood', { mood: mood.label })}><Icon name="x" /></button></span> : null}
-              {list.map(([k, label]) => <span key={k} className={`schip schip-filter${k.startsWith('tag:') ? ' schip-tag' : ''}${['formats', 'window', 'noTune'].includes(k) ? ' schip-tune' : ''}`}><span>{label}</span><button type="button" onClick={() => clearFilter(k)} aria-label={t('Remove {name}', { name: label })}><Icon name="x" /></button></span>)}
-              {chips.map((c) => <Chip key={`${c.kind}:${c.value}`} c={c} onRemove={editChip} />)}
-              <button type="button" className="schip-clear" onClick={() => { setQ(''); clearEverything(!document.documentElement.classList.contains('narrow')); }} title={t('Clear the search and every filter shown here')}><Icon name="x" />{t('Clear all')}</button>
-            </div>
-          );
-        })()}
+        {narrow ? chipRow : null}
         {mode !== 'feed' && askOut ? <div id="askOut" aria-live="polite">{askOut}</div> : null}
       </div>
       <div className="topright">

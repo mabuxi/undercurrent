@@ -2,6 +2,33 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.21.0 · 8 octobre 2026
+
+### Barre de recherche
+- Ce que le fil affiche (filtres et tags de recherche) se trouve dans la barre de recherche, avant ce que vous tapez, sur autant de lignes que nécessaire. Le × efface tout. Sur téléphone, ils restent sous la barre.
+- La puce « Tout effacer » disparaît : le × fait la même chose.
+- Ce qu’une recherche a fait tient en une ligne de résumé : ce qui a été cherché et où, avec ce qui a été trouvé. Survolez la barre, ou tapez dedans, et toutes les étapes se déplient.
+
+### Fil
+- Quelqu’un que vous suivez et qui publie beaucoup n’inonde plus le fil : par session, sa publication la plus populaire que vous n’avez pas vue, ou deux si vous aimez ses publications.
+- Les publications populaires doivent vous correspondre au moins autant que la plupart de votre fil ; l’attention ne départage qu’entre celles-là.
+- Le nom d’une source (Pornhub, RedTube, etc., utilisé quand une publication n’a pas d’auteur) n’est jamais pris pour un créateur ou une communauté : ni dans les suggestions En ce moment, ni dans ce que vous aimez.
+- Les publications marquées [OC], (OC), [OG], (OG), « OC: » ou « OG: », ou avec un tag OC, reçoivent le badge Contenu original en haut à droite, et la mention disparaît du titre et des tags. Les publications déjà là aussi.
+
+### Publications
+- Survolez un tag d’une publication et un × apparaît : retirez un tag qui ne correspond pas. Il reste retiré de cette publication, ne compte plus pour vos goûts depuis elle, et le tagueur en est informé pour l’utiliser plus prudemment.
+- Lecteurs d’autres sites : un j’aime demande deux clics rapides ; un lecteur qui prend le focus de lui-même ne compte plus.
+- Les profils de créateurs et de performeurs ont « Rechercher {nom} » avec une loupe, au lieu de « Seulement ce créateur dans le fil ». « Ajouter … comme source » disparaît : suivre quelqu’un le fait déjà.
+
+### Premiers pas
+- La première étape montre l’icône d’Undercurrent.
+- L’étape IA locale attend que les modèles soient téléchargés, lancés et répondent à une question test avant les kinks. « Continuer sans l’IA pour l’instant » reste disponible pour un long premier téléchargement.
+- Les kinks suivent qui vous voulez voir : en hétéro, les types de femmes, d’hommes et de couples côte à côte ; pour les hommes seulement, aucun type féminin ni de couple ; pour les femmes seulement, aucun type masculin.
+- Les origines commencent par les continents, Européens / Blancs compris ; choisissez-en un et ses pays et régions apparaissent dessous. Le kink d’un continent les couvre tous.
+- Les suggestions ne font apparaître que des kinks pas encore à l’écran, quelques-uns par clic, aussi dans d’autres familles. Chaque famille garde au moins six choix non pris en vue.
+- Chaque famille se termine par « En générer plus » : davantage de cette famille selon qui vous voulez voir et vos choix, par le modèle local quand il tourne.
+- Les idées de fantasmes sont des mini histoires : un lieu difficile à trouver, quelqu’un, ce qui se passe, et un rebondissement qui ne vient que de vos choix. Chaque idée est sa propre histoire, avec quelques-uns de vos choix, pas tous. Pareil pour les idées de fantasmes dans l’app. Pendant l’écriture, une plume et des cartes se remplissent.
+
 ## 0.20.2 · 8 octobre 2026
 
 ### Fil

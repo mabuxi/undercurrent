@@ -4,8 +4,8 @@ import path from 'node:path';
 import { execFile, spawn } from 'node:child_process';
 import { config } from './config.js';
 import { getDb, getSetting, setSetting, now } from './db.js';
-import { health, setModel } from './ai/ollama.js';
-import { FAMILIES, familyOf, conceptName, knownVariants, conceptsOf, isKinkConcept } from './concepts.js';
+import { health, setModel, chat, fastModel } from './ai/ollama.js';
+import { FAMILIES, familyOf, conceptName, knownVariants, conceptsOf, isKinkConcept, pickable, PARENT, GENDER_OF } from './concepts.js';
 import { log } from './log.js';
 import { tr, lang } from './i18n.js';
 import { conceptLabel, familyLabel } from './vocab.js';
@@ -239,9 +239,38 @@ export async function installOllama() {
   return { ok: true, started: true };
 }
 
-// The picker: concepts by family, each in its family colour. Popular things in what is already here come first.
-export function conceptCatalog() {
+// Who you want to see, from the balance in the welcome steps: men only, women only, hetero (a man and a woman), or
+// leaning one way.
+export function genderModeOf(male) {
+  const m = Number(male);
+  if (!Number.isFinite(m)) return 'any';
+  return m >= 90 ? 'men' : m <= 10 ? 'women' : m >= 45 && m <= 55 ? 'hetero' : m > 55 ? 'lean-men' : 'lean-women';
+}
+// A concept about only women never shows for men only, and the other way round; couples only with both.
+export function fitsGender(c, mode) {
+  const g = GENDER_OF[c];
+  if (!g || mode === 'any') return true;
+  if (mode === 'men') return g === 'm';
+  if (mode === 'women') return g === 'w';
+  return true;
+}
+// Order inside a family: what fits who you chose first, taking turns between the groups so a hetero balance sees
+// women's, men's and couples' things side by side.
+function genderOrder(list, mode) {
+  if (mode === 'any') return list;
+  const groups = { m: [], w: [], mix: [], n: [] };
+  for (const x of list) groups[GENDER_OF[x.concept] || 'n'].push(x);
+  const turns = mode === 'men' ? ['m', 'n'] : mode === 'women' ? ['w', 'n'] : mode === 'lean-men' ? ['m', 'n', 'mix', 'w'] : mode === 'lean-women' ? ['w', 'n', 'mix', 'm'] : ['w', 'mix', 'm', 'n'];
+  const out = [];
+  while (out.length < list.length) for (const k of turns) { const x = groups[k].shift(); if (x) out.push(x); else if (!turns.some((kk) => groups[kk].length)) break; }
+  return out.length === list.length ? out : [...out, ...list.filter((x) => !out.includes(x))];
+}
+
+// The picker: concepts by family, each in its family colour. Popular things in what is already here come first,
+// and what fits who you want to see. Ethnicities start with continents; what is inside one shows once you pick it.
+export function conceptCatalog({ male } = {}) {
   const db = getDb();
+  const mode = genderModeOf(male);
   const counts = new Map();
   try {
     for (const r of db.prepare(`SELECT t.name, COUNT(*) n FROM item_tags it JOIN tags t ON t.id = it.tag_id WHERE it.weight >= 0.45 AND t.kind != 'performer'
@@ -251,20 +280,26 @@ export function conceptCatalog() {
   const byKey = new Map(families.map((f) => [f.key, f]));
   for (const c of new Set([...ALL_CONCEPTS])) {
     const f = familyOf(c);
-    if (!f || !byKey.has(f) || !isKinkConcept(c)) continue;
-    byKey.get(f).concepts.push({ concept: c, name: conceptLabel(c, lang(), conceptName(c)), n: counts.get(c) || 0 });
+    if (!f || !byKey.has(f) || !pickable(c) || !fitsGender(c, mode)) continue;
+    byKey.get(f).concepts.push({ concept: c, name: conceptLabel(c, lang(), conceptName(c)), n: counts.get(c) || 0, ...(PARENT[c] ? { parent: PARENT[c] } : {}), ...(GENDER_OF[c] ? { gender: GENDER_OF[c] } : {}) });
   }
   // Most common in what is already here first; on a fresh install, the usual favourites of each family first.
   const rank = new Map(ALL_CONCEPTS.map((c, i) => [c, i]));
-  for (const f of families) f.concepts.sort((a, b) => (b.n > 50 ? b.n : 0) - (a.n > 50 ? a.n : 0) || rank.get(a.concept) - rank.get(b.concept));
+  for (const f of families) {
+    const top = f.concepts.filter((x) => !x.parent).sort((a, b) => (b.n > 50 ? b.n : 0) - (a.n > 50 ? a.n : 0) || rank.get(a.concept) - rank.get(b.concept));
+    const ordered = genderOrder(top, mode);
+    // Countries and regions right after their continent.
+    f.concepts = ordered.flatMap((x) => [x, ...f.concepts.filter((k) => k.parent === x.concept).sort((a, b) => rank.get(a.concept) - rank.get(b.concept))]);
+  }
   return families.filter((f) => f.concepts.length);
 }
 
 // Broad on purpose: straight first, gay and lesbian mixed in. On a fresh install each family shows its first ones.
-const ALL_CONCEPTS = ['latino', 'asian', 'black', 'interracial', 'arab', 'indian',
+const ALL_CONCEPTS = ['european', 'latino', 'asian', 'black', 'interracial', 'arab', 'indian',
+  'scandinavian', 'eastern european', 'british', 'french', 'german', 'italian', 'spanish', 'ebony', 'african', 'caribbean', 'japanese', 'korean', 'chinese', 'thai', 'filipino', 'vietnamese', 'brazilian', 'colombian', 'mexican', 'puerto rican', 'turkish', 'persian', 'moroccan', 'pakistani', 'bengali',
   'big tits', 'big ass', 'petite', 'curvy', 'blonde', 'natural tits', 'muscle', 'brunette', 'redhead', 'hairy', 'abs', 'small tits', 'bubble butt', 'thighs', 'feet', 'tattoo', 'hairy chest', 'beard', 'smooth', 'chubby', 'bbw', 'piercing', 'armpits',
   'bbc', 'bwc', 'uncut', 'veiny', 'big balls', 'cut',
-  'milf', '18 25', 'college', 'lesbian', 'mature', 'twink', 'daddy', 'jock', 'straight guy', 'gay for pay', 'bear', 'trans', 'femboy',
+  'milf', '18 25', 'college', 'lesbian', 'couple', 'mature', 'twink', 'daddy', 'jock', 'girl next door', 'cougar', 'hotwife', 'swingers', 'straight guy', 'gay for pay', 'bear', 'hunk', 'otter', 'alt girl', 'tomboy', 'trans', 'femboy',
   'blowjob', 'deepthroat', 'pussy licking', 'facesitting', 'sloppy', 'kissing', 'face fucking', 'rimming', 'cock worship',
   'missionary', 'doggystyle', 'riding', 'reverse cowgirl', 'standing sex', 'sixty nine', 'spooning', 'prone bone', 'mating press', 'anal', 'squirting', 'titfuck', 'handjob', 'fingering', 'toys', 'scissoring', 'strap on', 'bareback', 'breeding',
   'masturbation', 'solo', 'edging', 'gooning', 'ruined orgasm', 'prostate',
@@ -273,7 +308,7 @@ const ALL_CONCEPTS = ['latino', 'asian', 'black', 'interracial', 'arab', 'indian
   'lingerie', 'heels', 'yoga pants', 'underwear', 'uniform', 'jeans', 'shorts', 'socks', 'jockstrap', 'bulge',
   'massage', 'shower', 'outdoor', 'public', 'office', 'hotel', 'car', 'gym',
   'step family', 'cheating', 'casting', 'first time', 'roleplay', 'cuckold', 'caught',
-  'threesome', 'group sex', 'double penetration', 'pov', 'close up', 'webcam', 'audio', 'oiled', 'sweaty', 'piss',
+  'threesome', 'mmf', 'ffm', 'group sex', 'double penetration', 'pov', 'close up', 'webcam', 'audio', 'oiled', 'sweaty', 'piss',
   'hentai', 'animated', 'ai generated', 'yaoi', 'bara', 'futanari', 'furry'];
 
 // Things that tend to go with what you picked: from posts already here when there are any, otherwise the
@@ -290,11 +325,13 @@ const RELATED = {
 };
 // Suggestions for what goes with your picks. With `focus` (the one you just picked), what goes with that one comes
 // first, so every pick brings its own related kinks.
-export function suggestFor(picked = [], focus = null) {
+export function suggestFor(picked = [], focus = null, { male } = {}) {
+  const mode = genderModeOf(male);
   const want = new Set(picked);
   if (focus && want.has(focus)) picked = [focus, ...picked.filter((p) => p !== focus)];
   const score = new Map();
-  const add = (c, w) => { if (!want.has(c) && isKinkConcept(c) && familyOf(c)) score.set(c, (score.get(c) || 0) + w); };
+  // A country or region only once its continent is picked; nothing that does not fit who you want to see.
+  const add = (c, w) => { if (!want.has(c) && pickable(c) && familyOf(c) && fitsGender(c, mode) && (!PARENT[c] || want.has(PARENT[c]))) score.set(c, (score.get(c) || 0) + w); };
   for (const p of picked) for (const r of RELATED[p] || []) add(r, focus && p === focus ? 8 : 3);
   try {
     const db = getDb();
@@ -307,8 +344,44 @@ export function suggestFor(picked = [], focus = null) {
       for (const r of rows) for (const c of conceptsOf(r.name)) if (c !== p) add(c, (w * r.c) / total);
     }
   } catch {}
-  for (const p of picked) { const f = familyOf(p); if (f) for (const c of ALL_CONCEPTS) if (familyOf(c) === f) add(c, 0.4); }
-  return [...score.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([c]) => ({ concept: c, name: conceptLabel(c, lang(), conceptName(c)), family: familyOf(c), color: FAMILIES[familyOf(c)]?.color }));
+  // When the kink you just picked has nothing known to go with it, a few from its own family, so a click always
+  // brings something.
+  if (focus && [...score.keys()].filter((c) => (RELATED[focus] || []).includes(c)).length < 3) {
+    const f = familyOf(focus);
+    let n = 0;
+    if (f) for (const c of ALL_CONCEPTS) if (n < 4 && familyOf(c) === f && !want.has(c) && !score.has(c)) { add(c, 0.4); n++; }
+  }
+  // Plenty, so the picker can leave out what is already on screen and still have new ones for every family.
+  return [...score.entries()].sort((a, b) => b[1] - a[1]).slice(0, 40).map(([c]) => ({ concept: c, name: conceptLabel(c, lang(), conceptName(c)), family: familyOf(c), color: FAMILIES[familyOf(c)]?.color }));
+}
+
+// "Generate more" in one family: what is left of that family first, then what goes with your picks in the posts
+// here, then (when the local model runs) new ideas from it, all fitting who you want to see.
+export async function moreFor(family, { picked = [], shown = [], male } = {}) {
+  if (!FAMILIES[family]) return [];
+  const mode = genderModeOf(male);
+  const skip = new Set([...picked, ...shown].map((x) => String(x).toLowerCase()));
+  const out = [];
+  const push = (c, custom = false) => {
+    const k = String(c || '').toLowerCase().trim();
+    if (!k || skip.has(k) || out.some((x) => x.concept === k) || (!custom && (!pickable(k) || !fitsGender(k, mode)))) return;
+    out.push({ concept: k, name: custom ? k.charAt(0).toUpperCase() + k.slice(1) : conceptLabel(k, lang(), conceptName(k)), custom, ...(GENDER_OF[k] ? { gender: GENDER_OF[k] } : {}) });
+  };
+  for (const c of ALL_CONCEPTS) if (familyOf(c) === family && (!PARENT[c] || picked.includes(PARENT[c]))) push(c);
+  for (const x of suggestFor(picked, null, { male })) if (x.family === family) push(x.concept);
+  if (out.length < 6 && !config.mock && (await health()).ok) {
+    try {
+      const who = { men: 'men only (gay)', women: 'women only (lesbian)', hetero: 'a man and a woman together', 'lean-men': 'mostly men', 'lean-women': 'mostly women', any: 'anyone' }[mode];
+      const r = await Promise.race([chat({
+        kind: 'summary', model: fastModel(), temperature: 0.7, numPredict: 300,
+        schema: { type: 'object', properties: { kinks: { type: 'array', items: { type: 'string' } } }, required: ['kinks'] },
+        system: `You suggest kinks for one adult setting up a private adult-content browser. Give 8 more items for the family "${FAMILIES[family].name}": short plain English tag names (1 to 3 words, lowercase), the way porn sites tag, specific, all adults, nothing about age, family members, animals or non-consent. They want to see ${who}. Fit their picks. Never repeat what they already see.`,
+        user: `Their picks: ${picked.join(', ') || 'none yet'}\nAlready shown: ${[...skip].slice(0, 80).join(', ')}`
+      }), new Promise((_, rej) => setTimeout(() => rej(new Error('slow')), 25000))]);
+      for (const k of r?.kinks || []) { const c = conceptsOf(String(k))[0] || String(k).toLowerCase(); if (familyOf(c) === family || !familyOf(c)) push(c, !familyOf(c)); }
+    } catch {}
+  }
+  return out.slice(0, 8);
 }
 
 // Sources in the order most people use them, for the last step.

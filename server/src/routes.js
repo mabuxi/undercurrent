@@ -4,7 +4,7 @@ import { config } from './config.js';
 import { getDb, getSetting, setSetting, now, normalizeTag } from './db.js';
 import { buildFeed, presentOne, popRaw } from './rank.js';
 import { blockCreator, unblockCreator, listBlocked } from './blocks.js';
-import { getItem, itemTags, setState, hydrate, recheckBlocks, upsertItem, followed, addTags } from './store.js';
+import { getItem, itemTags, setState, hydrate, recheckBlocks, upsertItem, followed, addTags, removeItemTag } from './store.js';
 import { applyEvents, applyEvent, topTags, rebuildProfile, points } from './profile.js';
 import { topReplies } from './threads.js';
 import { lookupPerson, platformPosts, profileUrl } from './people.js';
@@ -35,7 +35,7 @@ import * as lemmy from './sources/lemmy.js';
 import * as tubes from './sources/tubes.js';
 import * as rss from './sources/redditRss.js';
 import { fetchMore, redditQueueSize, rememberSearch, fetchForInsight, followEverywhere } from './ingest.js';
-import { fastModel, setFastModel, pullModel, pulls, modelInfo } from './ai/ollama.js';
+import { fastModel, deepModel, setFastModel, pullModel, pulls, modelInfo } from './ai/ollama.js';
 import { queueDeep, deepNow } from './ai/tagger.js';
 import { autoDiscover, interestTerms } from './discover.js';
 import { brain, nodeDetail, strengthen, kinkIdForTag } from './brain.js';
@@ -43,7 +43,7 @@ import { performerInfo } from './sources/stars.js';
 import { tagsForItems, tagSpecificity } from './store.js';
 import { lustUrl, lustTest, TUBE_CDNS, tubeReferer } from './sources/lustpress.js';
 import { invalidatePool } from './searchstate.js';
-import { setupStatus, pullModels, installOllama, conceptCatalog, suggestFor, SOURCE_ORDER, modelOptions, chooseModels } from './setup.js';
+import { setupStatus, pullModels, installOllama, conceptCatalog, suggestFor, moreFor, SOURCE_ORDER, modelOptions, chooseModels } from './setup.js';
 import { fantasyIdeas } from './fantasyideas.js';
 import { listProfiles, createProfile, renameProfile, setProfileColor, switchProfile, deleteProfile, backupProfile, restoreBackup, deleteBackup, revealInFinder } from './profiles.js';
 import { updateStatus, applyUpdate, job as updateJob, whatsNew, markSeen, changelog } from './update.js';
@@ -83,7 +83,8 @@ function resolveFilters(f = {}) {
 
 api.post('/feed', wrap((req, res) => {
   const { filters = {}, exclude = [], limit = 10, mix = 15 } = req.body || {};
-  const r = buildFeed(resolveFilters(filters), { exclude, limit: Math.min(30, limit), mix });
+  const rf = resolveFilters(filters);
+  const r = buildFeed(rf, { exclude, limit: Math.min(30, limit), mix, capFollows: !rf.search && !rf.author && !rf.community && !rf.following && !rf.saved });
   // Posts about to be shown get a closer look (frames or the image itself), so their tags match what is really in them.
   try {
     const ids = r.items.filter((x) => ['image', 'set', 'short', 'gif', 'long'].includes(x.format)).map((x) => x.id);
@@ -312,6 +313,19 @@ api.post('/items/:id/kinks', wrap((req, res) => {
   }
   invalidatePool();
   res.json({ item: presentOne(getItem(id)) });
+}));
+
+// A tag that does not fit a post: it goes from that post for good, stops counting for your taste from that post,
+// and the tagger is told so it uses it less loosely.
+api.delete('/items/:id/tags/:tag', wrap((req, res) => {
+  const id = Number(req.params.id);
+  const it = getItem(id);
+  if (!it) return res.status(404).json({ error: tr('Not found') });
+  const name = removeItemTag(id, decodeURIComponent(req.params.tag));
+  if (!name) return res.status(404).json({ error: tr('Not found') });
+  if ((it.vote || 0) > 0 || it.saved || (it.rating || 0) >= 3 || (it.heat || 0) > 0) boostTags([name], -0.25);
+  invalidatePool();
+  res.json({ item: presentOne(getItem(id)), tag: name });
 }));
 
 api.post('/items/:id/less', wrap((req, res) => {
@@ -955,6 +969,24 @@ api.post('/models/test', wrap(async (req, res) => {
 // ---------- First run ----------
 api.get('/setup/status', wrap(async (req, res) => res.json(await setupStatus())));
 api.post('/setup/models', wrap(async (req, res) => res.json(await pullModels())));
+// Before the welcome steps go on to your kinks: the models are not only downloaded, they run and answer.
+api.post('/setup/check', wrap(async (req, res) => {
+  if (config.mock) return res.json({ ok: true, models: [{ name: 'test', ok: true }] });
+  const st = await setupStatus();
+  if (!st.ready) return res.json({ ok: false, waiting: true, models: [] });
+  const names = [...new Set([fastModel(), deepModel()].filter(Boolean))];
+  const models = [];
+  for (const name of names) {
+    try {
+      const out = await Promise.race([
+        chat({ kind: 'summary', model: name, temperature: 0, numPredict: 20, schema: { type: 'object', properties: { ok: { type: 'boolean' } }, required: ['ok'] }, system: 'Answer with {"ok": true}.', user: 'Are you working?' }),
+        new Promise((_, rej) => setTimeout(() => rej(new Error(tr('took too long'))), 90000))
+      ]);
+      models.push({ name, ok: !!out });
+    } catch (e) { models.push({ name, ok: false, error: String(e.message || e).slice(0, 120) }); }
+  }
+  res.json({ ok: models.length > 0 && models.every((m) => m.ok), models });
+}));
 api.get('/setup/models/options', wrap(async (req, res) => res.json(await modelOptions())));
 api.put('/setup/models/choice', wrap(async (req, res) => {
   chooseModels(req.body || {});
@@ -964,9 +996,10 @@ api.put('/setup/models/choice', wrap(async (req, res) => {
 api.post('/setup/ollama', wrap(async (req, res) => res.json(await installOllama())));
 api.get('/setup/concepts', wrap((req, res) => {
   const mine = new Set(listKinks({ includeHidden: false }).filter((k) => !k.isGroup).flatMap((k) => k.concepts || []));
-  res.json({ families: conceptCatalog(), picked: [...mine] });
+  res.json({ families: conceptCatalog({ male: req.query.male !== undefined ? Number(req.query.male) : undefined }), picked: [...mine] });
 }));
-api.post('/setup/suggest', wrap((req, res) => res.json({ suggestions: suggestFor((req.body?.picked || []).map(String).slice(0, 60), req.body?.focus ? String(req.body.focus) : null) })));
+api.post('/setup/suggest', wrap((req, res) => res.json({ suggestions: suggestFor((req.body?.picked || []).map(String).slice(0, 60), req.body?.focus ? String(req.body.focus) : null, { male: req.body?.male }) })));
+api.post('/setup/more', wrap(async (req, res) => res.json({ more: await moreFor(String(req.body?.family || ''), { picked: (req.body?.picked || []).map(String).slice(0, 60), shown: (req.body?.shown || []).map(String).slice(0, 300), male: req.body?.male }) })));
 api.get('/setup/sources', wrap((req, res) => {
   const st = providerState();
   const order = (id) => { const i = SOURCE_ORDER.indexOf(id); return i < 0 ? 99 : i; };
@@ -982,12 +1015,12 @@ api.post('/setup/fantasies', wrap(async (req, res) => {
   if (!config.mock && (await health()).ok) {
     try {
       const out = await Promise.race([chat({
-        kind: 'summary', model: fastModel(), temperature: 0.8, numPredict: 700,
+        kind: 'summary', model: deepModel() || fastModel(), temperature: 0.85, numPredict: 1400,
         schema: { type: 'object', properties: { fantasies: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, description: { type: 'string' }, kinks: { type: 'array', items: { type: 'string' } } }, required: ['name', 'description', 'kinks'] } } }, required: ['fantasies'] },
-        system: `You suggest fantasies for one adult using a private adult-content browser. A fantasy is a concrete scenario that ties two or three of the picked kinks together: a place, who is there and what happens, specific enough to picture, like "In the empty gym after closing, the jock who spots you pins you against the mirror". Never a list of the kinks, never "scenes where X and Y come together". Give 5, each in a different setting. name: 2 to 4 plain words, the scene, not the kinks. description: one sentence, second person, explicit is fine, all adults, nothing about family, age or non-consent. kinks: the exact picked kink names it uses, unchanged. ${replyIn()}`,
+        system: `You suggest fantasies for one adult using a private adult-content browser. A fantasy is a mini story of two or three sentences, second person ("you"), that someone would daydream about: a specific setting that is hard to come by, who is there, what happens, and one twist that makes it thrilling. It must feel personal: build it from the few picks that fit together best, not from all of them, and let the twist come from their picks (public or getting caught means risk, a straight guy means he is crossing a line for the first time, a partner means someone watching). Never a list of the kinks, never "scenes where X and Y come together", never generic ("a muscular man in the shower"). Good example for someone who picked muscle, public and blowjob: "In a spa's shared showers, where anyone could walk in, a muscular stranger keeps holding your gaze. He drops to his knees anyway. Footsteps pass the door twice and he does not stop." Every fantasy in a set has its own setting, its own person and its own twist, so they are clearly different stories. Explicit is fine; everyone is a consenting adult; nothing about family members, age, animals or non-consent. Give 5. name: 2 to 4 words naming the scene, not the kinks. description: the mini story. kinks: the exact picked kink names it really uses (2 or 3), unchanged. ${replyIn()}`,
         user: `Picked kinks: ${names.join(', ')}`
       }), new Promise((_, rej) => setTimeout(() => rej(new Error('slow')), 30000))]);
-      list = (out?.fantasies || []).map((f) => ({ name: String(f.name || '').slice(0, 50), description: String(f.description || '').slice(0, 240), concepts: (f.kinks || []).map((k) => picked[names.findIndex((n) => n.toLowerCase() === String(k).toLowerCase())]).filter(Boolean) }))
+      list = (out?.fantasies || []).map((f) => ({ name: String(f.name || '').slice(0, 50), description: String(f.description || '').slice(0, 480), concepts: (f.kinks || []).map((k) => picked[names.findIndex((n) => n.toLowerCase() === String(k).toLowerCase())]).filter(Boolean) }))
         .filter((f) => f.name && f.concepts.length >= 2);
     } catch {}
   }

@@ -27,7 +27,7 @@ function Welcome({ ok, setOk }) {
   return (
     <div className="ob-step ob-welcome">
       <LanguageSwitch compact />
-      <StepIcon name="flame" />
+      <img className="ob-appicon" src="/icon-192.png" alt="" width="84" height="84" />
       <p className="ob-kicker">{t('Welcome to')}</p>
       <h1 className="ob-title">Undercurrent</h1>
       <p className="ob-lede">{t("One feed from all your sources, tuned to exactly what you're into. It learns from what you heat, like and save, and everything (your taste, your history, the AI) stays on this Mac.")}</p>
@@ -41,7 +41,7 @@ function Welcome({ ok, setOk }) {
   );
 }
 
-function LocalAi({ status, options, choice, setChoice }) {
+function LocalAi({ status, options, choice, setChoice, aiCheck, asked }) {
   const st = status;
   if (!st) return <div className="ob-step"><p className="ob-lede">{t('Checking this Mac…')}</p></div>;
   const inst = st.ollama.install;
@@ -49,7 +49,7 @@ function LocalAi({ status, options, choice, setChoice }) {
     <div className="ob-step">
       <StepIcon name="brain" />
       <h2 className="ob-h">{t('The local AI')}</h2>
-      <p className="ob-lede">{t('Undercurrent runs AI models on this Mac with Ollama. They tag posts, look at pictures and power the assistant. Nothing is sent anywhere. The recommended models fit this Mac; choose others if you like. They download when you continue, while you set up the rest.')}</p>
+      <p className="ob-lede">{t('Undercurrent runs AI models on this Mac with Ollama. They tag posts, look at pictures and power the assistant. Nothing is sent anywhere. The recommended models fit this Mac; choose others if you like. They download first; the next steps open once they run and answer.')}</p>
       <div className={`ob-card ${st.ollama.running ? 'good' : ''}`}>
         <span className="ob-dot" /><div className="ob-grow"><b>Ollama</b><span>{st.ollama.running ? (st.ollama.version ? t('Running, version {v}', { v: st.ollama.version }) : t('Running')) : st.ollama.installed ? t('Installed, starting it…') : inst.state === 'downloading' ? t('Downloading from ollama.com…') : inst.state === 'unpacking' ? t('Installing in Applications…') : t('Getting it ready…')}</span>
           {inst.state === 'downloading' && inst.total ? <div className="ob-bar"><i style={{ width: `${Math.round((inst.received / inst.total) * 100)}%` }} /></div> : null}
@@ -58,6 +58,11 @@ function LocalAi({ status, options, choice, setChoice }) {
       </div>
       {inst.error ? <p className="ob-note bad">{t('Installing Ollama failed: {error}. You can get it from ollama.com and open Undercurrent again.', { error: inst.error })}</p> : null}
       <ModelChooser options={options} choice={choice} setChoice={setChoice} status={st} />
+      <div className={`ob-card ob-aicheck ${aiCheck?.ok ? 'good' : aiCheck?.ok === false && !aiCheck.waiting ? 'bad' : ''}`}>
+        <span className="ob-dot" />
+        <div className="ob-grow"><b>{t('Ready to use')}</b><span>{aiCheck?.ok ? t('The models are downloaded, running and answering.') : aiCheck === 'checking' ? t('Asking the models a test question…') : aiCheck?.ok === false && !aiCheck.waiting ? t('A model did not answer: {error}', { error: aiCheck.models?.find((m) => !m.ok)?.error || '?' }) : st.ready ? t('Checking that they run…') : asked ? t('Downloading the models. The next step opens when they are in and answer.') : t('Download the models to go on. This can take a while the first time.')}</span></div>
+        {aiCheck?.ok ? <span className="ob-pct"><Icon name="check" /></span> : aiCheck === 'checking' || (asked && !st.ready) ? <span className="spinner inline" /> : null}
+      </div>
       {st.ready ? <p className="ob-note good">{t('Everything is on this Mac already.')}</p> : null}
     </div>
   );
@@ -89,32 +94,44 @@ function Who({ gender, setGender }) {
   );
 }
 
-function Kinks({ families, picked, setPicked }) {
+function Kinks({ families, picked, setPicked, male }) {
   const [sugg, setSugg] = useState([]);
   const [own, setOwn] = useState('');
   const [open, setOpen] = useState(null);
+  const [extra, setExtra] = useState({});
+  const [genBusy, setGenBusy] = useState(null);
+  const [genNone, setGenNone] = useState({});
   const last = useRef(null);
   // Every pick brings its own related kinks: they are added in front of the earlier ones and stay, so the list keeps
   // growing as you click. What you pick leaves the list.
   useEffect(() => {
     if (!picked.length) { setSugg([]); return undefined; }
     const focus = last.current;
-    const tm = setTimeout(() => api('/setup/suggest', { method: 'POST', body: { picked, focus } }).then((r) => {
+    const tm = setTimeout(() => api('/setup/suggest', { method: 'POST', body: { picked, focus, male } }).then((r) => {
       setSugg((cur) => {
         const fresh = (r.suggestions || []).filter((x) => !picked.includes(x.concept));
         const added = fresh.filter((x) => !cur.some((c) => c.concept === x.concept));
         const keep = cur.filter((x) => !picked.includes(x.concept));
-        return [...added, ...keep].slice(0, 48);
+        return [...added, ...keep].slice(0, 80);
       });
     }).catch(() => {}), 200);
     return () => clearTimeout(tm);
-  }, [picked.join('|')]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [picked.join('|'), male]); // eslint-disable-line react-hooks/exhaustive-deps
   const toggle = (c) => {
     if (picked.includes(c)) { setPicked(picked.filter((x) => x !== c)); last.current = null; }
     else { last.current = c; setPicked([...picked, c]); }
   };
-  const colorOf = useMemo(() => { const m = new Map(); for (const f of families) for (const c of f.concepts) m.set(c.concept, f.color); return m; }, [families]);
-  const nameOf = useMemo(() => { const m = new Map(); for (const f of families) for (const c of f.concepts) m.set(c.concept, c.name); return m; }, [families]);
+  const colorOf = useMemo(() => { const m = new Map(); for (const f of families) for (const c of [...f.concepts, ...(extra[f.key] || [])]) m.set(c.concept, f.color); return m; }, [families, extra]);
+  const nameOf = useMemo(() => { const m = new Map(); for (const f of families) for (const c of [...f.concepts, ...(extra[f.key] || [])]) m.set(c.concept, c.name); for (const x of sugg) m.set(x.concept, x.name); return m; }, [families, extra, sugg]);
+  async function generate(f, shown) {
+    setGenBusy(f.key);
+    try {
+      const r = await api('/setup/more', { method: 'POST', body: { family: f.key, picked, shown, male } });
+      const more = (r.more || []).filter((x) => !shown.includes(x.concept));
+      if (more.length) setExtra((cur) => ({ ...cur, [f.key]: [...(cur[f.key] || []), ...more] }));
+      setGenNone((cur) => ({ ...cur, [f.key]: !more.length }));
+    } catch { setGenNone((cur) => ({ ...cur, [f.key]: true })); } finally { setGenBusy(null); }
+  }
   return (
     <div className="ob-step wide">
       <StepIcon name="flame" />
@@ -128,12 +145,20 @@ function Kinks({ families, picked, setPicked }) {
       ) : null}
       <div className="ob-fams">
         {families.map((f, fi) => {
-          const n = f.concepts.filter((c) => picked.includes(c.concept)).length;
-          // What goes with your picks shows up inside its own family, first, with a dashed outline.
-          const sug = sugg.filter((x) => x.family === f.key && !picked.includes(x.concept));
+          const all = [...f.concepts, ...(extra[f.key] || []).filter((x) => !f.concepts.some((c) => c.concept === x.concept))];
+          const n = all.filter((c) => picked.includes(c.concept)).length;
+          // Countries and regions only show under a continent you picked.
+          const tops = all.filter((c) => !c.parent);
+          const kidsOf = (c) => all.filter((k) => k.parent === c.concept && (picked.includes(c.concept) || all.some((x) => x.parent === c.concept && picked.includes(x.concept))));
+          // At least six you have not picked yet stay in view: picking from a family brings the next ones up.
+          let count = Math.min(tops.length, 8);
+          while (count < tops.length && tops.slice(0, count).filter((c) => !picked.includes(c.concept)).length < 6) count++;
+          const windowed = open === f.key ? tops : tops.slice(0, count);
+          const inView = new Set([...windowed.map((c) => c.concept), ...windowed.flatMap((c) => kidsOf(c).map((k) => k.concept))]);
+          // Suggestions only bring up what is not on screen yet: hidden behind "more", or new to this family.
+          const sug = sugg.filter((x) => x.family === f.key && !picked.includes(x.concept) && !inView.has(x.concept)).slice(0, 5);
           const sugSet = new Set(sug.map((x) => x.concept));
-          const rest = f.concepts.filter((c) => !sugSet.has(c.concept));
-          const shown = open === f.key ? rest : rest.slice(0, 8);
+          const hidden = tops.filter((c) => !inView.has(c.concept) && !sugSet.has(c.concept)).length;
           return (
             <section key={f.key} className={`ob-fam${sug.length ? ' has-sugg' : ''}`} style={{ '--c': f.color, '--i': fi }}>
               <header><span className="ob-famicon"><Icon name={FAMILY_ICON[f.key] || 'spark'} /></span><b>{f.name}</b>{n ? <em>{n}</em> : null}</header>
@@ -143,12 +168,20 @@ function Kinks({ families, picked, setPicked }) {
                     <Icon name="plus" />{x.name}
                   </button>
                 ))}
-                {shown.map((c) => (
-                  <button type="button" key={c.concept} className={`ob-tile${picked.includes(c.concept) ? ' on' : ''}`} onClick={() => toggle(c.concept)} aria-pressed={picked.includes(c.concept)}>
+                {windowed.map((c) => [
+                  <button type="button" key={c.concept} className={`ob-tile${picked.includes(c.concept) ? ' on' : ''}${c.custom ? ' gen' : ''}`} onClick={() => toggle(c.concept)} aria-pressed={picked.includes(c.concept)}>
                     {c.name}{picked.includes(c.concept) ? <Icon name="check" /> : null}
-                  </button>
-                ))}
-                {rest.length > 8 ? <button type="button" className="ob-tile more" onClick={() => setOpen(open === f.key ? null : f.key)}>{open === f.key ? t('Less') : t('+{n} more', { n: rest.length - 8 })}</button> : null}
+                  </button>,
+                  ...kidsOf(c).map((k) => (
+                    <button type="button" key={k.concept} className={`ob-tile kid${picked.includes(k.concept) ? ' on' : ''}`} onClick={() => toggle(k.concept)} aria-pressed={picked.includes(k.concept)}>
+                      {k.name}{picked.includes(k.concept) ? <Icon name="check" /> : null}
+                    </button>
+                  ))
+                ])}
+                {hidden > 0 || open === f.key ? <button type="button" className="ob-tile more" onClick={() => setOpen(open === f.key ? null : f.key)}>{open === f.key ? t('Less') : t('+{n} more', { n: hidden })}</button> : null}
+                <button type="button" className={`ob-tile genmore${genBusy === f.key ? ' busy' : ''}`} onClick={() => generate(f, [...all.map((c) => c.concept), ...sug.map((x) => x.concept)])} disabled={genBusy === f.key} title={t('More like this, from who you want to see and what you picked')}>
+                  {genBusy === f.key ? <span className="spinner inline" /> : <Icon name="why" />}{genNone[f.key] ? t('Nothing more for now') : t('Generate more')}
+                </button>
               </div>
             </section>
           );
@@ -177,7 +210,12 @@ function Fantasies({ picked, chosen, setChosen, list, setList, gender }) {
       <h2 className="ob-h">{t('Any fantasies?')}</h2>
       <p className="ob-lede">{t('A fantasy ties a few kinks together into a scenario. Pick any that speak to you; the feed and the map use them. This step is optional.')}</p>
       {picked.length < 2 ? <p className="ob-note">{t('Pick at least two kinks to get fantasy ideas, or write your own below.')}</p> : null}
-      {loading ? <p className="ob-note"><span className="spinner inline" /> {t('Writing a few ideas from your picks…')}</p> : null}
+      {loading ? (
+        <div className="ob-writing" role="status" aria-live="polite">
+          <p className="ob-writing-l"><span className="ob-quill"><Icon name="edit" /></span>{t('Writing a few stories from your picks')}<span className="ob-dots3"><i /><i /><i /></span></p>
+          <div className="ob-fants">{[0, 1, 2].map((i) => <div key={i} className="ob-fant skel" style={{ '--i': i }}><b /><span /><span /><span className="short" /></div>)}</div>
+        </div>
+      ) : null}
       <div className="ob-fants">
         {(list || []).map((f) => (
           <button type="button" key={f.name} className={`ob-fant${has(f) ? ' on' : ''}`} onClick={() => setChosen(has(f) ? chosen.filter((x) => x.name !== f.name) : [...chosen, f])}>
@@ -272,6 +310,8 @@ export default function Onboarding({ onDone }) {
   const [modelOpts, setModelOpts] = useState(null);
   const [choice, setChoice] = useState({});
   const askedInstall = useRef(false);
+  const [asked, setAsked] = useState(false);
+  const [aiCheck, setAiCheck] = useState(null);
 
   const reload = () => api('/setup/status').then((st) => {
     setStatus(st);
@@ -286,6 +326,11 @@ export default function Onboarding({ onDone }) {
     api('/limits').then((r) => setLimits((r.limits || []).map((x) => x.tag || x))).catch(() => {});
     api('/setup/models/options').then(setModelOpts).catch(() => {});
   }, []);
+  // The kinks shown fit who you chose on the step before: reloaded with that balance when you get there.
+  useEffect(() => {
+    if (step !== 3) return;
+    api(`/setup/concepts?male=${gender.male ?? 50}`).then((r) => setFamilies(r.families)).catch(() => {});
+  }, [step, gender.male]);
   // While models download, keep the progress fresh.
   useEffect(() => {
     const busy = status && (status.pulling || status.models.some((m) => m.pull && !m.pull.done) || ['downloading', 'unpacking'].includes(status.ollama.install.state) || !status.ollama.running);
@@ -296,7 +341,7 @@ export default function Onboarding({ onDone }) {
 
   // Skips the fantasies step when there is nothing to tie together.
   const go = (d) => {
-    if (step === 1 && d > 0) startDownloads();
+    if (step === 1 && d > 0 && !downloadsAsked.current) startDownloads();
     setDir(d);
     setStep((s) => {
       let n = Math.max(0, Math.min(STEPS.length - 1, s + d));
@@ -309,6 +354,7 @@ export default function Onboarding({ onDone }) {
   const downloadsAsked = useRef(false);
   function startDownloads() {
     downloadsAsked.current = true;
+    setAsked(true);
     api('/setup/models/choice', { method: 'PUT', body: { ...choice, pull: true } }).then((r) => { setModelOpts(r); reload(); }).catch(() => {});
   }
   useEffect(() => {
@@ -316,6 +362,16 @@ export default function Onboarding({ onDone }) {
       api('/setup/models', { method: 'POST', body: {} }).then(reload).catch(() => {});
     }
   }, [status?.ollama.running]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The models are checked for real (a test question) before the kinks step: downloaded is not enough.
+  const runCheck = () => {
+    setAiCheck('checking');
+    api('/setup/check', { method: 'POST', body: {} }).then(setAiCheck).catch((e) => setAiCheck({ ok: false, models: [{ ok: false, error: e.message }] }));
+  };
+  useEffect(() => {
+    if (step === 1 && status?.ready && aiCheck === null) runCheck();
+  }, [step, status?.ready]); // eslint-disable-line react-hooks/exhaustive-deps
+  const aiReady = !!aiCheck?.ok;
 
   async function finish() {
     if (!downloadsAsked.current) { downloadsAsked.current = true; await api('/setup/models/choice', { method: 'PUT', body: { ...choice } }).catch(() => {}); }
@@ -344,9 +400,9 @@ export default function Onboarding({ onDone }) {
         </header>
         <main className={`ob-body dir${dir > 0 ? 'f' : 'b'}`} key={step}>
           {step === 0 ? <Welcome ok={ok} setOk={setOk} /> : null}
-          {step === 1 ? <LocalAi status={status} options={modelOpts} choice={choice} setChoice={setChoice} /> : null}
+          {step === 1 ? <LocalAi status={status} options={modelOpts} choice={choice} setChoice={setChoice} aiCheck={aiCheck} asked={asked} /> : null}
           {step === 2 ? <Who gender={gender} setGender={setGender} /> : null}
-          {step === 3 ? <Kinks families={families} picked={picked} setPicked={setPicked} /> : null}
+          {step === 3 ? <Kinks families={families} picked={picked} setPicked={setPicked} male={gender.male} /> : null}
           {step === 4 ? <Fantasies picked={picked} chosen={chosen} setChosen={setChosen} list={fantList} setList={setFantList} gender={gender} /> : null}
           {step === 5 ? <Sources sources={sources} on={srcOn} setOn={setSrcOn} /> : null}
           {step === 6 ? <Limits limits={limits} setLimits={setLimits} /> : null}
@@ -355,7 +411,14 @@ export default function Onboarding({ onDone }) {
         {err ? <p className="ob-note bad ob-err">{err}</p> : null}
         <footer className="ob-foot">
           {step > 0 ? <button type="button" className="ob-btn ghost" onClick={() => go(-1)}><Icon name="chevL" />{t('Back')}</button> : <span />}
-          {step < STEPS.length - 1
+          {step === 1 && !aiReady ? (
+            <div className="ob-gate">
+              <button type="button" className="ob-skiplink" onClick={() => go(1)}>{t('Continue without the AI for now')}</button>
+              {!status?.ready && !asked ? <button type="button" className="ob-btn primary" onClick={startDownloads}><Icon name="download" />{t('Download the models')}</button>
+                : aiCheck?.ok === false && !aiCheck.waiting ? <button type="button" className="ob-btn primary" onClick={runCheck}><Icon name="refresh" />{t('Try again')}</button>
+                : <button type="button" className="ob-btn primary" disabled><span className="spinner inline" />{status?.ready ? t('Checking…') : t('Downloading…')}</button>}
+            </div>
+          ) : step < STEPS.length - 1
             ? <button type="button" className="ob-btn primary" onClick={() => go(1)} disabled={step === 0 && !ok}>{step === 0 ? t('Get started') : step === 3 && !picked.length ? t('Skip for now') : t('Continue')}<Icon name="chevR" /></button>
             : <button type="button" className="ob-btn primary" onClick={finish} disabled={saving}>{saving ? t('Saving…') : t('Start exploring')}<Icon name="chevR" /></button>}
         </footer>

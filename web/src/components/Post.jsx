@@ -359,6 +359,10 @@ export default function Post({ item: initial, focus = false, onStrong }) {
   }
 
   const toggle = (p) => setPanel((cur) => (cur === p ? null : p));
+  async function dropTag(tag) {
+    setItem((cur) => ({ ...cur, tags: (cur.tags || []).filter((x) => (typeof x === 'string' ? x : x.name) !== tag) }));
+    try { const r = await api(`/items/${item.id}/tags/${encodeURIComponent(tag)}`, { method: 'DELETE' }); if (r.item) setItem((cur) => ({ ...cur, ...r.item, vote: cur.vote })); toast(t('{tag} taken off this post. The tagger will use it more carefully.', { tag })); } catch (e) { toast(e.message); }
+  }
   const goneRef = useRef(null);
   useEffect(() => {
     if (!gone) return;
@@ -467,7 +471,12 @@ export default function Post({ item: initial, focus = false, onStrong }) {
             {allKinks.filter((k) => !k.isGroup && k.status !== 'hidden' && !item.kinks?.some((x) => x.id === k.id)).sort((a, b) => a.name.localeCompare(b.name)).map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
           </select>
         ) : <button type="button" className="chip ghost more addkink" onClick={() => setKinkPick(true)} title={t('Add this post to one of your kinks')}>{t('+ kink')}</button>}
-        {shownTags.map((tag) => <button type="button" key={tag} className={`chip ghost link${item.liked?.includes(tag) ? ' mine' : ''}`} onClick={() => runSearch(tag).catch(() => setFilters({ tags: [tag] }))} title={t('Search everything for {tag}', { tag })}>{tag}</button>)}
+        {shownTags.map((tag) => (
+          <span key={tag} className={`chip ghost tagx${item.liked?.includes(tag) ? ' mine' : ''}`}>
+            <button type="button" onClick={() => runSearch(tag).catch(() => setFilters({ tags: [tag] }))} title={t('Search everything for {tag}', { tag })}>{tag}</button>
+            <button type="button" className="kx" onClick={() => dropTag(tag)} aria-label={t('Take {tag} off this post', { tag })} title={t('Does not fit: take it off')}><Icon name="x" /></button>
+          </span>
+        ))}
         {tagList.length > 9 || allTags ? <button type="button" className="chip ghost more" onClick={() => setAllTags((x) => !x)}>{allTags ? t('fewer') : t('+{n} tags', { n: tagList.length - 9 })}</button> : null}
         <span className="chip ghost meta">{formatMeta(item)}</span>
       </div>

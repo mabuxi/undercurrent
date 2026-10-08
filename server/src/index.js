@@ -35,7 +35,7 @@ if (config.mock && process.env.UC_TEST_MODE === '1') {
   if ((l === 'en' || l === 'fr') && !getSetting('language', null)) setSetting('language', l);
 }
 { const { resetLanguageCache } = await import('./i18n.js'); resetLanguageCache(); }
-try { if ((getSetting('titleClean', 0) || 0) < 1) { const c = cleanupTitles(); setSetting('titleClean', 1); log('info', `Cleaned titles: ${c.oc} original content markers, ${c.blocked} moderator posts hidden`); } } catch (e) { log('warn', 'Title cleanup failed', e.message); }
+try { if ((getSetting('titleClean', 0) || 0) < 2) { const c = cleanupTitles(); setSetting('titleClean', 2); log('info', `Cleaned titles: ${c.oc} original content markers, ${c.blocked} moderator posts hidden`); } } catch (e) { log('warn', 'Title cleanup failed', e.message); }
 try { if (!getSetting('memClean', 0)) { const n = getDb().prepare("UPDATE memory SET status = 'archived' WHERE origin = 'user' AND content LIKE 'Liked \"%\" for:%' AND status != 'archived'").run().changes; setSetting('memClean', 1); if (n) log('info', `Moved ${n} post feedback notes out of memory`); } } catch (e) { log('warn', 'Memory cleanup failed', e.message); }
 try {
   if ((getSetting('tidyV', 0) || 0) < 2) {

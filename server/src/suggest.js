@@ -65,10 +65,10 @@ const FANTASY_SCHEMA = {
 
 const FANTASY_RULES = `You suggest sexual fantasies to one adult, based only on what they actually engaged with. All people involved are consenting adults.
 
-Write each fantasy as ONE concrete scenario sentence with a setting and an action, specific enough to picture, for example the level of detail in "Having sex in the sand dunes at sunset while hoping nobody walks by". Never vague ("something romantic"), never a list of tags.
+Write each fantasy as a mini story: two or three sentences, second person ("you"), that someone would daydream about: a specific setting that is hard to come by, who is there, what happens, and one twist that makes it thrilling. It must feel personal: build it from the few picks that fit together best, not from all of them, and let the twist come from their picks (public or getting caught means risk, a straight guy means he is crossing a line for the first time, a partner means someone watching). Never a list of the kinks, never "scenes where X and Y come together", never generic ("a muscular man in the shower"). Good example for someone who picked muscle, public and blowjob: "In a spa's shared showers, where anyone could walk in, a muscular stranger keeps holding your gaze. He drops to his knees anyway. Footsteps pass the door twice and he does not stop." Every fantasy in a set has its own setting, its own person and its own twist, so they are clearly different stories. Explicit is fine; everyone is a consenting adult; nothing about family members, age, animals or non-consent.
 
 Rules:
-- Only suggest a fantasy when several of their strongest signals point to it. Combine two or three things they clearly like into one situation.
+- Only suggest a fantasy when several of their strongest signals point to it. Combine two or three things they clearly like into one situation; do not cram in everything they like.
 - confidence 0 to 100: how sure you are this person wants it, judged from the evidence. Use 80+ only when the evidence is strong and consistent. Most ideas are 60 to 75.
 - title: 2 to 6 words.
 - kinks: names copied exactly from their kink list, 1 to 3.
@@ -97,7 +97,7 @@ export async function suggestFantasies({ force = false } = {}) {
     ].filter(Boolean).join('\n\n');
     let out;
     if (config.mock) {
-      out = { fantasies: [{ title: 'Sunset in the dunes', scenario: `Slow ${kinks[0].name.toLowerCase()} in the sand dunes at sunset, half hoping someone walks by.`, kinks: [kinks[0].name], tags: ['outdoor', 'sunset', 'public'], confidence: 82, why: 'You keep saving outdoor posts.' }] };
+      out = { fantasies: [{ title: 'Sunset in the dunes', scenario: `On a hidden beach between the dunes at sunset, a stranger who has been watching you all afternoon finally walks over. It turns into slow ${kinks[0].name.toLowerCase()} in the warm sand. Voices drift over from the path, and neither of you stops.`, kinks: [kinks[0].name], tags: ['outdoor', 'sunset', 'public'], confidence: 82, why: 'You keep saving outdoor posts.' }] };
     } else {
       out = await chat({ kind: 'suggest', system: `${FANTASY_RULES}
 ${replyIn()}`, user, schema: FANTASY_SCHEMA, temperature: 0.6, model: deepModel(), numPredict: 1100, numCtx: 8192 });
@@ -108,7 +108,7 @@ ${replyIn()}`, user, schema: FANTASY_SCHEMA, temperature: 0.6, model: deepModel(
       const conf = Math.round(Number(f.confidence) || 0);
       if (conf < 75 || !f.scenario || String(f.scenario).split(/\s+/).length < 6) continue;
       const ks = (f.kinks || []).map((x) => names.get(String(x).toLowerCase())).filter(Boolean);
-      if (put('fantasy', String(f.title).slice(0, 60), String(f.scenario).slice(0, 300), { kinks: ks.map((k) => ({ id: k.id, name: k.name, color: k.color })), tags: (f.tags || []).slice(0, 5).map((t) => String(t).toLowerCase()), why: String(f.why || '').slice(0, 200) }, Math.min(99, conf))) n++;
+      if (put('fantasy', String(f.title).slice(0, 60), String(f.scenario).slice(0, 600), { kinks: ks.map((k) => ({ id: k.id, name: k.name, color: k.color })), tags: (f.tags || []).slice(0, 5).map((t) => String(t).toLowerCase()), why: String(f.why || '').slice(0, 200) }, Math.min(99, conf))) n++;
     }
     setSetting('suggestFantasiesAt', now());
     if (n) log('info', `Suggested ${n} new fantasies`);

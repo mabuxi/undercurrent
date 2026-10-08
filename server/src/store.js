@@ -1,4 +1,4 @@
-import { getDb, now, tagId } from './db.js';
+import { getDb, now, tagId, normalizeTag, getSetting, setSetting } from './db.js';
 import { isBlockedCreator } from './blocks.js';
 import { postLangs } from './langdetect.js';
 import { isBlocked } from './safety.js';
@@ -17,10 +17,14 @@ export function isModPost(n) {
   return MOD_TITLE.test(String(n.title || ''));
 }
 
-const OC_RE = /\s*(?:\[\s*(?:oc|o\.c\.?|original(?: content)?)\s*\]|\(\s*(?:oc|o\.c\.?|original content)\s*\)|\{\s*oc\s*\})\s*/gi;
+const OC_RE = /\s*(?:\[\s*(?:oc|og|o\.c\.?|o\.g\.?|original(?: content)?)\s*\]|\(\s*(?:oc|og|o\.c\.?|o\.g\.?|original content)\s*\)|\{\s*(?:oc|og)\s*\})\s*/gi;
+// "[F OC]", "(og, 23)": an OC or OG inside a bracket with other words is taken out of the bracket.
+const OC_IN = /([\[(])([^\])]*?)\b(?:oc|og|o\.c\.?|o\.g\.?)(?![\w.])([^\])]*?)([\])])/gi;
+// Tags that only say "the poster made this": they become the Original content badge instead of a tag.
+export const OC_TAGS = new Set(['oc', 'og', 'o.c.', 'o.c', 'o.g.', 'original content', 'oc content', 'og content', 'my own content']);
 export function stripOc(title) {
   const t = String(title || '');
-  let out = t.replace(OC_RE, ' ').replace(/^\s*oc\s*[:\-–|]\s*/i, '').replace(/\s+[-–|]\s*oc\s*$/i, '').replace(/\s+oc$/i, '');
+  let out = t.replace(OC_RE, ' ').replace(OC_IN, (m, a, x, y, b) => { const rest = `${x} ${y}`.replace(/[\s,;/|]+/g, ' ').trim(); return rest ? `${a}${rest}${b}` : ' '; }).replace(/^\s*o[cg]\s*[:\-–|]\s*/i, '').replace(/\s+[-–|]\s*o[cg]\s*$/i, '').replace(/\s+oc$/i, '').replace(/\s+original content\s*$/i, '').replace(/^\s*original content\s*[:\-–|]\s*/i, '');
   out = out.replace(/\s{2,}/g, ' ').trim();
   return out && out !== t.trim() ? { title: out, oc: true } : { title: t, oc: false };
 }
@@ -30,7 +34,8 @@ const SOURCE_TAG_WEIGHT = { reddit: 0.5, redgifs: 0.7, rule34: 0.55, gelbooru: 0
 export function upsertItem(n) {
   const db = getDb();
   const oc = stripOc(n.title);
-  n = { ...n, title: oc.title, oc: n.oc || oc.oc };
+  const ocTag = (n.tags || []).some((x) => OC_TAGS.has(String(x || '').trim().toLowerCase()));
+  n = { ...n, title: oc.title, oc: n.oc || oc.oc || ocTag, tags: (n.tags || []).filter((x) => !OC_TAGS.has(String(x || '').trim().toLowerCase())) };
   let verdict = isBlocked({ title: n.title, body: n.body, tags: n.tags || [] });
   if (!verdict.blocked && isModPost(n)) verdict = { blocked: true, reason: 'announcement' };
   if (!verdict.blocked && isBlockedCreator(n)) verdict = { blocked: true, reason: 'creator' };
@@ -61,9 +66,36 @@ export function upsertItem(n) {
   return { id, created: true, blocked: verdict.blocked };
 }
 
+// Tags you took off a post stay off it: a later tagging pass does not put them back.
+let removedReady = false;
+function removedTable() {
+  if (removedReady) return;
+  getDb().exec('CREATE TABLE IF NOT EXISTS item_tag_removed (item_id INTEGER NOT NULL, tag_id INTEGER NOT NULL, ts INTEGER, PRIMARY KEY(item_id, tag_id))');
+  removedReady = true;
+}
+
+export function removeItemTag(itemId, name) {
+  removedTable();
+  const db = getDb();
+  const n = normalizeTag(name);
+  const row = n ? db.prepare('SELECT id FROM tags WHERE name = ?').get(n) : null;
+  if (!row) return null;
+  db.prepare('DELETE FROM item_tags WHERE item_id = ? AND tag_id = ?').run(Number(itemId), row.id);
+  db.prepare('INSERT OR REPLACE INTO item_tag_removed(item_id, tag_id, ts) VALUES(?, ?, ?)').run(Number(itemId), row.id, now());
+  // The tagger hears which tags people take off, so it uses them less loosely.
+  const wrong = getSetting('wrongTags', {}) || {};
+  wrong[n] = (wrong[n] || 0) + 1;
+  const keep = Object.entries(wrong).sort((a, b) => b[1] - a[1]).slice(0, 60);
+  setSetting('wrongTags', Object.fromEntries(keep));
+  touchPool();
+  return n;
+}
+
 export function addTags(itemId, tags, origin, weight = 0.5) {
   const db = getDb();
+  removedTable();
   const stmt = db.prepare('INSERT INTO item_tags(item_id, tag_id, weight, origin) VALUES(?, ?, ?, ?) ON CONFLICT(item_id, tag_id, origin) DO UPDATE SET weight = MAX(weight, excluded.weight)');
+  const gone = origin === 'user' ? null : db.prepare('SELECT 1 FROM item_tag_removed WHERE item_id = ? AND tag_id = ?');
   for (const t of tags) {
     const name = typeof t === 'string' ? t : t.name;
     if (!postTagOk(name)) continue;
@@ -71,6 +103,7 @@ export function addTags(itemId, tags, origin, weight = 0.5) {
     const id = tagId(name, typeof t === 'string' ? 'tag' : t.kind || 'tag');
     // A name found in the title (or looked up) is a person, even when a site also used it as a plain tag.
     if (id && t.kind === 'performer' && origin === 'title') db.prepare("UPDATE tags SET kind = 'performer' WHERE id = ? AND kind = 'tag'").run(id);
+    if (id && gone?.get(itemId, id)) continue;
     if (id) stmt.run(itemId, id, w, origin);
   }
 }
@@ -215,10 +248,18 @@ export function relatedTags(names, limit = 6) {
 // One pass over posts stored before OC markers and moderator posts were handled.
 export function cleanupTitles() {
   const db = getDb();
-  const rows = db.prepare("SELECT id, title FROM items WHERE title LIKE '%oc%' OR title LIKE '%o.c%' OR title LIKE '%original%'").all();
+  const rows = db.prepare("SELECT id, title FROM items WHERE title LIKE '%oc%' OR title LIKE '%o.c%' OR title LIKE '%og%' OR title LIKE '%o.g%' OR title LIKE '%original%'").all();
   const upd = db.prepare('UPDATE items SET title = ?, oc = 1 WHERE id = ?');
   let n = 0;
   db.transaction(() => { for (const r of rows) { const x = stripOc(r.title); if (x.oc) { upd.run(x.title, r.id); n++; } } })();
+  // Posts that only had an "OC" or "original content" tag: the badge instead, the tag goes.
+  const names = [...OC_TAGS];
+  const tagged = db.prepare(`SELECT DISTINCT it.item_id FROM item_tags it JOIN tags t ON t.id = it.tag_id WHERE t.name IN (${names.map(() => '?').join(',')})`).all(...names).map((r) => r.item_id);
+  db.transaction(() => {
+    for (const id of tagged) db.prepare('UPDATE items SET oc = 1 WHERE id = ?').run(id);
+    db.prepare(`DELETE FROM item_tags WHERE tag_id IN (SELECT id FROM tags WHERE name IN (${names.map(() => '?').join(',')}))`).run(...names);
+  })();
+  n += tagged.length;
   const b = recheckBlocks();
   return { oc: n, blocked: b.blocked };
 }

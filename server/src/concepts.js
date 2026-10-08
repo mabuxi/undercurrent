@@ -149,7 +149,67 @@ const SYN = {
   'size queen': ['size queen'],
   futanari: ['futanari', 'futa'],
   furry: ['furry', 'anthro'],
-  femdom: ['femdom']
+  femdom: ['femdom'],
+  european: ['european', 'white', 'caucasian', 'white girl', 'white guy', 'white woman', 'white man', 'europe'],
+  scandinavian: ['scandinavian', 'swedish', 'norwegian', 'danish', 'nordic', 'finnish'],
+  'eastern european': ['eastern european', 'russian', 'ukrainian', 'polish', 'czech', 'slavic', 'romanian', 'hungarian'],
+  british: ['british', 'english', 'scottish', 'irish', 'welsh', 'uk'],
+  french: ['french', 'francaise', 'française', 'french girl', 'french guy'],
+  german: ['german', 'deutsch', 'german girl', 'german guy'],
+  italian: ['italian', 'italiana', 'italiano'],
+  spanish: ['spanish', 'spain', 'espanola', 'española'],
+  ebony: ['ebony', 'ebony girl'],
+  african: ['african', 'nigerian', 'ghanaian', 'kenyan'],
+  caribbean: ['caribbean', 'jamaican', 'dominican', 'haitian'],
+  japanese: ['japanese', 'jav', 'japan'],
+  korean: ['korean', 'kpop'],
+  chinese: ['chinese', 'china'],
+  thai: ['thai', 'thailand'],
+  filipino: ['filipino', 'filipina', 'pinay', 'pinoy'],
+  vietnamese: ['vietnamese'],
+  brazilian: ['brazilian', 'brasileira', 'brazil'],
+  colombian: ['colombian', 'colombiana'],
+  mexican: ['mexican', 'mexicana'],
+  'puerto rican': ['puerto rican'],
+  turkish: ['turkish', 'turk'],
+  persian: ['persian', 'iranian'],
+  moroccan: ['moroccan', 'maghreb'],
+  pakistani: ['pakistani'],
+  bengali: ['bengali', 'bangladeshi'],
+  'girl next door': ['girl next door', 'girlnextdoor'],
+  cougar: ['cougar', 'cougars'],
+  tomboy: ['tomboy'],
+  'alt girl': ['alt girl', 'goth', 'goth girl', 'emo', 'egirl', 'e girl', 'alternative girl'],
+  otter: ['otter', 'otters'],
+  hunk: ['hunk', 'hunks', 'stud'],
+  couple: ['couple', 'couples', 'amateur couple', 'real couple', 'married couple'],
+  swingers: ['swingers', 'swinger', 'swapping', 'wife swap', 'partner swap'],
+  hotwife: ['hotwife', 'hot wife', 'shared wife', 'wife sharing'],
+  mmf: ['mmf', 'bisexual threesome', 'bi threesome'],
+  ffm: ['ffm', 'two girls one guy']
+};
+
+// Ethnicities go from a continent to a country or region: picking the continent shows what is inside it, and a
+// continent's kink matches all of them.
+export const CHILDREN = {
+  european: ['scandinavian', 'eastern european', 'british', 'french', 'german', 'italian', 'spanish'],
+  black: ['ebony', 'african', 'caribbean'],
+  asian: ['japanese', 'korean', 'chinese', 'thai', 'filipino', 'vietnamese'],
+  latino: ['brazilian', 'colombian', 'mexican', 'puerto rican'],
+  arab: ['turkish', 'persian', 'moroccan'],
+  indian: ['pakistani', 'bengali']
+};
+export const PARENT = Object.fromEntries(Object.entries(CHILDREN).flatMap(([p, list]) => list.map((c) => [c, p])));
+
+// Who a concept is about, for the welcome steps: m (men), w (women) or mix (a man and a woman together). Concepts
+// without one fit everyone. Only men: no w or mix. Only women: no m or mix.
+export const GENDER_OF = {
+  twink: 'm', daddy: 'm', jock: 'm', bear: 'm', femboy: 'm', 'straight guy': 'm', 'gay for pay': 'm', otter: 'm', hunk: 'm',
+  'hairy chest': 'm', beard: 'm', bbc: 'm', bwc: 'm', uncut: 'm', cut: 'm', veiny: 'm', 'big balls': 'm', 'cock worship': 'm', jockstrap: 'm', bulge: 'm', prostate: 'm',
+  milf: 'w', cougar: 'w', 'girl next door': 'w', tomboy: 'w', 'alt girl': 'w', lesbian: 'w', ebony: 'w',
+  'big tits': 'w', 'natural tits': 'w', 'small tits': 'w', curvy: 'w', petite: 'w', bbw: 'w', lingerie: 'w', heels: 'w', 'yoga pants': 'w',
+  titfuck: 'w', squirting: 'w', 'pussy licking': 'w', scissoring: 'w', 'strap on': 'w', femdom: 'w',
+  couple: 'mix', swingers: 'mix', hotwife: 'mix', mmf: 'mix', ffm: 'mix', cuckold: 'mix'
 };
 
 // On almost every post of this kind, or not a thing you can be into: never a kink, whatever the numbers say.
@@ -165,7 +225,9 @@ const COLORS = new Set(['black', 'white', 'grey', 'gray', 'red', 'blue', 'pink',
 const PERSON = new Set(['man', 'men', 'guy', 'guys', 'gay', 'male', 'boy', 'boys', 'stud', 'daddy', 'twink', 'jock', 'hunk', 'muscle', 'cock', 'dick', 'woman', 'women', 'girl', 'girls', 'teen', 'couple']);
 
 const FAMILY_OF = {
-  latino: 'ethnicity', asian: 'ethnicity', black: 'ethnicity', arab: 'ethnicity', indian: 'ethnicity', interracial: 'ethnicity',
+  european: 'ethnicity', latino: 'ethnicity', asian: 'ethnicity', black: 'ethnicity', arab: 'ethnicity', indian: 'ethnicity', interracial: 'ethnicity',
+  scandinavian: 'ethnicity', 'eastern european': 'ethnicity', british: 'ethnicity', french: 'ethnicity', german: 'ethnicity', italian: 'ethnicity', spanish: 'ethnicity', ebony: 'ethnicity', african: 'ethnicity', caribbean: 'ethnicity', japanese: 'ethnicity', korean: 'ethnicity', chinese: 'ethnicity', thai: 'ethnicity', filipino: 'ethnicity', vietnamese: 'ethnicity', brazilian: 'ethnicity', colombian: 'ethnicity', mexican: 'ethnicity', 'puerto rican': 'ethnicity', turkish: 'ethnicity', persian: 'ethnicity', moroccan: 'ethnicity', pakistani: 'ethnicity', bengali: 'ethnicity',
+  'girl next door': 'types', cougar: 'types', tomboy: 'types', 'alt girl': 'types', otter: 'types', hunk: 'types', couple: 'types', swingers: 'types', hotwife: 'types', mmf: 'group', ffm: 'group',
   muscle: 'body', abs: 'body', hairy: 'body', 'hairy chest': 'body', beard: 'body', smooth: 'body', chubby: 'body', thighs: 'body', feet: 'body', armpits: 'body', tattoo: 'body', piercing: 'body', 'bubble butt': 'body', 'big ass': 'body', 'big tits': 'body', 'small tits': 'body', blonde: 'body', redhead: 'body', brunette: 'body', petite: 'body', curvy: 'body', bbw: 'body',
   uncut: 'body', cut: 'body', veiny: 'body', bwc: 'body', bbc: 'body', 'big balls': 'body',
   twink: 'types', daddy: 'types', jock: 'types', bear: 'types', femboy: 'types', '18 25': 'types', mature: 'types', milf: 'types', trans: 'types', 'straight guy': 'types',
@@ -205,7 +267,7 @@ export const FAMILIES = {
   drawn: { name: 'Drawn and animated', color: '#B6A8B0' }
 };
 
-const DISPLAY = { '18 25': 'Young adults 18+', bwc: 'BWC', bbc: 'BBC', bbw: 'BBW', milf: 'MILF', pov: 'POV', 'close up': 'Close-up', 'step family': 'Step family', 'ai generated': 'AI generated', 'huge load': 'Huge load', 'big balls': 'Big balls', 'hairy chest': 'Hairy chest', 'dirty talk': 'Dirty talk', 'size difference': 'Size difference', 'group sex': 'Group sex', 'double penetration': 'Double penetration', 'face fucking': 'Face fucking', 'cock worship': 'Cock worship', 'ruined orgasm': 'Ruined orgasm', 'bubble butt': 'Bubble butt', 'straight guy': 'Straight guys', 'gay for pay': 'Gay for pay', 'natural tits': 'Natural tits', 'yoga pants': 'Yoga pants', 'strap on': 'Strap-on', 'first time': 'First time', 'pussy licking': 'Pussy licking', 'big ass': 'Big ass', 'big tits': 'Big tits', 'small tits': 'Small tits', 'size queen': 'Size queen', sloppy: 'Sloppy blowjob', uncut: 'Uncut', cut: 'Cut', 'reverse cowgirl': 'Reverse cowgirl', 'standing sex': 'Standing', 'sixty nine': '69', spooning: 'Spooning', 'prone bone': 'Prone bone', 'mating press': 'Mating press' };
+const DISPLAY = { '18 25': 'Young adults 18+', bwc: 'BWC', bbc: 'BBC', bbw: 'BBW', milf: 'MILF', pov: 'POV', 'close up': 'Close-up', 'step family': 'Step family', 'ai generated': 'AI generated', 'huge load': 'Huge load', 'big balls': 'Big balls', 'hairy chest': 'Hairy chest', 'dirty talk': 'Dirty talk', 'size difference': 'Size difference', 'group sex': 'Group sex', 'double penetration': 'Double penetration', 'face fucking': 'Face fucking', 'cock worship': 'Cock worship', 'ruined orgasm': 'Ruined orgasm', 'bubble butt': 'Bubble butt', 'straight guy': 'Straight guys', 'gay for pay': 'Gay for pay', 'natural tits': 'Natural tits', 'yoga pants': 'Yoga pants', 'strap on': 'Strap-on', 'first time': 'First time', 'pussy licking': 'Pussy licking', 'big ass': 'Big ass', 'big tits': 'Big tits', 'small tits': 'Small tits', 'size queen': 'Size queen', sloppy: 'Sloppy blowjob', uncut: 'Uncut', cut: 'Cut', 'reverse cowgirl': 'Reverse cowgirl', 'standing sex': 'Standing', 'sixty nine': '69', spooning: 'Spooning', 'prone bone': 'Prone bone', 'mating press': 'Mating press', european: 'European / White', black: 'Black / African', asian: 'Asian', latino: 'Latino / Latina', arab: 'Middle Eastern / Arab', indian: 'South Asian / Indian', 'eastern european': 'Eastern European', 'puerto rican': 'Puerto Rican', 'girl next door': 'Girl next door', 'alt girl': 'Alt girl', mmf: 'MMF', ffm: 'FFM', hotwife: 'Hotwife' };
 
 const VARIANT = new Map();
 for (const [concept, list] of Object.entries(SYN)) {
@@ -264,6 +326,10 @@ export function conceptsOf(tag) {
   return [n];
 }
 
+// Too common to become a kink by itself from what you watch, but fine to pick yourself in the welcome steps.
+export const PICK_ONLY = new Set(['european', 'british', 'french', 'couple']);
+export const pickable = (c) => PICK_ONLY.has(c) || isKinkConcept(c);
+
 export function isKinkConcept(c) {
   if (!c || NOT_KINK.has(c)) return false;
   if (!knownConcept(c) && DESCRIPTIVE.test(c)) return false;
@@ -283,7 +349,7 @@ export function conceptName(c) {
 
 // Every spelling we know for a concept, for matching posts that use a word nobody here has liked yet.
 export function knownVariants(c) {
-  return [c, ...(SYN[c] || [])];
+  return [...new Set([c, ...(SYN[c] || []), ...(CHILDREN[c] || []).flatMap((ch) => [ch, ...(SYN[ch] || [])])])];
 }
 
 export function knownConcept(c) {

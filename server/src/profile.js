@@ -1,4 +1,5 @@
 import { getDb, now, tagId, normalizeTag, getSetting, setSetting } from './db.js';
+import { isSourceName } from './sourcenames.js';
 import { itemTags, getItem, setState, specOf } from './store.js';
 
 const DAY = 86400000;
@@ -82,7 +83,7 @@ export function bump(key, delta, t = now(), countIt = true) {
 
 export function keysForItem(item, tags) {
   const keys = tags.map((tg) => [`t:${tg.id}`, tg.weight * Math.max(0.25, Math.min(1.3, specOf(tg.id)))]);
-  if (item.community) keys.push([`c:${item.community.toLowerCase()}`, 0.6]);
+  if (item.community && !isSourceName(item.community)) keys.push([`c:${item.community.toLowerCase()}`, 0.6]);
   if (item.author) keys.push([`a:${item.source}:${String(item.author).toLowerCase()}`, 0.6]);
   keys.push([`f:${item.format}`, 0.4]);
   keys.push([`s:${item.source}`, 0.35]);

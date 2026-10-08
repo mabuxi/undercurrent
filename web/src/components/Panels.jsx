@@ -247,7 +247,7 @@ export function PerformerPanel({ name, itemId, onBlocked }) {
       <ThumbGrid items={d.items} loading={loading} onOpen={(it) => setFilters({ tags: [name.toLowerCase()] }, { focus: it.id })} />
       <div className="wbtns">
         <button type="button" className={`ghost-btn small ${d.followed ? '' : 'accent'}`} onClick={follow}><Icon name={d.followed ? 'check' : 'plus'} />{d.followed ? plain(t('Following [button state]')) : t('Follow everywhere')}</button>
-        <button type="button" className="ghost-btn small" onClick={() => runSearch(`content from ${name}`).catch((e) => toast(e.message))}><Icon name="search" />{t('Look up {name}', { name })}</button>
+        <button type="button" className="ghost-btn small" onClick={() => runSearch(`content from ${name}`).catch((e) => toast(e.message))}><Icon name="search" />{t('Search {name}', { name })}</button>
         <BlockButton name={d.name} onBlock={async () => {
           try { const r = await api('/creators/block', { method: 'POST', body: { kind: 'performer', name, itemId } }); toast(tn(r.hidden, 'Blocked {name}: {n} post hidden. Pick what you did not like about them, or leave it.', 'Blocked {name}: {n} posts hidden. Pick what you did not like about them, or leave it.', { name: d.name })); onBlocked?.(); } catch (e) { toast(e.message); }
         }} />
@@ -325,7 +325,7 @@ export function PersonPanel({ person, item }) {
 }
 
 export function ProfilePanel({ item, onBlocked }) {
-  const { setFilters, toast } = useApp();
+  const { setFilters, toast, runSearch } = useApp();
   const [p, setP] = useState(null);
   const [error, setError] = useState(null);
   const [fetching, setFetching] = useState(true);
@@ -348,13 +348,6 @@ export function ProfilePanel({ item, onBlocked }) {
       toast(tn(r.followed.length, 'Following {name} on {n} source. New posts show up in your feed as Following.', 'Following {name} on {n} sources. New posts show up in your feed as Following.', { name: p.name }));
     } catch (e) { toast(e.message); }
   }
-  async function followCommunity() {
-    const c = item.community || '';
-    const isReddit = item.source === 'reddit' && c.startsWith('r/');
-    const value = isReddit ? `reddit|${c.slice(2)}` : `${item.source}|${c}`;
-    await api('/follow', { method: 'POST', body: { kind: 'community', value, on: true, label: c } });
-    toast(t('Added {name} to your sources. Its new posts are mixed into your feed.', { name: c }));
-  }
   if (error) return <p className="answer">{error}</p>;
   if (!p) return <p className="answer">{t('Loading profile…')}</p>;
   return (
@@ -365,9 +358,8 @@ export function ProfilePanel({ item, onBlocked }) {
       <ThumbGrid items={p.items} loading={fetching} onOpen={(it) => setFilters({ author: p.name }, { focus: it.id })} />
       <div className="wbtns">
         {p.canFollow ? <button type="button" className={`ghost-btn small ${p.followed ? '' : 'accent'}`} onClick={toggleFollow}><Icon name={p.followed ? 'check' : 'plus'} />{p.followed ? plain(t('Following [button state]')) : t('Follow')}</button> : null}
-        <button type="button" className="ghost-btn small" onClick={() => setFilters({ author: p.name })}><Icon name="person" />{t('Only this creator in the feed')}</button>
+        <button type="button" className="ghost-btn small" onClick={() => runSearch(`content from ${p.name}`).catch((e) => toast(e.message))}><Icon name="search" />{t('Search {name}', { name: p.name })}</button>
         {p.profileUrl ? <a className="ghost-btn small" href={p.profileUrl} target="_blank" rel="noreferrer noopener"><Icon name="open" />{t('Open on {source}', { source: SOURCE_NAME[item.source] || item.source })}</a> : null}
-        {item.community && ['reddit', 'lemmy'].includes(item.source) ? <button type="button" className="ghost-btn small" onClick={followCommunity}><Icon name="plus" />{t('Add {name} as a source', { name: item.community })}</button> : null}
         <BlockButton name={p.name} onBlock={async () => {
           try { const r = await api('/creators/block', { method: 'POST', body: { kind: 'author', source: item.source, name: p.name, itemId: item.id } }); toast(tn(r.hidden, 'Blocked {name}: {n} post hidden. Pick what you did not like about them, or leave it.', 'Blocked {name}: {n} posts hidden. Pick what you did not like about them, or leave it.', { name: p.name })); onBlocked?.(); } catch (e) { toast(e.message); }
         }} />
