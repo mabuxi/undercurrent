@@ -29,7 +29,7 @@ function put(kind, title, body, data, confidence) {
   return r.changes > 0;
 }
 
-function evidence(limit = 24) {
+export function evidence(limit = 24) {
   const eng = engagement(now() - 30 * 86400000, { limit: 400, minPoints: 2 }).sort((a, b) => b.p - a.p).slice(0, limit);
   const tagMap = tagsForItems(eng.map((e) => e.item_id));
   const spec = tagSpecificity().map;

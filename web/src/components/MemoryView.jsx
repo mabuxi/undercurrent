@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { ago, api } from '../api.js';
 import { useApp } from '../context.jsx';
+import { FantasyTools, OwnFantasy } from './FantasyEdit.jsx';
+import { deeperSpec } from './Windows.jsx';
 import { Icon } from '../icons.jsx';
 import { t, tn } from '../i18n.js';
 import HistoryDb from './History.jsx';
@@ -165,7 +167,7 @@ function PromptLog() {
 }
 
 function FantasyIdeas({ onSaved }) {
-  const { toast } = useApp();
+  const { toast, openMode } = useApp();
   const [list, setList] = useState(null);
   const [busy, setBusy] = useState(false);
   const load = () => api('/suggestions?kind=fantasy').then((r) => setList(r.suggestions)).catch(() => setList([]));
@@ -187,8 +189,10 @@ function FantasyIdeas({ onSaved }) {
               <span className="wtext">{sg.body}</span>
               <div className="fc-kinks">{(sg.data.kinks || []).map((k) => <span key={`k-${k.id || k.name}`} className="chip" style={{ '--c': k.color || '#F6C35B', '--c2': `color-mix(in srgb, ${k.color || '#F6C35B'} 16%, transparent)` }}>{k.name}</span>)}{(sg.data.tags || []).filter((x) => !(sg.data.kinks || []).some((k) => k.name.toLowerCase() === x)).map((x) => <span key={`t-${x}`} className="chip ghost">{x}</span>)}</div>
               {sg.data.why ? <span className="mini-meta">{sg.data.why}</span> : null}
+              <FantasyTools f={{ title: sg.title, scenario: sg.body, tags: sg.data.tags || [] }} avoid={list.map((x) => x.body)} onUpdate={async (r) => { const u = await api(`/suggestions/${sg.id}`, { method: 'PATCH', body: r }); setList((cur) => cur.map((x) => (x.id === sg.id ? u.suggestion : x))); toast(t('Updated. Shaped by you, so it counts as at least a 90% match.')); }} />
               <div className="memacts">
                 <button type="button" className="ghost-btn small accent" onClick={() => act(sg, 'save')}><Icon name="check" />{t('Save')}</button>
+                <button type="button" className="ghost-btn small" onClick={() => openMode('deeper', { fantasy: { title: sg.title, scenario: sg.body, tags: sg.data.tags || [] } })}><Icon name="spark" />{t('Go deeper')}</button>
                 <button type="button" className="ghost-btn small" onClick={() => act(sg, 'dismiss')}><Icon name="less" />{t('Not for me')}</button>
               </div>
             </div>
@@ -336,24 +340,27 @@ export default function MemoryView() {
                 <div className={`fantcard${f.saved ? ' saved' : ''}`} key={f.id}>
                   <div className="fc-head"><strong>{f.name}</strong><span className="fc-pct" title={t('Match with you')}>{f.match}%</span></div>
                   {f.description ? <span className="wtext">{f.description}</span> : null}
+                  {f.tags?.length ? <div className="fc-tags">{f.tags.map((x) => <span key={x} className="chip ghost">{x}</span>)}</div> : null}
                   <div className="fc-kinks">{f.kinks.length ? f.kinks.map((k) => <span key={k.id || k.name} className="chip" style={{ '--c': k.color || '#F6C35B', '--c2': `color-mix(in srgb, ${k.color || '#F6C35B'} 16%, transparent)` }}>{k.name}</span>) : <span className="mini-meta">{t('no kinks linked')}</span>}</div>
                   <div className="memacts">
                     <button type="button" className={`ghost-btn small${f.saved ? ' accent' : ''}`} onClick={async () => { await api(`/fantasies/${f.id}`, { method: 'PATCH', body: { saved: !f.saved } }); refreshMeta(); }}><Icon name="save" filled={!!f.saved} />{f.saved ? t('Saved [button state]') : t('Save')}</button>
+                    <button type="button" className="ghost-btn small" onClick={() => openMode('deeper', { fantasy: deeperSpec(f) })}><Icon name="spark" />{t('Go deeper')}</button>
                     <button type="button" className="icon-btn" onClick={async () => { await api(`/fantasies/${f.id}`, { method: 'DELETE' }); refreshMeta(); }} aria-label={t('Delete fantasy')}><Icon name="trash" /></button>
                   </div>
                 </div>
               ))}
             </div>
           ) : null}
-          <form className="fantform" onSubmit={async (e) => { e.preventDefault(); if (!newFant.name.trim()) { toast(t('Give the fantasy a name.')); return; } await api('/fantasies', { method: 'POST', body: newFant }); setNewFant({ name: '', description: '', kinks: [] }); refreshMeta(); }}>
+          <div className="fantform">
             <span className="fb-label">{t('New fantasy')}</span>
-            <input id="newFantName" value={newFant.name} onChange={(e) => setNewFant({ ...newFant, name: e.target.value })} placeholder={t('Fantasy name')} aria-label={t('Fantasy name')} />
-            <textarea id="newFantDesc" value={newFant.description} onChange={(e) => setNewFant({ ...newFant, description: e.target.value })} rows={2} placeholder={t('Describe the scenario in your own words')} aria-label={t('Fantasy description')} />
-            <div className="chiprow">{kinks.filter((k) => k.status === 'active').map((k) => (
-              <button type="button" key={k.id} className={`chip btn${newFant.kinks.includes(k.id) ? ' on' : ''}`} onClick={() => setNewFant({ ...newFant, kinks: newFant.kinks.includes(k.id) ? newFant.kinks.filter((x) => x !== k.id) : [...newFant.kinks, k.id] })}>{k.name}</button>
-            ))}</div>
-            <button type="submit" className="ghost-btn small accent"><Icon name="plus" />{t('Add fantasy')}</button>
-          </form>
+            <OwnFantasy
+              onAdd={async (o) => { await api('/fantasies', { method: 'POST', body: { ...o, kinks: newFant.kinks } }); setNewFant({ name: '', description: '', kinks: [] }); refreshMeta(); toast(t('Fantasy added.')); }}
+            >
+              <div className="chiprow"><span className="wnote">{t('Link it to your kinks (optional, the tags link it too):')}</span>{kinks.filter((k) => k.status === 'active' && !k.isGroup).map((k) => (
+                <button type="button" key={k.id} className={`chip btn${newFant.kinks.includes(k.id) ? ' on' : ''}`} onClick={() => setNewFant({ ...newFant, kinks: newFant.kinks.includes(k.id) ? newFant.kinks.filter((x) => x !== k.id) : [...newFant.kinks, k.id] })}>{k.name}</button>
+              ))}</div>
+            </OwnFantasy>
+          </div>
         </div>
       </div>
 

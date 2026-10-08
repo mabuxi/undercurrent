@@ -12,6 +12,10 @@ import { listMemory } from './memory.js';
 import { userLimits } from './safety.js';
 import { displayTag } from './tagquality.js';
 import { tr, trn } from './i18n.js';
+import { suggestFor } from './setup.js';
+import { knownVariants } from './concepts.js';
+import { deeperQuick, fantasyTags } from './deeper.js';
+import { discoveryCandidates } from './discovery.js';
 
 const same = (a, b) => String(a || '').toLowerCase().replace(/[^a-z0-9]+/g, '') === String(b || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 
@@ -66,7 +70,7 @@ function pickLayout(r) {
 }
 const SAVES = new Set(['recentSaved', 'oldSaves', 'savedPick']);
 let LAST_SAVES = 0;
-const RARE = new Set(['fantasySuggest', 'combo', 'tonight', 'analytics', 'map', 'limits', 'savedFant', 'moodCheck', 'rateRecent', 'recentSaved', 'oldSaves', 'shortsRail', 'memory', 'newKink', 'savedPick']);
+const RARE = new Set(['fantasySuggest', 'fantasyDeep', 'combo', 'tonight', 'analytics', 'map', 'limits', 'savedFant', 'moodCheck', 'rateRecent', 'recentSaved', 'oldSaves', 'shortsRail', 'memory', 'newKink', 'savedPick']);
 
 // Windows that come in variants take turns, so two analytics or map windows in a row never look the same.
 const TURN = new Map();
@@ -292,24 +296,42 @@ function build(type, r, ctx) {
     case 'analytics': return analytics(r, ctx);
     case 'lately': return ctx.kinks.length ? { type, title: tr('Lately vs all time'), meta: tr('last 7 days'), kinks: ctx.kinks.slice(0, 6), color: '#7FC49B' } : null;
     case 'map': {
-      const v = turn('map', 3);
-      if (v === 1 && ctx.groups.length) {
-        const groups = ctx.groups.filter((g) => ctx.children.get(g.id)?.length).map((g) => {
-          const kids = ctx.children.get(g.id);
-          return { id: g.id, name: g.label || g.name, color: g.color, score: Math.round(kids.reduce((a, b) => a + (b.allTime + b.lately) / 2, 0) / kids.length), kinks: kids.slice(0, 5).map((k) => ({ id: k.id, name: k.label || k.name, color: k.color })) };
-        }).sort((a, b) => b.score - a.score).slice(0, 5);
-        if (groups.length) return { type: 'map', variant: 'groups', title: tr('Your map: groups'), meta: trn(groups.length, '{n} family of kinks', '{n} families of kinks'), groups, color: '#B6A8B0' };
+      // Your map, two ways in turn: what you are into right now (and what is rising or fading), and kinks next to
+      // yours you have not opened yet, each with a post to try.
+      const v = turn('map', 2);
+      const live = ctx.kinks.filter((x) => !x.isGroup && x.status === 'active');
+      if (v === 1) {
+        const picks = [...new Set(live.flatMap((x) => x.concepts || []))].slice(0, 12);
+        // Also leave out kinks you turned off, and what you already watch a lot without it being a kink.
+        const have = new Set(listKinks({ includeHidden: true }).flatMap((x) => x.concepts || []));
+        const tagId = getDb().prepare('SELECT id FROM tags WHERE name = ?');
+        const opened = (names) => names.some((n) => { const row = tagId.get(n); const v = row ? ctx.aff.get(`t:${row.id}`)?.long || 0 : 0; return v > 0.15 || v < -0.05; });
+        const next = [];
+        for (const sg of suggestFor(picks, null, { male: genderPrefs().male })) {
+          if (next.length >= 4) break;
+          if (have.has(sg.concept)) continue;
+          const tags = knownVariants(sg.concept).slice(0, 8);
+          if (opened(tags)) continue;
+          const items = feed({ tags }, 1, 0);
+          if (items.length) next.push({ concept: sg.concept, name: sg.name, color: sg.color || '#B79BF0', family: sg.family, tags, item: items[0] });
+        }
+        if (next.length >= 2) return { type: 'map', variant: 'next', title: tr('Your map: next to explore'), meta: tr('next to what you like, not opened yet'), next, color: '#B79BF0' };
       }
-      if (v === 2) {
-        const b = brain();
-        const name = new Map(b.nodes.map((n) => [n.key, n]));
-        const links = b.edges.filter((e) => e.a[0] === 'k' && e.b[0] === 'k').sort((x, y) => y.w - x.w).slice(0, 5)
-          .map((e) => ({ a: { id: name.get(e.a)?.id, name: name.get(e.a)?.name, color: name.get(e.a)?.color }, b: { id: name.get(e.b)?.id, name: name.get(e.b)?.name, color: name.get(e.b)?.color }, w: e.w }));
-        if (links.length) return { type: 'map', variant: 'links', title: tr('Your map: strongest links'), meta: tr('kinks your brain ties together'), links, color: '#B6A8B0' };
-      }
-      return ctx.kinks.length ? { type, variant: 'brain', title: tr('Your map'), meta: `${trn(ctx.kinks.length, '{n} kink', '{n} kinks')} · ${trn(ctx.fantasies.length, '{n} fantasy', '{n} fantasies')}`, kinks: ctx.kinks.slice(0, 8), fantasies: ctx.fantasies.slice(0, 4), color: '#B6A8B0' } : null;
+      if (!live.length) return null;
+      const now = live.slice().sort((a, b2) => b2.now + b2.lately - a.now - a.lately).slice(0, 9).map((x) => ({ id: x.id, name: x.label || x.name, color: x.color, now: x.now, delta: x.lately - x.allTime }));
+      return { type: 'map', variant: 'now', title: tr('Your map: right now'), meta: trn(live.length, '{n} kink', '{n} kinks'), now, color: '#B6A8B0' };
     }
     case 'limits': return { type, title: tr('Hard limits'), meta: tr('never shown'), limits: userLimits(), color: '#E07070' };
+    case 'fantasyDeep': {
+      // Go deeper into one of your fantasies: its first question right here, the rest in its own view.
+      const pool = [...ctx.fantasies.map((f) => ({ id: f.id, title: f.name, scenario: f.description, tags: fantasyTags(f, ctx.kinks), kinks: f.kinks })),
+        ...listSuggestions('fantasy', { limit: 4 }).map((sg) => ({ suggestion: sg.id, title: sg.title, scenario: sg.body, tags: sg.data.tags || [], kinks: sg.data.kinks || [] }))].filter((f) => f.tags.length);
+      if (!pool.length) return null;
+      const f = pool[Math.floor(r() * pool.length)];
+      const step = deeperQuick({ tags: f.tags });
+      if (step.done || !step.options?.length) return null;
+      return { type, title: tr('Go deeper: {name}', { name: f.title }), meta: tr('find what you crave in it'), fantasy: f, step: { dim: step.dim, question: step.question, options: step.options.slice(0, 4) }, items: step.posts.slice(0, 3), color: '#F6C35B' };
+    }
     case 'savedFant': return { type, title: tr('Your fantasies'), meta: tr('saved scenarios'), fantasies: ctx.fantasies, color: '#F6C35B' };
     case 'journey': {
       const mode = ['close', 'branch', 'genre'][turn('journey', 3)];
@@ -318,12 +340,19 @@ function build(type, r, ctx) {
       const kk = f ? null : k;
       if (!f && !kk) return { type, title: tr('Journeys'), meta: tr('a guided path, start to end'), kinks: ctx.kinks.slice(0, 3), color: '#F6C35B' };
       const subject = f ? { kind: 'fantasy', id: f.id, name: f.name, color: '#F6C35B' } : { kind: 'kink', id: kk.id, name: kk.label || kk.name, color: kk.color };
-      const label = tr(mode === 'close' ? 'Dive deeper into {name}' : mode === 'branch' ? 'Branch out from {name}' : 'Surprise me near {name}', { name: subject.name });
-      const blurb = mode === 'close' ? tr('Your strongest matches for it, from quick visuals to a longer piece at the end.')
-        : mode === 'branch' ? tr('Starts where you are comfortable, then crosses into the kink it pairs with best.')
-          : tr('Things you have not seen yet from the same family, picked to still fit you.');
-      const preview = journey({ kink: kk?.id, fantasy: f?.id, mode, limit: 3 }).steps.map(slim);
-      return { type: 'journeyOne', title: label, meta: mode === 'close' ? tr('journey · deeper') : mode === 'branch' ? tr('journey · branch out') : tr('journey · same family'), subject, mode, blurb, items: preview, color: subject.color };
+      // A discovery journey only when there is somewhere new next to it; the destination stays a surprise, so the
+      // preview shows where it starts.
+      let m2 = mode;
+      if (m2 === 'genre') {
+        const anchor = f ? fantasyTags(f, ctx.kinks) : (kk.tags || []).slice(0, 5).map((x) => x.name);
+        if (!discoveryCandidates({ anchor, limit: 3 }).candidates.length) m2 = 'close';
+      }
+      const label = tr(m2 === 'close' ? 'Dive deeper into {name}' : m2 === 'branch' ? 'Branch out from {name}' : 'Discover something new near {name}', { name: subject.name });
+      const blurb = m2 === 'close' ? tr('Your strongest matches for it, from quick visuals to a longer piece at the end.')
+        : m2 === 'branch' ? tr('Starts where you are comfortable, then crosses into the kink it pairs with best.')
+          : tr('A journey to a kind of post you have never opened that sits right next to it. Where it ends stays a surprise.');
+      const preview = journey({ kink: kk?.id, fantasy: f?.id, mode: m2 === 'genre' ? 'close' : m2, limit: 3 }).steps.map(slim);
+      return { type: 'journeyOne', title: label, meta: m2 === 'close' ? tr('journey · deeper') : m2 === 'branch' ? tr('journey · branch out') : tr('journey · somewhere new'), subject, mode: m2, blurb, items: preview, color: subject.color };
     }
     case 'combo': {
       const list = listSuggestions('combo', { limit: 12 });
@@ -447,7 +476,7 @@ function analytics(r, ctx) {
 
 // Content windows (categories, formats, kinks, mixes, fantasies, creators) make up most of the column;
 // every two or three windows one of the other kinds (numbers, map, journeys, memory…) comes in between.
-const CONTENT_W = [['formatMix', 7], ['kinkDeep', 4], ['kinkList', 4], ['kinkMix', 3], ['nearby', 2], ['pair', 2], ['combo', 2], ['fantasy', 2], ['fantasySuggest', 2], ['newKink', 2], ['performer', 2], ['creator', 2], ['hotThread', 3], ['stories', 1], ['gifs', 1], ['shortsRail', 1], ['gallery', 1], ['trending', 1], ['discovery', 1], ['community', 1], ['followLatest', 2], ['followSpotlight', 1], ['following', 1], ['kinkSpot', 1], ['tagNow', 1]];
+const CONTENT_W = [['formatMix', 7], ['kinkDeep', 4], ['kinkList', 4], ['kinkMix', 3], ['nearby', 2], ['pair', 2], ['combo', 2], ['fantasy', 2], ['fantasySuggest', 2], ['fantasyDeep', 2], ['newKink', 2], ['performer', 2], ['creator', 2], ['hotThread', 3], ['stories', 1], ['gifs', 1], ['shortsRail', 1], ['gallery', 1], ['trending', 1], ['discovery', 1], ['community', 1], ['followLatest', 2], ['followSpotlight', 1], ['following', 1], ['kinkSpot', 1], ['tagNow', 1]];
 const OTHER_W = [['analytics', 4], ['map', 3], ['journey', 4], ['rateRecent', 2], ['recentSaved', 0.5], ['oldSaves', 0.5], ['tonight', 1], ['limits', 1], ['savedFant', 1], ['moodCheck', 1], ['memory', 1]];
 const RHYTHM = [0, 0, 1, 0, 0, 0, 1];
 function pickFrom(list, r) {

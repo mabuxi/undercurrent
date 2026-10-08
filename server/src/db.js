@@ -190,6 +190,7 @@ export function openDb(file = config.dbPath) {
   db.pragma('synchronous = NORMAL');
   db.exec(SCHEMA);
   const cols = db.prepare('PRAGMA table_info(items)').all().map((c) => c.name);
+  if (!db.prepare('PRAGMA table_info(fantasies)').all().some((c) => c.name === 'tags')) db.exec('ALTER TABLE fantasies ADD COLUMN tags TEXT');
   if (!cols.includes('block_reason')) db.exec('ALTER TABLE items ADD COLUMN block_reason TEXT');
   if (!cols.includes('ai_deep')) db.exec('ALTER TABLE items ADD COLUMN ai_deep INTEGER DEFAULT 0');
   if (!cols.includes('via')) db.exec('ALTER TABLE items ADD COLUMN via TEXT');

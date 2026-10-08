@@ -213,6 +213,11 @@ const followKey = (it) => (it.author ? `a:${it.source}:${String(it.author).toLow
 export function buildFeed(filters = {}, { exclude = [], limit = 12, mix = 15, capFollows = false } = {}) {
   const t = now();
   const f = { ...(filters || {}) };
+  // A fantasy with tags and none of your kinks in it shows the posts with its tags.
+  if (f.fantasy) {
+    const fan = listFantasies().find((x) => x.id === Number(f.fantasy));
+    if (fan && !fan.kinks.length && fan.tags?.length) f.tags = [...new Set([...(f.tags || []), ...fan.tags])];
+  }
   const sq = f.search ? getSearchSpec(f.search) : null;
   if (f.search && !sq && f.searchLabel) f.q = f.searchLabel;
   if (sq) f.includeSeen = true;

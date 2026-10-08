@@ -5,6 +5,7 @@ import { Icon } from '../icons.jsx';
 import { Avatar, HeatSlider, plain } from './Panels.jsx';
 import { TopReplies } from './Media.jsx';
 import { drawMap } from '../mapdraw.js';
+import { FantasyTools } from './FantasyEdit.jsx';
 import { t, tn } from '../i18n.js';
 
 function thumbUrl(it) {
@@ -249,6 +250,64 @@ function MiniMap({ data }) {
   return <div className="mmap-box"><canvas ref={ref} className="mmap" role="img" aria-label={t('Small map of your kinks and fantasies')} /></div>;
 }
 
+// Your map, right now: one bubble per kink, bigger the more you are into it these days, with what is rising or
+// fading. A tap filters the feed on it.
+function MapNow({ w }) {
+  const { setFilters, openMode } = useApp();
+  const max = Math.max(...w.now.map((k) => k.now), 51);
+  const min = Math.min(...w.now.map((k) => k.now), 50);
+  return (
+    <div className="win-body">
+      <div className="mapbubbles">
+        {w.now.map((k) => {
+          const f = max === min ? 0.5 : (k.now - min) / (max - min);
+          const size = Math.round(58 + f * 46);
+          return (
+            <button type="button" key={k.id} className="mbub" style={{ '--c': k.color, '--c2': rgba(k.color || '#999', 0.14 + f * 0.2), width: size, height: size }} onClick={() => setFilters({ kink: k.id })} title={t('{n}% right now', { n: k.now })}>
+              <span className="mbn">{k.name}</span>
+              {Math.abs(k.delta) >= 3 ? <em className={k.delta > 0 ? 'up' : 'down'}>{k.delta > 0 ? '▲' : '▼'} {Math.abs(k.delta)}</em> : null}
+            </button>
+          );
+        })}
+      </div>
+      <p className="wnote">{t('Bigger means more right now. ▲ rising, ▼ fading this week. Tap one to see its posts.')}</p>
+      <div className="wbtns"><button type="button" className="ghost-btn small" onClick={() => openMode('map')}><Icon name="map" />{t('Expand your map')}</button></div>
+    </div>
+  );
+}
+
+// Your map, next to explore: kinks next to yours that you have not opened yet, each with one post to try.
+function MapNext({ w, open }) {
+  const { setFilters, openMode, toast, refreshMeta } = useApp();
+  const [added, setAdded] = useState({});
+  const add = async (e) => {
+    try {
+      await api('/kinks', { method: 'POST', body: { name: e.name, tags: e.tags } });
+      setAdded((a) => ({ ...a, [e.concept]: true }));
+      refreshMeta();
+      toast(t('{name} is one of your kinks now.', { name: e.name }));
+    } catch (err) { toast(err.message); }
+  };
+  return (
+    <div className="win-body">
+      <div className="mapnext">
+        {w.next.map((e) => (
+          <div key={e.concept} className="mnrow" style={{ '--c': e.color }}>
+            <button type="button" className="mnthumb" onClick={() => open(e.item)} aria-label={e.item.title}><Thumb it={e.item} shape={shapeOf(e.item) === 'txt' ? 'txt' : 'sq'} /></button>
+            <div className="mntext">
+              <button type="button" className="chip btn" style={{ '--c': e.color, '--c2': rgba(e.color, 0.16) }} onClick={() => setFilters({ tags: e.tags.slice(0, 4) })}>{e.name}</button>
+              <span className="mini-title">{e.item.title}</span>
+            </div>
+            <button type="button" className={`ghost-btn small mnadd${added[e.concept] ? ' on' : ''}`} onClick={() => add(e)} disabled={added[e.concept]} title={t('Add as a kink')}><Icon name={added[e.concept] ? 'check' : 'plus'} /></button>
+          </div>
+        ))}
+      </div>
+      <p className="wnote">{t('Tap a name to see its posts, a picture to open the post, + to make it one of your kinks.')}</p>
+      <div className="wbtns"><button type="button" className="ghost-btn small" onClick={() => openMode('map')}><Icon name="map" />{t('Expand your map')}</button></div>
+    </div>
+  );
+}
+
 const FORMAT_NAME = { long: t('Long videos'), short: t('Short clips'), gif: t('GIFs'), image: t('Images'), set: t('Image sets'), story: t('Stories'), discussion: t('Threads') };
 
 function MatchBar({ value }) {
@@ -257,9 +316,15 @@ function MatchBar({ value }) {
 }
 
 function FantasySuggest({ w, open }) {
-  const { toast, refreshMeta, setFilters } = useApp();
+  const { toast, refreshMeta, setFilters, openMode } = useApp();
   const [state, setState] = useState('new');
-  const sg = w.suggestion;
+  const [sg, setSg] = useState(w.suggestion);
+  const update = async (r) => {
+    const u = await api(`/suggestions/${sg.id}`, { method: 'PATCH', body: r });
+    const x = u.suggestion;
+    setSg({ ...sg, title: x.title, scenario: x.body, kinks: x.data.kinks || [], tags: x.data.tags || [], confidence: x.confidence, why: x.data.why });
+    toast(t('Updated. Shaped by you, so it counts as at least a 90% match.'));
+  };
   const act = async (action) => {
     try {
       await api(`/suggestions/${sg.id}`, { method: 'POST', body: { action } });
@@ -270,6 +335,7 @@ function FantasySuggest({ w, open }) {
   if (state === 'dismissed') return <div className="win-body"><p className="wnote">{t('Dismissed.')}</p></div>;
   return (
     <div className="win-body"><div className="fant">
+      {sg.title !== w.title ? <h4>{sg.title}</h4> : null}
       <p className="scenario serif">{sg.scenario}</p>
       <div className="chiprow">
         {sg.kinks.map((k) => <button type="button" key={k.id} className="chip btn" style={{ '--c': k.color, '--c2': rgba(k.color, 0.16) }} onClick={() => setFilters({ kink: k.id })}>{k.name}</button>)}
@@ -277,11 +343,38 @@ function FantasySuggest({ w, open }) {
       </div>
       <MatchBar value={sg.confidence} />
       {sg.why ? <p className="wnote">{sg.why}</p> : null}
+      {state !== 'saved' ? <FantasyTools f={{ title: sg.title, scenario: sg.scenario, tags: sg.tags }} onUpdate={update} /> : null}
       {w.items?.length ? <div className="wgrid three">{w.items.slice(0, 3).map((it) => <Tile key={it.id} it={it} onOpen={open} />)}</div> : null}
       <div className="wbtns">
         <button type="button" className="ghost-btn small accent" onClick={() => act('save')} disabled={state === 'saved'}><Icon name="save" filled={state === 'saved'} />{state === 'saved' ? plain(t('Saved [button state]')) : t('Save fantasy')}</button>
+        <button type="button" className="ghost-btn small" onClick={() => openMode('deeper', { fantasy: { title: sg.title, scenario: sg.scenario, tags: sg.tags?.length ? sg.tags : sg.kinks.map((k) => k.name.toLowerCase()) } })}><Icon name="spark" />{t('Go deeper')}</button>
         <button type="button" className="ghost-btn small" onClick={() => act('dismiss')}><Icon name="less" />{t('Not for me')}</button>
       </div>
+    </div></div>
+  );
+}
+
+// A fantasy as the go deeper view takes it: its tags, or its kinks' names when it has no tags yet.
+export const deeperSpec = (f) => ({ id: f.id, title: f.name || f.title, scenario: f.description ?? f.scenario, tags: f.tags?.length ? f.tags : (f.kinks || []).map((k) => String(k.name).toLowerCase()) });
+
+// Go deeper, right in the feed: the first choice is here; picking one opens the rest.
+function FantasyDeep({ w, open }) {
+  const { openMode } = useApp();
+  const f = w.fantasy;
+  const spec = { id: f.id, title: f.title, scenario: f.scenario, tags: f.tags };
+  return (
+    <div className="win-body"><div className="fant">
+      {f.scenario ? <p className="scenario serif">{f.scenario}</p> : null}
+      <p className="dp-wq">{w.step.question}</p>
+      <div className="dp-opts small">
+        {w.step.options.map((o) => (
+          <button type="button" key={o.tag} className="dp-opt" onClick={() => openMode('deeper', { fantasy: spec, answers: [{ dim: w.step.dim, tag: o.tag, label: o.label, shown: w.step.options.map((x) => x.tag) }] })}>
+            <b>{o.label}</b>{o.count ? <small>{tn(o.count, '{n} post', '{n} posts', { n: fmtNum(o.count) })}</small> : null}
+          </button>
+        ))}
+      </div>
+      {w.items?.length ? <div className="wgrid three">{w.items.slice(0, 3).map((it) => <Tile key={it.id} it={it} onOpen={open} />)}</div> : null}
+      <div className="wbtns"><button type="button" className="ghost-btn small accent" onClick={() => openMode('deeper', { fantasy: spec })}><Icon name="spark" />{t('Go deeper')}</button></div>
     </div></div>
   );
 }
@@ -402,7 +495,8 @@ function Body({ w, open }) {
           {fant.description ? <p className="wtext">{fant.description}</p> : null}
           <div className="chiprow">{fant.kinks.map((k) => <span key={k.id} className="chip" style={{ '--c': k.color, '--c2': rgba(k.color, 0.16) }}>{k.name}</span>)}</div>
           <div className="wbtns">
-            <button type="button" className="ghost-btn small accent" onClick={() => openMode('journey', { fantasy: fant.id })}><Icon name="route" />{t('Start a journey')}</button>
+            <button type="button" className="ghost-btn small accent" onClick={() => openMode('deeper', { fantasy: deeperSpec(fant) })}><Icon name="spark" />{t('Go deeper')}</button>
+            <button type="button" className="ghost-btn small" onClick={() => openMode('journey', { fantasy: fant.id })}><Icon name="route" />{t('Start a journey')}</button>
             <button type="button" className="ghost-btn small" onClick={async () => { await api(`/fantasies/${fant.id}`, { method: 'PATCH', body: { saved: !fant.saved } }); setFant({ ...fant, saved: !fant.saved }); refreshMeta(); toast(fant.saved ? t('Removed from your fantasies.') : t('Saved to your fantasies.')); }}><Icon name="check" />{fant.saved ? plain(t('Saved [button state]')) : t('Save fantasy')}</button>
           </div>
         </div></div>
@@ -458,6 +552,8 @@ function Body({ w, open }) {
         </div><p className="wnote">{t('Left bar all time, right bar the last week.')}</p></div>
       );
     case 'map':
+      if (w.variant === 'now') return <MapNow w={w} />;
+      if (w.variant === 'next') return <MapNext w={w} open={open} />;
       if (w.variant === 'groups') {
         return (
           <div className="win-body">
@@ -467,20 +563,6 @@ function Body({ w, open }) {
                 <div className="track2"><i style={{ width: `${g.score}%`, background: g.color }} /></div>
                 <div className="chiprow">{g.kinks.map((k) => <button type="button" key={k.id} className="chip btn" style={{ '--c': k.color, '--c2': rgba(k.color, 0.16) }} onClick={() => setFilters({ kink: k.id })}>{k.name}</button>)}</div>
               </div>
-            ))}
-            <div className="wbtns"><button type="button" className="ghost-btn small" onClick={() => openMode('map')}><Icon name="map" />{t('Expand your map')}</button></div>
-          </div>
-        );
-      }
-      if (w.variant === 'links') {
-        return (
-          <div className="win-body">
-            {w.links.map((l, i) => (
-              <button type="button" key={i} className="linkrow" onClick={() => setFilters({ pair: [l.a.id, l.b.id] })}>
-                <span className="chip" style={{ '--c': l.a.color, '--c2': rgba(l.a.color || '#999', 0.16) }}>{l.a.name}</span>
-                <span className="linkline"><i style={{ opacity: 0.35 + l.w * 0.65, height: `${2 + Math.round(l.w * 4)}px` }} /></span>
-                <span className="chip" style={{ '--c': l.b.color, '--c2': rgba(l.b.color || '#999', 0.16) }}>{l.b.name}</span>
-              </button>
             ))}
             <div className="wbtns"><button type="button" className="ghost-btn small" onClick={() => openMode('map')}><Icon name="map" />{t('Expand your map')}</button></div>
           </div>
@@ -558,6 +640,8 @@ function Body({ w, open }) {
       );
     case 'fantasySuggest':
       return <FantasySuggest w={w} open={open} />;
+    case 'fantasyDeep':
+      return <FantasyDeep w={w} open={open} />;
     case 'newKink':
       return <NewKink w={w} open={open} />;
     case 'limits':
@@ -590,7 +674,7 @@ function Body({ w, open }) {
           <div className="wbtns col">
             {w.kinks[0] ? <button type="button" className="ghost-btn small" onClick={() => openMode('journey', { kink: w.kinks[0].id, mode: 'branch' })}><Icon name="route" />{t('Branch out from {name}', { name: w.kinks[0].name })}</button> : null}
             {w.kinks[1] ? <button type="button" className="ghost-btn small" onClick={() => openMode('journey', { kink: w.kinks[1].id, mode: 'close' })}><Icon name="route" />{t('Go deep into {name}', { name: w.kinks[1].name })}</button> : null}
-            <button type="button" className="ghost-btn small" onClick={() => openMode('journey', { mode: 'surprise' })}><Icon name="route" />{t('Surprise me')}</button>
+            <button type="button" className="ghost-btn small" onClick={() => openMode('journey', { mode: 'surprise' })}><Icon name="spark" />{t('Discover something new')}</button>
           </div>
         </div>
       );

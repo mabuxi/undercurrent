@@ -3,6 +3,34 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.22.0 · 9 October 2026
+
+### Full screen on a phone
+- Full screen is now a TikTok-style viewer: one post fills the screen, a swipe up or down snaps to the next or previous one, with no windows in between and the tab bar out of the way. Tapping a video in the feed opens it too, also for players from other sites.
+- Everything a post can do is still there: like (double-tap anywhere also likes), dislike, heat, comments, save and the ⋯ menu in a column on the right; who posted it, the title (tap for the full text) and one line of kinks and tags at the bottom. Profiles, comments, "Why this", the assistant, all kinks and tags (to add or remove them) open in a sheet that slides up.
+- A tap pauses or plays, a thin line at the bottom shows how far the video is and can be dragged to jump, pinch zooms in (drag to look around, double-tap to go back). One sound switch at the top for every video.
+- Players from other sites play right in the viewer; swipe outside the player to go on.
+- More posts load before you reach the end, what you like or save in the viewer shows in the feed too, the back gesture closes it, and the feed is waiting on the post you were last on. Nothing in the feed plays or counts time behind it.
+
+### Fantasies
+- Suggested fantasies have "Refine" and "Regenerate", in the welcome steps, in Memory and in the fantasy windows of the feed. Refine opens the fantasy's tags: take some off, type new ones, then "Update the story" rewrites it around them. Regenerate writes a different story from the same tags.
+- Writing your own fantasy: tags are suggested while you type the story (the words it says at once, what the AI reads in it when you pause); pick the ones that fit or type your own. Fantasies you write or shape yourself always count as at least a 90% match.
+- New: "Go deeper" into any fantasy, from its window, Memory, the map, or a new window in the feed that already asks the first question. It asks one quick choice at a time (where, with whom, what happens, how it feels, what they wear, how it ends…), each choice showing how many posts have it, and the posts follow every answer. At the end the fantasy is rewritten around everything you chose: save it as a new fantasy, update the old one, make it a kink, or see it in the feed.
+
+### Journeys
+- "Surprise me" is now a discovery journey. The bigger model reads everything you did and leads you to a kind of post you have never opened that sits right next to what you love. The destination is never made up: it is a real kind of post here that comes up together with things you love far more often than chance, opened by nobody in your history, nothing you disliked, never family roleplay. You get there through a few stepping stones you already like, each with posts that have both, and the destination stays a surprise until the last stage.
+- At the end you say whether it was for you: love it (it becomes a kink), maybe (more of it in the feed, or go deeper into it), or not for me (journeys never go there again). Each journey goes somewhere new.
+- Tested on a real profile with the real local models: plans arrive in about 20 seconds once the model is loaded.
+
+### Your map window
+- It now takes turns between "right now" (your kinks as bubbles, bigger when you are into them now, with what is rising or fading; tap one to filter) and "next to explore" (kinks next to yours that you have not opened, each with a post to try, a tap to see its posts and + to make it a kink).
+
+### Small things
+- Thumbs down is blue and save is yellow, in the same soft colours.
+- Opening a profile scrolls further down, so the profile starts at the top of the screen.
+- The welcome steps no longer run off the right edge of a phone screen.
+- On a phone, tapping a video with its own controls is picked up again (it never reached the app before).
+
 ## 0.21.2 · 8 October 2026
 
 ### Welcome steps

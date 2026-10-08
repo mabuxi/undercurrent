@@ -3,6 +3,7 @@ import { api, rgba, FORMATS, ago } from '../api.js';
 import { useApp } from '../context.jsx';
 import BrainCanvas from './BrainCanvas.jsx';
 import KinkBoard, { evidenceLine } from './KinkBoard.jsx';
+import { deeperSpec } from './Windows.jsx';
 import { Icon } from '../icons.jsx';
 import { t, tn } from '../i18n.js';
 import { EVENT_LABEL, secs, Thumb } from './History.jsx';
@@ -76,9 +77,10 @@ function Detail({ nodeKey, brain, reload, onSelect }) {
           <button type="button" className="ghost-btn small accent" onClick={() => setFilters(d?.filter || (node.type === 'tag' ? { tags: [node.name] } : node.type === 'fantasy' ? { fantasy: node.id } : { kink: node.id }))}><Icon name="eye" />{t('Show in feed')}</button>
           {node.type !== 'tag' ? (
             <>
+              {node.type === 'fantasy' ? <button type="button" className="ghost-btn small accent" onClick={async () => { const fs = await api('/fantasies').then((r) => r.fantasies).catch(() => []); const f = fs.find((x) => x.id === node.id); if (f) openMode('deeper', { fantasy: deeperSpec(f) }); }}><Icon name="spark" />{t('Go deeper')}</button> : null}
               <button type="button" className="ghost-btn small" onClick={() => openMode('journey', { ...(node.type === 'fantasy' ? { fantasy: node.id } : { kink: node.id }), mode: 'close' })}><Icon name="route" />{t('Dive deeper')}</button>
               <button type="button" className="ghost-btn small" onClick={() => openMode('journey', { ...(node.type === 'fantasy' ? { fantasy: node.id } : { kink: node.id }), mode: 'branch' })}><Icon name="route" />{t('Branch out')}</button>
-              <button type="button" className="ghost-btn small" onClick={() => openMode('journey', { ...(node.type === 'fantasy' ? { fantasy: node.id } : { kink: node.id }), mode: 'genre' })}><Icon name="route" />{t('Surprise me, same family')}</button>
+              <button type="button" className="ghost-btn small" onClick={() => openMode('journey', { ...(node.type === 'fantasy' ? { fantasy: node.id } : { kink: node.id }), mode: 'genre' })}><Icon name="route" />{t('Discover something new near it')}</button>
             </>
           ) : null}
           {node.type === 'tag' ? <button type="button" className="ghost-btn small" onClick={async () => { const r = await api(`/brain/promote/${node.id}`, { method: 'POST', body: {} }); toast(t('It is a kink now.')); await reload(); refreshMeta(); onSelect(`k${r.id}`); }}><Icon name="flame" />{t('Make it a kink')}</button> : null}

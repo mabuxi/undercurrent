@@ -6,6 +6,7 @@ import Linkify from './Linkify.jsx';
 import { t, tn } from '../i18n.js';
 import { useTranslate, TranslateButton, TranslatedNote } from './Translate.jsx';
 import { useZoomFullscreen } from './Zoom.jsx';
+import { useTkOpen } from '../tk.js';
 
 let HlsLib = null;
 async function loadHls() {
@@ -34,7 +35,10 @@ function useFar(ref, onFar) {
   }, [ref]);
 }
 
-export function VideoPlayer({ item, active, onPlay, onReady }) {
+export function VideoPlayer({ item, active, onPlay, onReady, onFull, inTk = false, preload = false, exposeRef }) {
+  // In the feed nothing plays while the full screen viewer covers it; the viewer's own players are not affected.
+  const tkOpen = useTkOpen();
+  const covered = tkOpen && !inTk;
   const [hover, setHover] = useState(false);
   const ref = useRef(null);
   const hlsRef = useRef(null);
@@ -56,7 +60,7 @@ export function VideoPlayer({ item, active, onPlay, onReady }) {
   const loop = item.format !== 'long';
   const [ar, setAr] = useState(item.width && item.height ? item.width / item.height : null);
 
-  useEffect(() => { if ((active || hover) && !armed) setArmed(true); }, [active, hover, armed]);
+  useEffect(() => { if ((active || hover || preload) && !armed) setArmed(true); }, [active, hover, armed, preload]);
   const wrapRef = useRef(null);
   const boxRef = useRef(null);
   const zoom = useZoomFullscreen(boxRef);
@@ -64,7 +68,7 @@ export function VideoPlayer({ item, active, onPlay, onReady }) {
   const openFs = () => { setHoldH(wrapRef.current?.offsetHeight || null); zoom.open(); };
   useEffect(() => { if (!zoom.fs) setHoldH(null); }, [zoom.fs]);
   useFar(wrapRef, () => {
-    if (!armed || zoom.fs) return;
+    if (!armed || zoom.fs || inTk) return;
     hlsRef.current?.destroy();
     hlsRef.current = null;
     const v = ref.current;
@@ -112,7 +116,7 @@ export function VideoPlayer({ item, active, onPlay, onReady }) {
   useEffect(() => {
     const v = ref.current;
     if (!v || !armed) return;
-    if (active || hover || zoom.fs) {
+    if (((active || hover) && !covered) || zoom.fs) {
       v.play().catch((err) => {
         if (err?.name === 'NotAllowedError' && !v.muted) {
           applyMuted(true);
@@ -121,7 +125,7 @@ export function VideoPlayer({ item, active, onPlay, onReady }) {
         }
       });
     } else v.pause();
-  }, [active, hover, armed, src, hlsUrl, zoom.fs]);
+  }, [active, hover, armed, src, hlsUrl, zoom.fs, covered]);
 
   function onError() {
     if (item.media.kind === 'redgifs' && !refreshed) {
@@ -207,13 +211,13 @@ export function VideoPlayer({ item, active, onPlay, onReady }) {
       <div className={`${cls}${zoom.fs ? ' fsbox' : ''}`} style={style} ref={boxRef}>
         {src || hlsUrl ? (
           <video
-            ref={ref}
+            ref={(el) => { ref.current = el; if (exposeRef) exposeRef.current = el; }}
             poster={poster ? (triedProxy ? proxied(poster) : poster) : undefined}
             muted={muted}
             loop={loop}
             playsInline
             preload={armed ? 'auto' : 'metadata'}
-            controls={armed}
+            controls={armed && !inTk}
             controlsList="nofullscreen"
             onError={onError}
             onTimeUpdate={onTime}
@@ -225,19 +229,19 @@ export function VideoPlayer({ item, active, onPlay, onReady }) {
             onLoadedMetadata={onMeta}
           />
         ) : poster ? <img src={poster} alt="" loading="lazy" referrerPolicy="no-referrer" /> : null}
-        <Badge format={item.format} />
-        {item.duration ? <span className="dur">{fmtDur(item.duration)}</span> : null}
+        {!inTk ? <Badge format={item.format} /> : null}
+        {item.duration && !inTk ? <span className="dur">{fmtDur(item.duration)}</span> : null}
         {loading && !error ? <span className="spinner" aria-label={t('Loading video')} /> : null}
-        {item.media.hasAudio !== false && (src || hlsUrl) && armed ? (
+        {!inTk && item.media.hasAudio !== false && (src || hlsUrl) && armed ? (
           <button type="button" className={`mutebtn${muted ? '' : ' on'}`} onClick={(e) => { e.stopPropagation(); if (muted) unmute(); else { setSound(false); } }} aria-label={muted ? t('Turn sound on') : t('Turn sound off')} title={muted ? t('Sound on for every video') : t('Sound off for every video')}>
             <Icon name={muted ? 'mute' : 'volume'} />
           </button>
         ) : null}
-        {(src || hlsUrl) && armed && !zoom.fs ? <button type="button" className="fsbtn" onClick={(e) => { e.stopPropagation(); openFs(); }} aria-label={t('Full screen')} title={t('Full screen: pinch or double-tap to zoom')}><Icon name="expand" /></button> : null}
+        {(src || hlsUrl) && armed && !zoom.fs && !inTk ? <button type="button" className="fsbtn" onClick={(e) => { e.stopPropagation(); if (onFull) onFull(); else openFs(); }} aria-label={t('Full screen')} title={t('Full screen: pinch or double-tap to zoom')}><Icon name="expand" /></button> : null}
         {zoom.fs ? <button type="button" className="fsclose" onClick={(e) => { e.stopPropagation(); zoom.close(); }} aria-label={t('Close full screen')}><Icon name="x" /></button> : null}
         {error ? <div className="mediaerr">{error}</div> : null}
       </div>
-      {item.format === 'long' ? (
+      {item.format === 'long' && !inTk ? (
         <div className="longbar" aria-hidden="true"><i style={{ width: `${Math.round(progress * 100)}%` }} /></div>
       ) : null}
     </div>
@@ -266,6 +270,9 @@ export function EmbedPlayer({ item, active, onPlay, onReady }) {
   const [playing, setPlaying] = useState(false);
   const embedRef = useRef(null);
   useFar(embedRef, () => { if (playing) setPlaying(false); });
+  // The full screen viewer takes over: the player in the feed stops, so two never play at once.
+  const tkOpen = useTkOpen();
+  useEffect(() => { if (tkOpen && playing) setPlaying(false); }, [tkOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   const [sandboxed, setSandboxed] = useState(true);
   const [proxyAll, setProxyAll] = useState(false);
   const [dead, setDead] = useState(false);
@@ -501,12 +508,12 @@ export function TextBody({ item, onPerson }) {
   );
 }
 
-export function Media({ item, active, near = true, height, onPlay, onReady, onPerson, onLike }) {
+export function Media({ item, active, near = true, height, onPlay, onReady, onPerson, onLike, onFull }) {
   const m = item.media || {};
   useEffect(() => { if (m.kind === 'text' || !m.kind) onReady?.(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   if (!near && m.kind !== 'text') return <div className="media-sleep" style={{ height: height || 320 }} aria-hidden="true" />;
   if (m.kind === 'embed') return <EmbedPlayer item={item} active={active} onPlay={onPlay} onReady={onReady} />;
-  if (m.kind === 'video' || m.kind === 'redgifs') return <VideoPlayer item={item} active={active} onPlay={onPlay} onReady={onReady} />;
+  if (m.kind === 'video' || m.kind === 'redgifs') return <VideoPlayer item={item} active={active} onPlay={onPlay} onReady={onReady} onFull={onFull} />;
   if (m.kind === 'gallery') return <Gallery item={item} onReady={onReady} />;
   if (m.kind === 'image') return <ImageMedia item={item} src={m.src} mid={m.mid} onReady={onReady} />;
   if (m.kind === 'text') return <TextBody item={item} onPerson={onPerson} />;

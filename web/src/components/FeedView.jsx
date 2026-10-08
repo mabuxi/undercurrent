@@ -4,6 +4,7 @@ import { useApp, MOODS, crumbList } from '../context.jsx';
 import { Icon } from '../icons.jsx';
 import Post from './Post.jsx';
 import { Window } from './Windows.jsx';
+import Immersive, { inViewer } from './Immersive.jsx';
 import ErrorBoundary from './ErrorBoundary.jsx';
 import { refreshWindows } from './SideColumn.jsx';
 import { begin, end } from '../activity.js';
@@ -322,6 +323,9 @@ export default function FeedView() {
   const retryTimer = useRef(null);
   const prefetching = useRef(false);
   const [deeper, setDeeper] = useState({});
+  // The full screen viewer on a phone: which post it opened on.
+  const [tk, setTk] = useState(null);
+  const strongDone = useRef(new Set());
   const deeperCount = useRef(0);
   const shown = useRef(new Set());
   const busy = useRef(false);
@@ -417,6 +421,8 @@ export default function FeedView() {
     setItems([]);
     setWins([]);
     setDeeper({});
+    setTk(null);
+    strongDone.current = new Set();
     deeperCount.current = 0;
     setDone(false);
     setTotal(null);
@@ -444,7 +450,8 @@ export default function FeedView() {
   searchingRef.current = searching;
   // "Going deeper" (similar posts after one you were into) is for the feed: a search shows only what you searched for.
   const onStrong = useCallback(async (item, why) => {
-    if (searchingRef.current || deeperCount.current > 40) return;
+    if (searchingRef.current || deeperCount.current > 40 || strongDone.current.has(item.id)) return;
+    strongDone.current.add(item.id);
     deeperCount.current++;
     begin(`sim${item.id}`, t('Finding similar posts'));
     try {
@@ -478,13 +485,27 @@ export default function FeedView() {
     } catch (e) { toast(e.message); }
   }
 
+  const openTk = useCallback((it) => { if (inViewer(it)) setTk({ id: it.id }); }, []);
+  // Leaving the viewer puts the feed on the post you were last on.
+  const closeTk = useCallback((lastId) => {
+    setTk(null);
+    requestAnimationFrame(() => {
+      const el = lastId && document.querySelector(`.feed article.post[data-id="${lastId}"]`);
+      if (!el) return;
+      const top = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--toph'), 10) || 60;
+      window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top - top, behavior: 'auto' });
+    });
+  }, []);
+  const imm = narrow ? openTk : undefined;
   const list = [];
+  const flat = [];
   items.forEach((it, i) => {
-    list.push(<ErrorBoundary key={it.id} name="Post"><Post item={it} focus={opts.focus === it.id} onStrong={onStrong} /></ErrorBoundary>);
+    flat.push(it);
+    list.push(<ErrorBoundary key={it.id} name="Post"><Post item={it} focus={opts.focus === it.id} onStrong={onStrong} onImmersive={imm} /></ErrorBoundary>);
     const d = deeper[it.id];
     if (d) {
       list.push(<div key={`d${it.id}`} className="deeper"><span className="deeper-why">{d.why}</span></div>);
-      d.items.forEach((x) => list.push(<ErrorBoundary key={x.id} name="Post"><Post item={{ ...x, label: 'deeper' }} onStrong={onStrong} /></ErrorBoundary>));
+      d.items.forEach((x) => { const dx = { ...x, label: 'deeper' }; flat.push(dx); list.push(<ErrorBoundary key={x.id} name="Post"><Post item={dx} onStrong={onStrong} onImmersive={imm} /></ErrorBoundary>); });
     }
     // On a phone a window comes after every 3 to 5 posts.
     const slot = WIN_AFTER.indexOf(i + 1);
@@ -502,6 +523,7 @@ export default function FeedView() {
       {error ? <div className="empty">{error}</div> : null}
       {wider && items.length ? <div className="deeper"><span className="deeper-why">{t('Few exact matches left, now also showing close matches')}</span></div> : null}
       {fresh ? <button type="button" className="freshbar" onClick={() => { reset(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>{t('New results from your sources are in · Show them')}</button> : null}
+      {tk && narrow ? <ErrorBoundary name="Viewer"><Immersive items={flat} startId={tk.id} onClose={closeTk} onMore={() => loadMoreRef.current?.()} loading={loading || finding} done={done} onStrong={onStrong} /></ErrorBoundary> : null}
       <div className="sentinel" ref={sentinel}>
         {finding || loading || waiting ? (
           <span className="finding"><span className="spin" />{finding ? t('Finding more like this on your sources…') : waiting ? t('Nothing left that matches. Checking your sources once more shortly…') : t('Loading more…')}</span>

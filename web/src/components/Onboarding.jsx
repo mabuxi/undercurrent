@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { LanguageSwitch } from './Language.jsx';
 import { api } from '../api.js';
+import { FantasyTools, OwnFantasy } from './FantasyEdit.jsx';
 import { Icon } from '../icons.jsx';
 import { ModelChooser } from './ModelChooser.jsx';
 import { t, tn } from '../i18n.js';
@@ -222,7 +223,6 @@ function Kinks({ families, picked, setPicked, male }) {
 function Fantasies({ picked, chosen, setChosen, list, setList, gender }) {
   const [loading, setLoading] = useState(false);
   const [byAi, setByAi] = useState(true);
-  const [own, setOwn] = useState({ name: '', description: '' });
   // The local model may need a while (a big model has to load first), so the ideas are written in the background
   // and this step checks every two seconds.
   async function write() {
@@ -257,21 +257,29 @@ function Fantasies({ picked, chosen, setChosen, list, setList, gender }) {
         <p className="ob-note ob-quick"><Icon name="why" />{t('The local AI did not answer in time, so these are quick ideas from your picks.')} <button type="button" className="ob-skiplink" onClick={write}>{t('Ask the AI again')}</button></p>
       ) : null}
       <div className="ob-fants">
-        {(list || []).map((f) => (
-          <button type="button" key={f.name} className={`ob-fant${has(f) ? ' on' : ''}`} onClick={() => setChosen(has(f) ? chosen.filter((x) => x.name !== f.name) : [...chosen, f])}>
-            <b>{f.name}</b><span>{f.description}</span>
-            {f.tags?.length ? <span className="ob-fanttags">{f.tags.map((x) => <em key={x}>{x}</em>)}</span> : null}
-            {has(f) ? <Icon name="check" /> : null}
-          </button>
+        {(list || []).map((f, i) => (
+          <div key={`${i}${f.name}`} className={`ob-fant${has(f) ? ' on' : ''}${f.own ? ' own' : ''}`}>
+            <button type="button" className="ob-fantmain" onClick={() => setChosen(has(f) ? chosen.filter((x) => x.name !== f.name) : [...chosen, f])} aria-pressed={has(f)}>
+              <b>{f.name}</b><span>{f.description}</span>
+              {f.tags?.length ? <span className="ob-fanttags">{f.tags.map((x) => <em key={x}>{x}</em>)}</span> : null}
+              {has(f) ? <Icon name="check" /> : null}
+            </button>
+            {!f.own ? (
+              <FantasyTools
+                f={{ title: f.name, scenario: f.description, tags: f.tags || [] }}
+                male={gender?.male}
+                avoid={(list || []).map((x) => x.description)}
+                onUpdate={(r) => {
+                  const next = { ...f, name: r.title, description: r.scenario, tags: r.tags, concepts: [] };
+                  setList((cur) => cur.map((x) => (x === f ? next : x)));
+                  if (has(f)) setChosen(chosen.map((x) => (x.name === f.name ? next : x)));
+                }}
+              />
+            ) : null}
+          </div>
         ))}
       </div>
-      {picked.length >= 1 ? (
-        <form className="ob-own col" onSubmit={(e) => { e.preventDefault(); if (!own.name.trim()) return; setChosen([...chosen, { name: own.name.trim(), description: own.description.trim(), concepts: picked.slice(0, 3) }]); setOwn({ name: '', description: '' }); }}>
-          <input value={own.name} onChange={(e) => setOwn({ ...own, name: e.target.value })} placeholder={t('Your own fantasy, name it')} aria-label={t('Fantasy name')} />
-          <input value={own.description} onChange={(e) => setOwn({ ...own, description: e.target.value })} placeholder={t('Describe it in one sentence (optional)')} aria-label={t('Fantasy description')} />
-          <button type="submit" className="ob-btn">{t('Add fantasy')}</button>
-        </form>
-      ) : null}
+      <OwnFantasy compact onAdd={(o) => { const f = { ...o, own: true, concepts: [] }; setList((cur) => [...(cur || []), f]); setChosen([...chosen, f]); }} />
     </div>
   );
 }

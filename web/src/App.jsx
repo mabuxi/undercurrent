@@ -6,6 +6,7 @@ import SideColumn from './components/SideColumn.jsx';
 import FeedView from './components/FeedView.jsx';
 import MapView from './components/MapView.jsx';
 import JourneyView from './components/JourneyView.jsx';
+import DeeperView from './components/DeeperView.jsx';
 import MemoryView from './components/MemoryView.jsx';
 import SettingsView from './components/SettingsView.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
@@ -167,7 +168,7 @@ export default function App() {
 
   const openMode = useCallback((m, spec = null) => {
     setMode(m);
-    if (m === 'journey') setJourneySpec({ ...spec, key: Date.now() });
+    if (m === 'journey' || m === 'deeper') setJourneySpec({ ...spec, key: Date.now() });
     // Another view opens at its top, with its title under the top bar, not halfway down.
     setTimeout(() => window.scrollTo({ top: 0, behavior: 'auto' }), 30);
   }, []);
@@ -329,6 +330,7 @@ export default function App() {
               {mode === 'feed' ? (tuneReady ? <FeedView key="feed" /> : <div className="feedwait" />) : null}
               {mode === 'map' ? <MapView /> : null}
               {mode === 'journey' && journeySpec ? <JourneyView key={journeySpec.key} spec={journeySpec} /> : null}
+              {mode === 'deeper' && journeySpec ? <DeeperView key={journeySpec.key} spec={journeySpec} /> : null}
               {mode === 'memory' ? <MemoryView /> : null}
               {mode === 'settings' ? <SettingsView /> : null}
             </ErrorBoundary>

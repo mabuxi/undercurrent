@@ -2,6 +2,34 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.22.0 · 9 octobre 2026
+
+### Plein écran sur téléphone
+- Le plein écran est maintenant une visionneuse façon TikTok : une publication remplit l’écran, un glissement vers le haut ou le bas passe à la suivante ou à la précédente, sans fenêtres entre elles et sans la barre d’onglets. Toucher une vidéo dans le fil l’ouvre aussi, également pour les lecteurs d’autres sites.
+- Tout ce qu’une publication permet reste là : j’aime (un double-tap n’importe où aussi), je n’aime pas, chaleur, commentaires, enregistrer et le menu ⋯ dans une colonne à droite ; qui l’a publiée, le titre (toucher pour le texte entier) et une ligne de kinks et de tags en bas. Profils, commentaires, « Pourquoi ça », l’assistant, tous les kinks et tags (pour en ajouter ou en retirer) s’ouvrent dans un panneau qui glisse vers le haut.
+- Un toucher met en pause ou relance, une fine ligne en bas montre où en est la vidéo et se fait glisser pour sauter, pincer zoome (glisser pour se déplacer, double-tap pour revenir). Un seul bouton de son en haut pour toutes les vidéos.
+- Les lecteurs d’autres sites jouent directement dans la visionneuse ; glissez en dehors du lecteur pour continuer.
+- D’autres publications se chargent avant la fin, ce que vous aimez ou enregistrez dans la visionneuse apparaît aussi dans le fil, le geste retour la ferme, et le fil vous attend sur la dernière publication vue. Rien dans le fil ne joue ni ne compte de temps derrière.
+
+### Fantasmes
+- Les fantasmes suggérés ont « Affiner » et « Régénérer », dans les premiers pas, dans Mémoire et dans les fenêtres de fantasmes du fil. Affiner ouvre les tags du fantasme : retirez-en, écrivez-en de nouveaux, puis « Mettre à jour l’histoire » la réécrit autour d’eux. Régénérer écrit une autre histoire avec les mêmes tags.
+- Écrire votre propre fantasme : des tags sont proposés pendant que vous écrivez (ce que les mots disent tout de suite, ce que l’IA y lit quand vous faites une pause) ; choisissez ceux qui conviennent ou écrivez les vôtres. Les fantasmes que vous écrivez ou façonnez vous-même comptent toujours comme au moins 90 % de correspondance.
+- Nouveau : « Aller plus loin » dans n’importe quel fantasme, depuis sa fenêtre, Mémoire, la carte, ou une nouvelle fenêtre du fil qui pose déjà la première question. Un choix rapide à la fois (où, avec qui, ce qui se passe, l’ambiance, ce qu’ils portent, comment ça finit…), chaque choix montre combien de publications l’ont, et les publications suivent chaque réponse. À la fin, le fantasme est réécrit autour de tout ce que vous avez choisi : enregistrez-le comme nouveau fantasme, mettez l’ancien à jour, faites-en un kink ou voyez-le dans le fil.
+
+### Voyages
+- « Surprenez-moi » devient un voyage de découverte. Le grand modèle lit tout ce que vous avez fait et vous mène vers un genre de publication que vous n’avez jamais ouvert, juste à côté de ce que vous aimez. La destination n’est jamais inventée : c’est un vrai genre de publication d’ici qui apparaît avec ce que vous aimez bien plus souvent que le hasard, jamais ouvert, rien que vous n’ayez pas aimé, jamais de jeu de rôle familial. Vous y arrivez par quelques étapes que vous aimez déjà, chacune avec des publications qui ont les deux, et la destination reste une surprise jusqu’à la dernière étape.
+- À la fin, vous dites si c’était pour vous : j’adore (ça devient un kink), peut-être (plus dans le fil, ou aller plus loin dedans), ou pas pour moi (les voyages n’y retournent jamais). Chaque voyage va ailleurs.
+- Testé sur un vrai profil avec les vrais modèles locaux : le plan arrive en une vingtaine de secondes une fois le modèle chargé.
+
+### La fenêtre Votre carte
+- Elle alterne entre « en ce moment » (vos kinks en bulles, plus grandes quand ils vous attirent maintenant, avec ce qui monte ou baisse ; touchez-en une pour filtrer) et « à explorer ensuite » (des kinks voisins des vôtres jamais ouverts, chacun avec une publication à essayer, un toucher pour voir ses publications et + pour en faire un kink).
+
+### Petites choses
+- Je n’aime pas est bleu et enregistrer est jaune, dans les mêmes couleurs douces.
+- Ouvrir un profil fait défiler plus bas, pour que le profil commence en haut de l’écran.
+- Les premiers pas ne dépassent plus du bord droit d’un écran de téléphone.
+- Sur téléphone, toucher une vidéo avec ses propres commandes est de nouveau pris en compte (ça n’arrivait jamais à l’app).
+
 ## 0.21.2 · 8 octobre 2026
 
 ### Premiers pas

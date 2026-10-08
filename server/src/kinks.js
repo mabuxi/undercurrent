@@ -215,19 +215,32 @@ export function listFantasies() {
   return getDb().prepare('SELECT * FROM fantasies ORDER BY saved DESC, updated DESC').all().map((f) => {
     const ids = JSON.parse(f.kinks || '[]');
     const ks = kinks.filter((k) => ids.includes(k.id));
-    const match = ks.length ? Math.round(ks.reduce((a, b) => a + (b.allTime + b.lately) / 2, 0) / ks.length) : 50;
-    return { id: f.id, name: f.name, description: f.description, kinks: ks.map((k) => ({ id: k.id, name: k.name, color: k.color })), saved: !!f.saved, origin: f.origin, match };
+    let match = ks.length ? Math.round(ks.reduce((a, b) => a + (b.allTime + b.lately) / 2, 0) / ks.length) : 50;
+    // One you wrote or shaped yourself is yours: at least 90%.
+    if (f.origin === 'user') match = Math.max(90, match);
+    return { id: f.id, name: f.name, description: f.description, kinks: ks.map((k) => ({ id: k.id, name: k.name, color: k.color })), tags: (() => { try { return JSON.parse(f.tags || '[]'); } catch { return []; } })(), saved: !!f.saved, origin: f.origin, match };
   });
 }
 
-export function saveFantasy({ id, name, description = '', kinks = [], saved = 1, origin = 'user' }) {
+// Your kinks a set of tags is about: by their tags, or by what the tags mean.
+export function kinkIdsForTagNames(tags = []) {
+  const want = new Set(tags.map((t) => normalizeTag(String(t))).filter(Boolean));
+  const concepts = new Set([...want].flatMap((t) => conceptsOf(t)));
+  if (!want.size) return [];
+  return listKinks().filter((k) => !k.isGroup && k.status !== 'hidden' && (k.tags.some((t) => want.has(t.name)) || (k.concepts || []).some((c) => concepts.has(c)))).map((k) => k.id);
+}
+
+export function saveFantasy({ id, name, description = '', kinks = [], tags, saved = 1, origin }) {
   const db = getDb();
+  const clean = Array.isArray(tags) ? [...new Set(tags.map((t) => normalizeTag(String(t))).filter(Boolean))].slice(0, 16) : null;
+  // Tags without kinks: the kinks they are about are linked, so the feed and the map use the fantasy.
+  if (clean?.length && !kinks.length) kinks = kinkIdsForTagNames(clean);
   if (id) {
-    db.prepare('UPDATE fantasies SET name = ?, description = ?, kinks = ?, saved = ?, updated = ? WHERE id = ?').run(name, description, JSON.stringify(kinks), saved ? 1 : 0, now(), id);
+    db.prepare('UPDATE fantasies SET name = ?, description = ?, kinks = ?, saved = ?, updated = ?, tags = COALESCE(?, tags), origin = COALESCE(?, origin) WHERE id = ?').run(name, description, JSON.stringify(kinks), saved ? 1 : 0, now(), clean ? JSON.stringify(clean) : null, origin || null, id);
     return id;
   }
-  return Number(db.prepare('INSERT INTO fantasies(name, description, kinks, saved, origin, created, updated) VALUES(?, ?, ?, ?, ?, ?, ?)')
-    .run(name, description, JSON.stringify(kinks), saved ? 1 : 0, origin, now(), now()).lastInsertRowid);
+  return Number(db.prepare('INSERT INTO fantasies(name, description, kinks, saved, origin, created, updated, tags) VALUES(?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(name, description, JSON.stringify(kinks), saved ? 1 : 0, origin || 'user', now(), now(), JSON.stringify(clean || [])).lastInsertRowid);
 }
 
 export function deleteFantasy(id) {

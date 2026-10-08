@@ -12,7 +12,10 @@ import { genderPrefs, setGenderPrefs, autoMale } from './gender.js';
 import { queueLook } from './ai/looker.js';
 import { listSuggestions, setSuggestion, suggestCombos, suggestFantasies, refreshFantasyIdeas } from './suggest.js';
 import { touchSession } from './sessions.js';
-import { listKinks, createKink, updateKink, deleteKink, mergeKinks, unlockKink, listFantasies, saveFantasy, deleteFantasy, setLink, removeLink } from './kinks.js';
+import { listKinks, createKink, updateKink, deleteKink, mergeKinks, unlockKink, listFantasies, saveFantasy, deleteFantasy, setLink, removeLink, kinkIdsForTagNames } from './kinks.js';
+import { writeFantasy, tagsForText, conceptsFor } from './fantasywrite.js';
+import { deeperStep, fantasyTags } from './deeper.js';
+import { planDiscovery, journeyOutcome } from './discovery.js';
 import { removedConcepts, forgetRemoved, risingConcepts, RULES } from './kinkengine.js';
 import { conceptName } from './concepts.js';
 import { grouped, addMemory, updateMemory, deleteMemory, CATEGORIES, listPrompts, deletePrompt } from './memory.js';
@@ -832,7 +835,8 @@ api.post('/suggestions/:id', wrap((req, res) => {
   if (!row) return res.status(404).json({ error: tr('Not found') });
   const data = JSON.parse(row.data || '{}');
   if (req.body?.action === 'save' && row.kind === 'fantasy') {
-    const id = saveFantasy({ name: row.title, description: row.body, kinks: (data.kinks || []).map((k) => k.id), saved: 1, origin: 'ai' });
+    // One you refined is yours (at least 90%); its kinks follow the tags you gave it.
+    const id = saveFantasy({ name: row.title, description: row.body, kinks: data.refined ? [] : (data.kinks || []).map((k) => k.id), tags: data.tags || [], saved: 1, origin: data.refined ? 'user' : 'ai' });
     setSuggestion(row.id, 'saved');
     return res.json({ ok: true, fantasyId: id });
   }
@@ -840,12 +844,82 @@ api.post('/suggestions/:id', wrap((req, res) => {
   res.json({ ok: true });
 }));
 
+// A fantasy idea you refined or regenerated: its new story and tags, and it counts as yours from then on.
+api.patch('/suggestions/:id', wrap((req, res) => {
+  const row = getDb().prepare('SELECT * FROM suggestions WHERE id = ?').get(Number(req.params.id));
+  if (!row) return res.status(404).json({ error: tr('Not found') });
+  const b = req.body || {};
+  const data = JSON.parse(row.data || '{}');
+  const tags = Array.isArray(b.tags) ? [...new Set(b.tags.map((t) => normalizeTag(String(t))).filter(Boolean))].slice(0, 16) : data.tags || [];
+  const ids = kinkIdsForTagNames(tags);
+  const all = listKinks();
+  const next = { ...data, tags, refined: true, kinks: all.filter((k) => ids.includes(k.id)).map((k) => ({ id: k.id, name: k.label || k.name, color: k.color })) };
+  const title = String(b.title || row.title).slice(0, 60);
+  const body = String(b.scenario ?? row.body).slice(0, 300);
+  const conf = Math.max(90, row.confidence || 0);
+  try {
+    getDb().prepare('UPDATE suggestions SET title = ?, body = ?, data = ?, confidence = ? WHERE id = ?').run(title, body, JSON.stringify(next), conf, row.id);
+  } catch {
+    // Another idea already has this title.
+    getDb().prepare('UPDATE suggestions SET body = ?, data = ?, confidence = ? WHERE id = ?').run(body, JSON.stringify(next), conf, row.id);
+  }
+  const r = getDb().prepare('SELECT * FROM suggestions WHERE id = ?').get(row.id);
+  res.json({ suggestion: { ...r, data: JSON.parse(r.data || '{}') } });
+}));
+
+// Writing a fantasy from tags: polled, since the bigger model may need a while to load.
+api.post('/fantasy/write', wrap((req, res) => {
+  const id = `w${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const job = { done: false, result: null };
+  FANT_JOBS.set(id, job);
+  for (const [k] of [...FANT_JOBS].slice(0, -20)) FANT_JOBS.delete(k);
+  const b = req.body || {};
+  writeFantasy({ tags: b.tags, scenario: b.scenario, title: b.title, mode: b.mode, male: b.male ?? genderPrefs().male, avoid: b.avoid || [] })
+    .then((r) => { job.result = r; }).catch(() => { job.result = { title: b.title || '', scenario: b.scenario || '', tags: b.tags || [], byAi: false }; }).finally(() => { job.done = true; });
+  res.json({ job: id });
+}));
+api.get('/fantasy/write/:id', wrap((req, res) => {
+  const job = FANT_JOBS.get(req.params.id);
+  if (!job) return res.status(404).json({ error: tr('Not found') });
+  res.json(job.done ? { done: true, ...job.result } : { done: false });
+}));
+// A discovery journey: planned by the bigger model in the background (it may need a while to load), checked here.
+api.post('/journey/discover', wrap((req, res) => {
+  const id = `j${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const job = { done: false, result: null, started: now() };
+  FANT_JOBS.set(id, job);
+  for (const [k] of [...FANT_JOBS].slice(0, -20)) FANT_JOBS.delete(k);
+  const b = req.body || {};
+  let anchor = [];
+  let anchorName = '';
+  if (b.kink) {
+    const k = listKinks({ includeHidden: true }).find((x) => x.id === Number(b.kink));
+    if (k) { anchor = k.tags.slice(0, 5).map((t) => t.name); anchorName = k.label || k.name; }
+  } else if (b.fantasy) {
+    const f = listFantasies().find((x) => x.id === Number(b.fantasy));
+    if (f) { anchor = fantasyTags(f, listKinks({ includeHidden: true })); anchorName = f.name; }
+  }
+  planDiscovery({ anchor, anchorName }).then((r) => { job.result = r; }).catch((e) => { log('warn', `Journey failed: ${e.message}`); job.result = { steps: [], stages: [], title: tr('Nothing new nearby yet'), description: e.message }; }).finally(() => { job.done = true; });
+  res.json({ job: id });
+}));
+api.get('/journey/discover/:id', wrap((req, res) => {
+  const job = FANT_JOBS.get(req.params.id);
+  if (!job) return res.status(404).json({ error: tr('Not found') });
+  res.json(job.done ? { done: true, ...job.result } : { done: false, waited: Math.round((now() - job.started) / 1000) });
+}));
+api.post('/journey/outcome', wrap((req, res) => res.json(journeyOutcome(normalizeTag(String(req.body?.dest || '')), ['love', 'maybe', 'no'].includes(req.body?.verdict) ? req.body.verdict : null))));
+// Going deeper into a fantasy: the next choice to make, and the posts for what is chosen so far.
+api.post('/fantasy/deeper', wrap(async (req, res) => res.json(await deeperStep(req.body || {}))));
+// The tags a story you are typing is about.
+api.post('/fantasy/tags', wrap(async (req, res) => res.json(await tagsForText(req.body?.text, { ai: !!req.body?.ai }))));
+
 api.get('/fantasies', wrap((req, res) => res.json({ fantasies: listFantasies() })));
 api.post('/fantasies', wrap((req, res) => res.json({ id: saveFantasy(req.body || {}) })));
 api.patch('/fantasies/:id', wrap((req, res) => {
   const cur = listFantasies().find((f) => f.id === Number(req.params.id));
   if (!cur) return res.status(404).json({ error: tr('Not found') });
-  res.json({ id: saveFantasy({ id: cur.id, name: cur.name, description: cur.description, kinks: cur.kinks.map((k) => k.id), saved: cur.saved, ...req.body }) });
+  const b = req.body || {};
+  res.json({ id: saveFantasy({ id: cur.id, name: cur.name, description: cur.description, kinks: b.tags && !b.kinks ? [] : cur.kinks.map((k) => k.id), saved: cur.saved, ...b, origin: b.tags || b.description != null ? 'user' : undefined }) });
 }));
 api.delete('/fantasies/:id', wrap((req, res) => { deleteFantasy(Number(req.params.id)); res.json({ ok: true }); }));
 
@@ -1100,8 +1174,9 @@ api.post('/setup/finish', wrap(async (req, res) => {
     boostTags(knownVariants(c).slice(0, 4), 1.2);
   }
   for (const f of b.fantasies || []) {
-    const ids = (f.concepts || []).map((c) => idFor.get(c)).filter(Boolean);
-    if (f.name && ids.length) saveFantasy({ name: String(f.name).slice(0, 60), description: String(f.description || '').slice(0, 300), kinks: ids, saved: 1, origin: 'user' });
+    const tags = Array.isArray(f.tags) ? f.tags : [];
+    const ids = [...new Set([...(f.concepts || []), ...conceptsFor(tags)].map((c) => idFor.get(c)).filter(Boolean))];
+    if (f.name) saveFantasy({ name: String(f.name).slice(0, 60), description: String(f.description || '').slice(0, 300), kinks: ids, tags, saved: 1, origin: 'user' });
   }
   if (b.gender) setGenderPrefs({ male: Number(b.gender.male ?? 50), auto: !!b.gender.auto, trans: b.gender.trans !== false, everyone: false });
   for (const [id, on] of Object.entries(b.sources || {})) if (PROVIDERS[id]) setProvider(id, { enabled: !!on });

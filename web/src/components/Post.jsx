@@ -8,6 +8,8 @@ import { AskPanel, Avatar, CommentsPanel, ProfilePanel, PerformerPanel, PersonPa
 import Linkify from './Linkify.jsx';
 import { t, tn } from '../i18n.js';
 import { useTranslate, TranslateButton, TranslatedNote } from './Translate.jsx';
+import { usePostActions } from '../postactions.js';
+import { useTkOpen } from '../tk.js';
 
 // A performer's photo from the Pornhub performer list, or their initials when there is none.
 function PerfAvatar({ p }) {
@@ -16,8 +18,7 @@ function PerfAvatar({ p }) {
   return <img className="avatar av-s avimg" src={imgSrc(p.thumb)} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBad(true)} />;
 }
 
-const HAS_COMMENTS = new Set(['reddit', 'lemmy']);
-const AUTO_UP_HEAT = 2;
+export const HAS_COMMENTS = new Set(['reddit', 'lemmy']);
 
 // Right after a hide, a thumbs down or a block: which tags did you not like? Only what you pick counts against future
 // posts. For a hide or a block the bigger model makes a guess too (marked with a spark), but a guess never counts
@@ -135,8 +136,10 @@ function useNear(ref) {
   return near;
 }
 
-function useVisibility(ref, id, onLong, ready, members) {
-  const [active, setActive] = useState(false);
+function useVisibility(ref, id, onLong, ready, members, paused) {
+  const [seen, setActive] = useState(false);
+  // While the full screen viewer covers the feed, nothing in the feed plays or counts time.
+  const active = seen && !paused;
   const started = useRef(0);
   const impressed = useRef(false);
   const longTimer = useRef(null);
@@ -182,7 +185,7 @@ function useVisibility(ref, id, onLong, ready, members) {
   return active;
 }
 
-function identity(it) {
+export function identity(it) {
   const perf = it.performers || [];
   if (it.source === 'reddit') return { name: `u/${it.author}`, handle: it.author, sub: [it.community] };
   if (it.source === 'redgifs') return { name: it.author ? `@${it.author}` : 'RedGIFs', handle: it.author, sub: ['RedGIFs'] };
@@ -192,7 +195,7 @@ function identity(it) {
   return { name: it.author || it.community || it.source, handle: it.author, sub: [it.community] };
 }
 
-export default function Post({ item: initial, focus = false, onStrong }) {
+export default function Post({ item: initial, focus = false, onStrong, onImmersive }) {
   const { toast, setFilters, runSearch, kinks: allKinks, refreshMeta } = useApp();
   const [item, setItem] = useState(initial);
   const itemRef = useRef(initial);
@@ -238,7 +241,8 @@ export default function Post({ item: initial, focus = false, onStrong }) {
   };
   const ref = useRef(null);
   const [ready, setReady] = useState(false);
-  const active = useVisibility(ref, item.id, strong, ready, item.collection?.members);
+  const tkOpen = useTkOpen();
+  const active = useVisibility(ref, item.id, strong, ready, item.collection?.members, tkOpen);
   const near = useNear(ref);
   const mediaRef = useRef(null);
   const lastH = useRef(null);
@@ -250,11 +254,30 @@ export default function Post({ item: initial, focus = false, onStrong }) {
   // Double-tapping the picture or video likes the post, like on Instagram. A single tap on an image waits a moment
   // so a double tap does not also open it.
   const tap = useRef({ t: 0, x: 0, y: 0, timer: null, pass: false });
-  function onMediaClick(e) {
+  // A video with its own controls gets no click from a finger tap (Safari and Chrome keep it for the controls), so
+  // on a touch screen a short tap on a video is picked up from the pointer itself.
+  const pdown = useRef(null);
+  const lastPtrTap = useRef(0);
+  function onMediaPointerDown(e) { pdown.current = e.pointerType === 'mouse' ? null : { x: e.clientX, y: e.clientY, t: Date.now() }; }
+  function onMediaPointerUp(e) {
+    const d = pdown.current;
+    pdown.current = null;
+    if (!d || !e.target.closest?.('video')) return;
+    if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 12 || Date.now() - d.t > 450) return;
+    lastPtrTap.current = Date.now();
+    onMediaClick(e, true);
+  }
+  function onMediaClick(e, fromPointer = false) {
     const r = tap.current;
+    if (!fromPointer && e.target.closest?.('video') && Date.now() - lastPtrTap.current < 700) return;
     if (r.pass) { r.pass = false; return; }
-    // Players from other sites have no double-tap like at all: every click there is for the player.
-    if (item.media?.kind === 'embed') return;
+    const full = narrowNow && onImmersive ? () => onImmersive(itemRef.current) : null;
+    // Players from other sites have no double-tap like at all: every click there is for the player. On a phone a tap
+    // on one opens it in the full screen viewer, where it plays.
+    if (item.media?.kind === 'embed') {
+      if (full && !e.target.closest('iframe, .embednote, a, .linkbtn')) { e.preventDefault(); e.stopPropagation(); full(); }
+      return;
+    }
     if (e.target.closest('a, input, select, textarea, .mutebtn, .linkbtn, .ghost-btn, .icon-btn, .play, .tbtn, .fsbox, .fsbtn')) return;
     const at = Date.now();
     if (at - r.t < 300 && Math.abs(e.clientX - r.x) < 40 && Math.abs(e.clientY - r.y) < 40) {
@@ -276,83 +299,34 @@ export default function Post({ item: initial, focus = false, onStrong }) {
       r.timer = setTimeout(() => { r.pass = true; btn.click(); }, 300);
       return;
     }
-    // A tap on a video pauses or plays it, but only once it is clear it was not the first tap of a double-tap, so
-    // liking never pauses the video. Taps on the player's own controls (the bar at the bottom) go straight through.
+    // A tap on a video pauses or plays it (on a phone it opens the full screen viewer), but only once it is clear it
+    // was not the first tap of a double-tap, so liking never pauses the video. Taps on the player's own controls (the
+    // bar at the bottom) go straight through.
     const v = e.target.closest('video');
     if (v) {
       const box = v.getBoundingClientRect();
       if (v.controls && e.clientY > box.bottom - 56) return;
-      e.preventDefault();
+      if (!fromPointer) e.preventDefault();
       e.stopPropagation();
       clearTimeout(r.timer);
-      r.timer = setTimeout(() => { if (v.paused) v.play().catch(() => {}); else v.pause(); }, 300);
+      r.timer = setTimeout(() => { if (full) full(); else if (v.paused) v.play().catch(() => {}); else v.pause(); }, 300);
+    } else if (full && e.target.closest('.vidwrap')) {
+      clearTimeout(r.timer);
+      r.timer = setTimeout(full, 300);
     }
   }
   useEffect(() => () => clearTimeout(tap.current.timer), []);
-  const voteRef = useRef(null);
-  const likeByTap = () => { if (itemRef.current.vote > 0) play('up'); else voteRef.current?.(1); };
-
-  voteRef.current = (d) => vote(d);
-  async function vote(dir) {
-    const next = item.vote === dir ? 0 : dir;
-    play(next > 0 ? 'up' : next < 0 ? 'down' : item.vote > 0 ? 'unup' : 'undown');
-    setItem({ ...item, vote: next, autoUp: false, score: item.score - item.vote + next, upvotes: item.upvotes != null ? item.upvotes - (item.vote > 0 ? 1 : 0) + (next > 0 ? 1 : 0) : null });
-    if (next > 0) strong('up');
-    setDownNote(next < 0);
-    try {
-      const r = await api(`/items/${item.id}/vote`, { method: 'POST', body: { dir: next } });
-      if (r.synced && next) toast(next > 0 ? t('Upvoted on Reddit too.') : t('Downvoted on Reddit too.'));
-      else if (!next && item.vote) toast(item.vote > 0 ? t('Like taken back. What it taught your feed is undone.') : t('Dislike taken back. What it taught your feed is undone.'));
-    } catch (e) { toast(e.message); }
-  }
-
-  async function save() {
-    const on = !item.saved;
-    play(on ? 'save' : 'unsave');
-    setItem({ ...item, saved: on });
-    if (on) strong('save');
-    try {
-      const r = await api(`/items/${item.id}/save`, { method: 'POST', body: { on } });
-      toast(on ? (r.synced ? t('Saved here and on Reddit.') : t('Saved.')) : t('Removed from saved. What saving it taught your feed is undone.'));
-    } catch (e) { toast(e.message); }
-  }
-
-  async function less() {
-    play('hide');
-    setLeaving(true);
-    setTimeout(() => setGone(true), window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 720);
-    try {
-      await api(`/items/${item.id}/less`, { method: 'POST', body: {} });
-      toast(t('Hidden. Pick what you did not like, or leave it.'));
-    } catch (e) { toast(e.message); }
-  }
-
-  // Finding something hot is liking it: a heat of 2 flames or more upvotes it too (also on Reddit when that is on).
-  async function rate(n) {
-    const autoUp = n >= AUTO_UP_HEAT && item.vote <= 0;
-    // Heat taken back below two flames also takes back the upvote it gave.
-    const autoDown = n < AUTO_UP_HEAT && item.vote > 0 && item.autoUp;
-    setItem((cur) => ({ ...cur, rating: n, ...(autoUp ? { vote: 1, autoUp: true, upvotes: cur.upvotes != null ? cur.upvotes + 1 - (cur.vote > 0 ? 1 : 0) : null } : autoDown ? { vote: 0, autoUp: false, upvotes: cur.upvotes != null ? cur.upvotes - 1 : null } : {}) }));
-    if (n > 0) strong('rate');
-    try {
-      await api(`/items/${item.id}/rate`, { method: 'POST', body: { value: n } });
-      if (autoUp) await api(`/items/${item.id}/vote`, { method: 'POST', body: { dir: 1 } });
-      if (autoDown) await api(`/items/${item.id}/vote`, { method: 'POST', body: { dir: 0 } });
-      if (!n) { toast(autoDown ? t('Heat and upvote taken back. What they taught your feed is undone.') : t('Heat taken back. What it taught your feed is undone.')); return; }
-      if (n) toast(n >= 4 ? (autoUp ? t('On fire and upvoted. Your feed goes deeper into this.') : t('On fire. Your feed goes deeper into this.')) : (autoUp ? t('Noted how hot this was, and upvoted it. It counts more than an upvote.') : t('Noted how hot this was. It counts more than an upvote.')));
-    } catch (e) { toast(e.message); }
-  }
-
-  // Put this post in one of your kinks, or take it out when the tagging got it wrong.
-  async function setKink(k, on) {
-    setKinkPick(false);
-    try {
-      const r = await api(`/items/${item.id}/kinks`, { method: 'POST', body: { kink: k.id, on } });
-      setItem((cur) => ({ ...cur, kinks: r.item.kinks, tags: r.item.tags }));
-      toast(on ? t('Added to {name}.', { name: k.name }) : t('Taken out of {name}: the tags that put it there are removed from this post.', { name: k.name }));
-      refreshMeta?.();
-    } catch (e) { toast(e.message); }
-  }
+  const [downNote, setDownNote] = useState(false);
+  const acts = usePostActions(item, setItem, {
+    play, strong, toast, refreshMeta,
+    onDown: setDownNote,
+    onHide: () => { setLeaving(true); setTimeout(() => setGone(true), window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 720); }
+  });
+  const { vote, save, less, rate } = acts;
+  const likeByTap = () => acts.like();
+  const setKink = (k, on) => { setKinkPick(false); acts.setKink(k, on); };
+  // Hidden in the full screen viewer: gone here too.
+  useEffect(() => { if (item.hiddenNow && !gone) setGone(true); }, [item.hiddenNow]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function applyPatch(patch) {
     if (patch.hidden) setGone(true);
@@ -361,10 +335,7 @@ export default function Post({ item: initial, focus = false, onStrong }) {
   }
 
   const toggle = (p) => setPanel((cur) => (cur === p ? null : p));
-  async function dropTag(tag) {
-    setItem((cur) => ({ ...cur, tags: (cur.tags || []).filter((x) => (typeof x === 'string' ? x : x.name) !== tag) }));
-    try { const r = await api(`/items/${item.id}/tags/${encodeURIComponent(tag)}`, { method: 'DELETE' }); if (r.item) setItem((cur) => ({ ...cur, ...r.item, vote: cur.vote })); toast(t('{tag} taken off this post. The tagger will use it more carefully.', { tag })); } catch (e) { toast(e.message); }
-  }
+  const dropTag = (tag) => acts.dropTag(tag);
   const goneRef = useRef(null);
   useEffect(() => {
     if (!gone) return;
@@ -382,13 +353,20 @@ export default function Post({ item: initial, focus = false, onStrong }) {
   // Opening a profile, a performer or any panel under the post scrolls it into view.
   useEffect(() => {
     if (!panel) return undefined;
-    const tm = setTimeout(() => panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 60);
+    // A profile starts right under the top bar, so you see it from its top instead of its last lines.
+    const isProfile = panel === 'profile' || panel.startsWith('performer:') || panel.startsWith('person:');
+    const tm = setTimeout(() => {
+      const el = panelRef.current;
+      if (!el) return;
+      if (!isProfile) { el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); return; }
+      const top = document.querySelector('header.top')?.getBoundingClientRect().bottom || 70;
+      window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top - top - 10, behavior: 'smooth' });
+    }, 90);
     return () => clearTimeout(tm);
   }, [panel]);
   const openPerson = (p) => setPanel(`person:${p.platform || 'any'}|${p.handle}`);
   const trTitle = useTranslate(item, 'title');
   const trBody = useTranslate(item, 'body');
-  const [downNote, setDownNote] = useState(false);
   // On a phone the kinks and tags stay on one line; a button at its end opens them all.
   useEffect(() => {
     const el = chipsRef.current;
@@ -449,7 +427,7 @@ export default function Post({ item: initial, focus = false, onStrong }) {
         </div>
       ) : null}
       {!isText ? <p className="ptitle"><Linkify text={trTitle.text || item.title} source={item.source} onPerson={openPerson} /><TranslateButton tr={trTitle} small /><TranslatedNote tr={trTitle} /></p> : null}
-      <div ref={mediaRef} className="pmedia" onClickCapture={onMediaClick}><PostFx fx={fx} /><HeatFx heat={heat} /><Media item={item} active={active} near={near} height={lastH.current} onPlay={() => strong('play')} onReady={() => setReady(true)} onPerson={openPerson} onLike={item.media?.kind === 'embed' ? undefined : likeByTap} /></div>
+      <div ref={mediaRef} className="pmedia" onClickCapture={onMediaClick} onPointerDownCapture={onMediaPointerDown} onPointerUpCapture={onMediaPointerUp}><PostFx fx={fx} /><HeatFx heat={heat} /><Media item={item} active={active} near={near} height={lastH.current} onPlay={() => strong('play')} onReady={() => setReady(true)} onPerson={openPerson} onLike={item.media?.kind === 'embed' ? undefined : likeByTap} onFull={narrowNow && onImmersive ? () => onImmersive(itemRef.current) : undefined} /></div>
       {!isText && item.body ? <p className="ptext caption"><Linkify text={trBody.text || item.body} source={item.source} onPerson={openPerson} /><TranslateButton tr={trBody} small /><TranslatedNote tr={trBody} /></p> : null}
       {item.aiSummary && !isText ? <p className="aisum">{item.aiSummary}</p> : null}
       <div className={`chipwrap${over && !allTags ? ' over' : ''}`}>
@@ -502,7 +480,7 @@ export default function Post({ item: initial, focus = false, onStrong }) {
         <div className="grp end" onClick={(e) => { if (menu && e.target.closest('button, a')) setTimeout(() => setMenu(false), 120); }}>
           <button type="button" className={`pb icon${panel === 'ask' ? ' on' : ''}`} onClick={() => toggle('ask')} aria-label={t('Ask or tell the assistant about this post')} title={t('Ask or tell the assistant')}><Icon name="ask" /><span className="pblabel">{t('Ask the assistant')}</span></button>
           <button type="button" className={`pb icon${panel === 'why' ? ' on' : ''}`} onClick={() => toggle('why')} aria-label={t('Why this')} title={t('Why this')}><Icon name="why" /><span className="pblabel">{t('Why this')}</span></button>
-          <button type="button" className={`pb icon${item.saved ? ' on' : ''}`} onClick={save} aria-label={item.saved ? t('Unsave') : t('Save')} title={item.saved ? plain(t('Saved [button state]')) : t('Save')}><Icon name="save" filled={item.saved} /><span className="pblabel">{item.saved ? t('Unsave') : t('Save')}</span></button>
+          <button type="button" className={`pb icon savebtn${item.saved ? ' on' : ''}`} onClick={save} aria-label={item.saved ? t('Unsave') : t('Save')} title={item.saved ? plain(t('Saved [button state]')) : t('Save')}><Icon name="save" filled={item.saved} /><span className="pblabel">{item.saved ? t('Unsave') : t('Save')}</span></button>
           <button type="button" className="pb icon" onClick={less} aria-label={t('Less like this')} title={t('Less like this')}><Icon name="less" /><span className="pblabel">{t('Less like this')}</span></button>
           {item.url ? <a className="pb icon" href={item.url} target="_blank" rel="noreferrer noopener" aria-label={t('Open on source')} title={t('Open on the original site')} onClick={() => track(item.id, 'open')}><Icon name="open" /><span className="pblabel">{t('Open on the original site')}</span></a> : null}
         </div>
