@@ -3,6 +3,27 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.22.2 · 9 October 2026
+
+### Full screen on a phone
+- Videos stay in the middle of the screen again, under the buttons (the 0.22.1 change that moved wide videos above the buttons is undone).
+- Videos of a minute or more get a small row under the video: −15 seconds, the phone's own full screen player, +15 seconds.
+- Holding the side of a video of a minute or more plays it at 5x instead of 2x; shorter videos stay at 2x.
+- The background behind a post takes the colours of what is playing (or of the picture), and fades as the video changes.
+- While you swipe through the viewer, the feed behind it follows along, so closing the viewer puts you back on the same post with everything above it already loaded.
+
+### Feed on a phone
+- A tap on a video in the feed pauses or plays it again; the full screen viewer only opens from the full screen button, or when you go full screen with the player's own button.
+- Players from other sites in the feed get a full screen button too. Pornhub, RedTube, YouPorn and Eporner videos now play in the feed in the phone's own player as well (the site's player stays the fallback).
+- Fixed: a player could stop by itself right after pressing play when the feed swapped it for another player.
+- Tags, kinks and the × that removes a tag no longer react when your finger lands on them to stop or start a scroll; only a real tap counts. This also applies in the full screen viewer.
+
+### How what you watch counts
+- Time spent watching now counts more the longer it is, and it no longer stops at a tiny maximum: about 0,6 points for 9 seconds, 1,5 for 30 seconds, 2,3 for a minute, 3,2 for two minutes, 4,4 for five and 5,4 for ten. Before, 9 seconds and 2 minutes both gave 0,3. Several visits to the same post add up to the total time.
+- A like, a save or heat counts more the longer you had watched: half after a glance, in full after two minutes. Time watched after liking brings it up the same way, so the order does not matter. A dislike still counts in full right away.
+- Watching to the end and loops count less than before (time itself now carries that).
+- Your taste and history are recalculated once with the new weights when you update.
+
 ## 0.22.1 · 9 October 2026
 
 ### Full screen on a phone

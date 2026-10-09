@@ -486,16 +486,19 @@ export default function FeedView() {
   }
 
   const openTk = useCallback((it) => { if (inViewer(it)) setTk({ id: it.id }); }, []);
-  // Leaving the viewer puts the feed on the post you were last on.
+  // The feed follows the viewer in the background (so what is above the post has loaded and settled by the time you
+  // come back), and leaving the viewer puts it exactly on the post you were last on.
+  const toPost = useCallback((id) => {
+    const el = id && document.querySelector(`.feed article.post[data-id="${id}"]`);
+    if (!el) return;
+    const top = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--toph'), 10) || 60;
+    window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top - top, behavior: 'auto' });
+  }, []);
   const closeTk = useCallback((lastId) => {
     setTk(null);
-    requestAnimationFrame(() => {
-      const el = lastId && document.querySelector(`.feed article.post[data-id="${lastId}"]`);
-      if (!el) return;
-      const top = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--toph'), 10) || 60;
-      window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top - top, behavior: 'auto' });
-    });
-  }, []);
+    toPost(lastId);
+    requestAnimationFrame(() => { toPost(lastId); setTimeout(() => toPost(lastId), 120); });
+  }, [toPost]);
   const imm = narrow ? openTk : undefined;
   const list = [];
   const flat = [];
@@ -523,7 +526,7 @@ export default function FeedView() {
       {error ? <div className="empty">{error}</div> : null}
       {wider && items.length ? <div className="deeper"><span className="deeper-why">{t('Few exact matches left, now also showing close matches')}</span></div> : null}
       {fresh ? <button type="button" className="freshbar" onClick={() => { reset(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>{t('New results from your sources are in · Show them')}</button> : null}
-      {tk && narrow ? <ErrorBoundary name="Viewer"><Immersive items={flat} startId={tk.id} onClose={closeTk} onMore={() => loadMoreRef.current?.()} loading={loading || finding} done={done} onStrong={onStrong} /></ErrorBoundary> : null}
+      {tk && narrow ? <ErrorBoundary name="Viewer"><Immersive items={flat} startId={tk.id} onClose={closeTk} onCurrent={toPost} onMore={() => loadMoreRef.current?.()} loading={loading || finding} done={done} onStrong={onStrong} /></ErrorBoundary> : null}
       <div className="sentinel" ref={sentinel}>
         {finding || loading || waiting ? (
           <span className="finding"><span className="spin" />{finding ? t('Finding more like this on your sources…') : waiting ? t('Nothing left that matches. Checking your sources once more shortly…') : t('Loading more…')}</span>

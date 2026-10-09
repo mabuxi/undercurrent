@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { api, ago, fmtDur, fmtNum, formatMeta, imgSrc, LABELS, proxied, rgba, track } from '../api.js';
 import { useApp } from '../context.jsx';
 import { Icon } from '../icons.jsx';
-import { VideoPlayer } from './Media.jsx';
+import { VideoPlayer, DIRECT } from './Media.jsx';
 import { PostFx, HeatFx } from './PostFx.jsx';
 import { AskPanel, Avatar, CommentsPanel, ProfilePanel, PerformerPanel, PersonPanel, WhyPanel } from './Panels.jsx';
 import { DislikeNote, HAS_COMMENTS, identity } from './Post.jsx';
@@ -11,6 +11,7 @@ import { usePostActions } from '../postactions.js';
 import { setTkOpen, withChanges } from '../tk.js';
 import { soundOn, setSound, onSound } from '../sound.js';
 import { t, tn } from '../i18n.js';
+import { tapOnly } from '../tapguard.js';
 
 // The full screen viewer on a phone, like TikTok: one post fills the screen, a swipe up or down snaps to the next or
 // the previous one, nothing else in between (no windows), and the tab bar is out of the way. Everything a post can do
@@ -29,9 +30,8 @@ function SafeImg({ url, className, onLoad, onFail }) {
   return <img className={className} src={stage === 0 ? imgSrc(url) : proxied(url)} alt="" referrerPolicy="no-referrer" onLoad={onLoad} onError={() => { if (stage === 1) onFail?.(); setStage((s) => s + 1); }} draggable={false} />;
 }
 
-// Sites whose player an iPhone often shows black: their video file is played in the phone's own player instead,
-// through the Mac, so it starts by itself, can go 2x and fills the screen. Their own player stays the fallback.
-const DIRECT = new Set(['pornhub', 'redtube', 'youporn', 'eporner']);
+// Sites whose player an iPhone often shows black (DIRECT): their video file is played in the phone's own player
+// instead, through the Mac, so it starts by itself, can go faster and fills the screen.
 
 function TkEmbed({ item, active, preload, onReady, vref, onPlay, sandboxed, onNative }) {
   const [m, setM] = useState(item.media);
@@ -110,15 +110,20 @@ function TkMedia({ item, active, preload, vref, onReady, onPlay, sandboxed, onNa
 }
 
 // The thin line at the bottom of a video: how far it is, and drag it to jump.
-function TkProgress({ vref, active, slideRef }) {
+function TkProgress({ vref, active, slideRef, onMeta }) {
   const bar = useRef(null);
   const [scrub, setScrub] = useState(null);
+  const sent = useRef('');
   useEffect(() => {
     if (!active) return undefined;
     let raf = 0;
     const loop = () => {
       const v = vref.current;
-      if (v && v.duration && isFinite(v.duration) && bar.current) bar.current.style.width = `${(v.currentTime / v.duration) * 100}%`;
+      if (v && v.duration && isFinite(v.duration)) {
+        if (bar.current) bar.current.style.width = `${(v.currentTime / v.duration) * 100}%`;
+        const key = `${Math.round(v.duration)}|${v.videoWidth}|${v.videoHeight}`;
+        if (key !== sent.current) { sent.current = key; onMeta?.({ d: v.duration, w: v.videoWidth, h: v.videoHeight }); }
+      }
       slideRef.current?.classList.toggle('paused', !!v && v.paused && v.readyState >= 2 && !v.ended);
       raf = requestAnimationFrame(loop);
     };
@@ -308,6 +313,70 @@ function HeatRail({ value, onChange, onLive }) {
   );
 }
 
+// The background behind a post takes the colours of what is playing: a tiny copy of the frame (or the picture) is
+// averaged every second and a half, the vivid parts counting more, and the glow fades to the new colour. Files from
+// sites that do not allow reading their pixels use the cover picture through the Mac instead.
+function toneOf(data) {
+  let r = 0, g = 0, b = 0, n = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const R = data[i], G = data[i + 1], B = data[i + 2];
+    const mx = Math.max(R, G, B), mn = Math.min(R, G, B);
+    if (mx < 18) continue;
+    const w = 1 + ((mx - mn) / (mx || 1)) * 3;
+    r += R * w; g += G * w; b += B * w; n += w;
+  }
+  if (!n) return null;
+  r /= n * 255; g /= n * 255; b /= n * 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  let h = 0;
+  const d = mx - mn;
+  if (d) h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  const l = (mx + mn) / 2;
+  const s = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
+  return `hsl(${Math.round(((h * 60) + 360) % 360)} ${Math.round(Math.min(0.85, s * 1.3) * 100)}% ${Math.round(Math.max(0.2, Math.min(0.42, l)) * 100)}% / 0.8)`;
+}
+function sample(src) {
+  const c = document.createElement('canvas');
+  c.width = 16; c.height = 16;
+  const x = c.getContext('2d', { willReadFrequently: true });
+  x.drawImage(src, 0, 0, 16, 16);
+  return toneOf(x.getImageData(0, 0, 16, 16).data);
+}
+function useAmbient(active, vref, zoomRef, ambRef, item) {
+  useEffect(() => {
+    if (!active) return undefined;
+    let alive = true;
+    let fromPoster = false;
+    let blank = 0;
+    const set = (col) => {
+      if (!col) { if (++blank >= 3) posterTone(); return; }
+      if (alive && ambRef.current) ambRef.current.style.setProperty('--amb', col);
+    };
+    const m = item.media || {};
+    const still = m.poster || m.thumbs?.[0] || m.mid || m.src || m.items?.[0]?.mid || m.items?.[0]?.src;
+    const posterTone = () => {
+      if (fromPoster || !still) return;
+      fromPoster = true;
+      const im = new Image();
+      im.onload = () => { try { const col = sample(im); if (col && alive && ambRef.current) ambRef.current.style.setProperty('--amb', col); } catch {} };
+      im.src = proxied(still);
+    };
+    const tick = () => {
+      const v = vref.current;
+      if (v && v.readyState >= 2 && !fromPoster) {
+        try { set(sample(v)); } catch { posterTone(); }
+        return;
+      }
+      const img = zoomRef.current?.querySelector('img');
+      if (img?.complete && img.naturalWidth && !fromPoster) { try { set(sample(img)); } catch { posterTone(); } return; }
+      if (!v) posterTone();
+    };
+    const first = setTimeout(tick, 350);
+    const iv = setInterval(tick, 1500);
+    return () => { alive = false; clearTimeout(first); clearInterval(iv); };
+  }, [active, item.id]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
 function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave }) {
   const { toast, refreshMeta, setFilters, runSearch, kinks: allKinks } = useApp();
   const [item, setItem] = useState(() => withChanges(initial));
@@ -321,10 +390,12 @@ function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave
   const [kinkPick, setKinkPick] = useState(false);
   const [native, setNative] = useState(false);
   const [sandboxed, setSandboxed] = useState(true);
-  const [fast, setFast] = useState(false);
-  const [box, setBox] = useState(null);
+  const [fast, setFast] = useState(0);
+  const [vmeta, setVmeta] = useState(null);
+  const [ctlTop, setCtlTop] = useState(null);
   const vref = useRef(null);
-  const railRef = useRef(null);
+  const infoRef = useRef(null);
+  const ambRef = useRef(null);
   const slideRef = useRef(null);
   const stageRef = useRef(null);
   const zoomRef = useRef(null);
@@ -366,26 +437,46 @@ function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave
 
   const isEmbed = item.media?.kind === 'embed';
   const isVideo = item.media?.kind === 'video' || item.media?.kind === 'redgifs' || (isEmbed && native);
-  // A wide video or a player from another site sits above the buttons instead of under them: its box ends where
-  // the buttons start, and the video fits inside it.
-  const wide = (isEmbed && item.format !== 'short') || ((item.media?.kind === 'video' || item.media?.kind === 'redgifs') && ((item.width && item.height && item.width > item.height * 1.1) || (!item.height && item.format === 'long')));
+  // A longer video (a minute or more) gets a small row under it: back 15 seconds, the phone's own full screen
+  // player, forward 15 seconds. The video itself stays in the middle, under the buttons.
+  const dur = vmeta?.d || item.duration || 0;
+  const isLong = isVideo && (dur ? dur >= 60 : item.format === 'long');
   useLayoutEffect(() => {
-    if (!wide) { setBox(null); return undefined; }
+    if (!isLong || !active) return undefined;
     const fit = () => {
-      const sl = slideRef.current?.getBoundingClientRect();
-      const rail = railRef.current?.getBoundingClientRect();
-      const topBtn = document.querySelector('.tk-top .tk-tb')?.getBoundingClientRect();
-      if (!sl || !rail) return;
-      // The top buttons stay put while the slides move, so their bottom is the same distance into every slide.
-      const top = Math.max(0, (topBtn ? topBtn.bottom : 56) + 6);
-      const h = Math.max(120, rail.top - sl.top - top - 10);
-      setBox((b) => (b && b.top === top && b.h === h ? b : { top, h }));
+      const st = stageRef.current;
+      const sl = slideRef.current;
+      if (!st || !sl) return;
+      const v = vref.current;
+      const W = st.clientWidth;
+      const H = st.clientHeight;
+      const ar = v?.videoWidth && v?.videoHeight ? v.videoWidth / v.videoHeight : item.width && item.height ? item.width / item.height : 16 / 9;
+      const bottom = H / 2 + Math.min(H, W / ar) / 2;
+      const info = infoRef.current?.getBoundingClientRect();
+      const infoTop = info ? info.top - sl.getBoundingClientRect().top : H - 150;
+      const top = Math.round(Math.max(90, Math.min(bottom + 10, infoTop - 48)));
+      setCtlTop((x) => (x === top ? x : top));
     };
     fit();
     window.addEventListener('resize', fit);
     return () => window.removeEventListener('resize', fit);
-  }, [wide, active]);
-  // Holding the left or right side of a video plays it at 2x until you let go.
+  }, [isLong, active, vmeta, open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const skipBy = (s2) => {
+    const v = vref.current;
+    if (!v || !v.duration || !isFinite(v.duration)) return;
+    v.currentTime = Math.max(0, Math.min(v.duration - 0.5, v.currentTime + s2));
+  };
+  const nativeFull = () => {
+    const v = vref.current;
+    if (!v) return;
+    try {
+      if (document.fullscreenEnabled && v.requestFullscreen) v.requestFullscreen().catch(() => v.webkitEnterFullscreen?.());
+      else v.webkitEnterFullscreen?.();
+    } catch {}
+    track(item.id, 'open');
+  };
+  useAmbient(active && !hidden, vref, zoomRef, ambRef, item);
+  // Holding the left or right side of a video plays it faster until you let go: 2x, or 5x for a longer video.
   const hold = useRef({ timer: null, x: 0, y: 0, until: 0 });
   const holdStart = (e) => {
     const v = vref.current;
@@ -396,14 +487,22 @@ function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave
     const h = hold.current;
     h.x = e.clientX; h.y = e.clientY;
     clearTimeout(h.timer);
-    h.timer = setTimeout(() => { const vv = vref.current; if (!vv) return; vv.playbackRate = 2; if (vv.paused) vv.play().catch(() => {}); setFast(true); h.until = Infinity; }, 380);
+    h.timer = setTimeout(() => {
+      const vv = vref.current;
+      if (!vv) return;
+      const want = isLong ? 5 : 2;
+      try { vv.playbackRate = want; } catch { try { vv.playbackRate = 2; } catch {} }
+      if (vv.paused) vv.play().catch(() => {});
+      setFast(vv.playbackRate > 1 ? vv.playbackRate : want);
+      h.until = Infinity;
+    }, 380);
   };
   const holdMove = (e) => { const h = hold.current; if (h.timer && Math.hypot(e.clientX - h.x, e.clientY - h.y) > 10) { clearTimeout(h.timer); h.timer = null; } };
   const holdEnd = () => {
     const h = hold.current;
     clearTimeout(h.timer);
     h.timer = null;
-    if (fast) { const v = vref.current; if (v) v.playbackRate = 1; setFast(false); h.until = Date.now() + 450; }
+    if (fast) { const v = vref.current; if (v) v.playbackRate = 1; setFast(0); h.until = Date.now() + 450; }
   };
   useEffect(() => { if (!active && fast) holdEnd(); }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
   const tap = useRef({ t: 0, timer: null });
@@ -476,8 +575,8 @@ function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave
           <div className="tk-sec"><span className="fb-label">{t('Kinks')}</span><div className="chiprow all">
             {(item.kinks || []).map((k) => (
               <span key={k.id} className="chip link kchip" style={{ '--c': k.color, '--c2': rgba(k.color, 0.16) }}>
-                <button type="button" onClick={() => leaveTo(() => setFilters({ kink: k.id }))}>{k.name}</button>
-                <button type="button" className="kx" onClick={() => acts.setKink(k, false)} aria-label={t('This post is not {name}', { name: k.name })}><Icon name="x" /></button>
+                <button type="button" onClick={tapOnly(() => leaveTo(() => setFilters({ kink: k.id })))}>{k.name}</button>
+                <button type="button" className="kx" onClick={tapOnly(() => acts.setKink(k, false))} aria-label={t('This post is not {name}', { name: k.name })}><Icon name="x" /></button>
               </span>
             ))}
             {kinkPick ? (
@@ -490,8 +589,8 @@ function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave
           <div className="tk-sec"><span className="fb-label">{t('Tags')}</span><div className="chiprow all">
             {tags.map((tag) => (
               <span key={tag} className={`chip ghost tagx${item.liked?.includes(tag) ? ' mine' : ''}`}>
-                <button type="button" onClick={() => leaveTo(() => runSearch(tag).catch(() => setFilters({ tags: [tag] })))}>{tag}</button>
-                <button type="button" className="kx" onClick={() => acts.dropTag(tag)} aria-label={t('Take {tag} off this post', { tag })} title={t('Does not fit: take it off')}><Icon name="x" /></button>
+                <button type="button" onClick={tapOnly(() => leaveTo(() => runSearch(tag).catch(() => setFilters({ tags: [tag] }))))}>{tag}</button>
+                <button type="button" className="kx" onClick={tapOnly(() => acts.dropTag(tag))} aria-label={t('Take {tag} off this post', { tag })} title={t('Does not fit: take it off')}><Icon name="x" /></button>
               </span>
             ))}
           </div></div>
@@ -518,18 +617,26 @@ function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave
   })();
 
   return (
-    <div ref={slideRef} className={`tk-s${zoomed ? ' zoomed' : ''}${open ? ' open' : ''}${box ? ' wide' : ''}`} style={{ '--c': c, '--c2': rgba(c, 0.3) }}>
+    <div ref={slideRef} className={`tk-s${zoomed ? ' zoomed' : ''}${open ? ' open' : ''}`} style={{ '--c': c, '--c2': rgba(c, 0.3) }}>
+      <div className="tk-amb" ref={ambRef} aria-hidden="true" />
       <div className="tk-stage" ref={stageRef} onClick={onTap} onPointerDown={holdStart} onPointerMove={holdMove} onPointerUp={holdEnd} onPointerCancel={holdEnd} onContextMenu={(e) => e.preventDefault()}>
-        <div className="tk-zoom" ref={zoomRef} style={box ? { top: box.top, height: box.h, bottom: 'auto', '--boxh': `${box.h}px` } : undefined}>
+        <div className="tk-zoom" ref={zoomRef}>
           <TkMedia item={item} active={active && !hidden} preload={preload} vref={vref} onReady={() => setReady(true)} onPlay={() => strong('play')} sandboxed={sandboxed} onNative={setNative} />
         </div>
-        {fast ? <span className="tk-fast" aria-live="polite">2× <Icon name="chevR" /><Icon name="chevR" /></span> : null}
+        {fast ? <span className="tk-fast" aria-live="polite">{String(fast).replace('.', ',')}× <Icon name="chevR" /><Icon name="chevR" /></span> : null}
         <PostFx fx={fx} />
         <HeatFx heat={heat} />
         {isVideo ? <span className="tk-pausedicon" aria-hidden="true"><Icon name="play" filled /></span> : null}
       </div>
       <div className="tk-shade" aria-hidden="true" />
-      <div className="tk-rail" ref={railRef}>
+      {isLong && ctlTop != null && !hidden ? (
+        <div className="tk-ctl" style={{ top: ctlTop }}>
+          <button type="button" onClick={() => skipBy(-15)} aria-label={t('Back 15 seconds')}>−15</button>
+          <button type="button" className="fs" onClick={nativeFull} aria-label={t('Open in the full screen player')} title={t('Open in the full screen player')}><Icon name="expand" /></button>
+          <button type="button" onClick={() => skipBy(15)} aria-label={t('Forward 15 seconds')}>+15</button>
+        </div>
+      ) : null}
+      <div className="tk-rail">
         <button type="button" className="tk-av" onClick={() => setSheet(who)} aria-label={t('Show profile of {name}', { name: id.name })}>
           {item.media?.avatar ? <img className="avatar av-m avimg" src={item.media.avatar} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.display = 'none'; }} /> : <Avatar name={id.name} />}
         </button>
@@ -540,7 +647,7 @@ function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave
         <button type="button" className={`tk-b save${item.saved ? ' on' : ''}`} onClick={acts.save} aria-label={item.saved ? t('Unsave') : t('Save')}><Icon name="save" filled={item.saved} /></button>
         <button type="button" className="tk-b" onClick={() => setSheet('more')} aria-label={t('More actions')}><Icon name="dots" filled /></button>
       </div>
-      <div className="tk-info">
+      <div className="tk-info" ref={infoRef}>
         <button type="button" className="tk-who" onClick={() => setSheet(who)}><strong>{id.name}</strong><span>{sub}</span></button>
         {title ? <button type="button" className="tk-title" onClick={() => setOpen((o) => !o)} aria-expanded={open}>{title}</button> : null}
         {open ? (
@@ -551,13 +658,13 @@ function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave
           </div>
         ) : null}
         <div className="tk-tags">
-          {(item.performers || []).slice(0, 3).map((p) => <button type="button" key={`p${p}`} className="tk-chip perf" onClick={() => { setSheet(`performer:${p}`); strong('performer'); }}><Icon name="person" />{String(p).replace(/^@+/, '')}</button>)}
-          {(item.kinks || []).map((k) => <button type="button" key={`k${k.id}`} className="tk-chip kink" style={{ '--c': k.color }} onClick={() => leaveTo(() => setFilters({ kink: k.id }))}>{k.name}</button>)}
-          {tags.slice(0, 12).map((tag) => <button type="button" key={tag} className="tk-chip" onClick={() => leaveTo(() => runSearch(tag).catch(() => setFilters({ tags: [tag] })))}>#{tag}</button>)}
+          {(item.performers || []).slice(0, 3).map((p) => <button type="button" key={`p${p}`} className="tk-chip perf" onClick={tapOnly(() => { setSheet(`performer:${p}`); strong('performer'); })}><Icon name="person" />{String(p).replace(/^@+/, '')}</button>)}
+          {(item.kinks || []).map((k) => <button type="button" key={`k${k.id}`} className="tk-chip kink" style={{ '--c': k.color }} onClick={tapOnly(() => leaveTo(() => setFilters({ kink: k.id })))}>{k.name}</button>)}
+          {tags.slice(0, 12).map((tag) => <button type="button" key={tag} className="tk-chip" onClick={tapOnly(() => leaveTo(() => runSearch(tag).catch(() => setFilters({ tags: [tag] }))))}>#{tag}</button>)}
         </div>
         <button type="button" className="tk-tagsbtn" onClick={() => setSheet('tags')} aria-label={t('Show all kinks and tags')}><Icon name="tag" /></button>
       </div>
-      {isVideo ? <TkProgress vref={vref} active={active} slideRef={slideRef} /> : null}
+      {isVideo ? <TkProgress vref={vref} active={active} slideRef={slideRef} onMeta={setVmeta} /> : null}
       {hidden ? (
         <div className="tk-gone">
           <p>{hidden === 'block' ? t('Blocked. Nothing from them shows up again; you can unblock them in Memory.') : t('Hidden. The feed will show less like this.')}</p>
@@ -576,7 +683,7 @@ function MuteBtn() {
   return <button type="button" className="tk-tb" onClick={() => setSound(!on)} aria-label={on ? t('Turn sound off') : t('Turn sound on')}><Icon name={on ? 'volume' : 'mute'} /></button>;
 }
 
-export default function Immersive({ items, startId, onClose, onMore, loading, done, onStrong }) {
+export default function Immersive({ items, startId, onClose, onMore, loading, done, onStrong, onCurrent }) {
   const list = items.filter(inViewer);
   const startAt = Math.max(0, list.findIndex((x) => x.id === startId));
   const [cur, setCur] = useState(startAt);
@@ -640,6 +747,13 @@ export default function Immersive({ items, startId, onClose, onMore, loading, do
     window.addEventListener('resize', re);
     return () => window.removeEventListener('resize', re);
   }, [cur]);
+  // The feed behind follows along, so closing the viewer lands on the same post with everything above it loaded.
+  useEffect(() => {
+    const id = list[cur]?.id;
+    if (!id || !onCurrent) return undefined;
+    const tm = setTimeout(() => onCurrent(id), 250);
+    return () => clearTimeout(tm);
+  }, [cur]); // eslint-disable-line react-hooks/exhaustive-deps
   // More posts load before you reach the end.
   useEffect(() => { if (!done && !loading && list.length - cur <= 3) onMore(); }, [cur, list.length, done, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 

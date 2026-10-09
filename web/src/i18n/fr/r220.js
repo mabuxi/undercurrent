@@ -89,5 +89,8 @@ export default {
   "Load without the content blocker": "Charger sans le bloqueur de contenu",
   "Turn the content blocker back on": "Réactiver le bloqueur de contenu",
   "The content blocker is on again for this player.": "Le bloqueur de contenu est de nouveau actif pour ce lecteur.",
-  "Player loaded without the content blocker.": "Lecteur chargé sans le bloqueur de contenu."
+  "Player loaded without the content blocker.": "Lecteur chargé sans le bloqueur de contenu.",
+  "Back 15 seconds": "Reculer de 15 secondes",
+  "Forward 15 seconds": "Avancer de 15 secondes",
+  "Open in the full screen player": "Ouvrir dans le lecteur plein écran"
 };

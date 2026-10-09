@@ -2,6 +2,27 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.22.2 · 9 octobre 2026
+
+### Plein écran sur téléphone
+- Les vidéos restent de nouveau au milieu de l’écran, sous les boutons (le changement de la 0.22.1 qui plaçait les vidéos larges au-dessus des boutons est annulé).
+- Les vidéos d’une minute ou plus ont une petite rangée sous la vidéo : −15 secondes, le lecteur plein écran du téléphone, +15 secondes.
+- Maintenir le côté d’une vidéo d’une minute ou plus la lit en 5x au lieu de 2x ; les vidéos plus courtes restent en 2x.
+- Le fond derrière un post prend les couleurs de ce qui est lu (ou de l’image), et change en douceur avec la vidéo.
+- Pendant que vous faites défiler le plein écran, le fil derrière suit, donc en fermant vous revenez sur le même post avec tout ce qui est au-dessus déjà chargé.
+
+### Fil sur téléphone
+- Un toucher sur une vidéo du fil la met de nouveau en pause ou la relance ; le plein écran ne s’ouvre plus qu’avec le bouton plein écran, ou quand vous passez en plein écran avec le bouton du lecteur.
+- Les lecteurs d’autres sites dans le fil ont aussi un bouton plein écran. Les vidéos Pornhub, RedTube, YouPorn et Eporner se lisent maintenant aussi dans le fil avec le lecteur du téléphone (le lecteur du site reste la solution de secours).
+- Corrigé : un lecteur pouvait s’arrêter tout seul juste après avoir appuyé sur lecture quand le fil le remplaçait par un autre lecteur.
+- Les tags, les kinks et le × qui retire un tag ne réagissent plus quand votre doigt s’y pose pour arrêter ou lancer un défilement ; seul un vrai toucher compte. Pareil dans le plein écran.
+
+### Comment ce que vous regardez compte
+- Le temps passé à regarder compte maintenant d’autant plus qu’il est long, sans s’arrêter à un tout petit maximum : environ 0,6 point pour 9 secondes, 1,5 pour 30 secondes, 2,3 pour une minute, 3,2 pour deux minutes, 4,4 pour cinq et 5,4 pour dix. Avant, 9 secondes et 2 minutes donnaient toutes les deux 0,3. Plusieurs visites du même post s’additionnent en temps total.
+- Un like, une sauvegarde ou de la chaleur comptent d’autant plus que vous aviez regardé longtemps : la moitié après un coup d’œil, en entier après deux minutes. Le temps regardé après le like le complète de la même façon, donc l’ordre ne change rien. Un dislike compte toujours en entier tout de suite.
+- Regarder jusqu’au bout et les boucles comptent moins qu’avant (le temps lui-même porte ça maintenant).
+- Vos goûts et votre historique sont recalculés une fois avec les nouveaux poids à la mise à jour.
+
 ## 0.22.1 · 9 octobre 2026
 
 ### Plein écran sur téléphone

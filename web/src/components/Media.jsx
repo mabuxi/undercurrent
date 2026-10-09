@@ -29,7 +29,8 @@ function useFar(ref, onFar) {
   useEffect(() => {
     const el = ref.current;
     if (!el || typeof IntersectionObserver === 'undefined') return undefined;
-    const io = new IntersectionObserver(([e]) => { if (!e.isIntersecting) cb.current(); }, { rootMargin: '2500px 0px' });
+    // An element taken out of the page (a player swapped for another) is not far away.
+    const io = new IntersectionObserver(([e]) => { if (!e.isIntersecting && e.target.isConnected) cb.current(); }, { rootMargin: '2500px 0px' });
     io.observe(el);
     return () => io.disconnect();
   }, [ref]);
@@ -60,6 +61,30 @@ export function VideoPlayer({ item, active, onPlay, onReady, onFull, onFail, inT
   const watch = useRef({ maxQ: 0, loops: 0, mark: 0, last: 0, completed: false, rew: 0 });
   const loop = item.format !== 'long';
   const [ar, setAr] = useState(item.width && item.height ? item.width / item.height : null);
+  // On a phone, going full screen from the feed (the player's own button too) opens the full screen viewer instead.
+  const fullRef = useRef(onFull);
+  fullRef.current = onFull;
+  const hasFull = !!onFull && !inTk;
+  useEffect(() => {
+    const v = ref.current;
+    if (!v || !hasFull) return undefined;
+    const go = () => {
+      setTimeout(() => {
+        try { if (v.webkitDisplayingFullscreen) v.webkitExitFullscreen?.(); } catch {}
+        if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+      }, 60);
+      fullRef.current?.();
+    };
+    const fc = () => { if (document.fullscreenElement === v || document.webkitFullscreenElement === v) go(); };
+    v.addEventListener('webkitbeginfullscreen', go);
+    document.addEventListener('fullscreenchange', fc);
+    document.addEventListener('webkitfullscreenchange', fc);
+    return () => {
+      v.removeEventListener('webkitbeginfullscreen', go);
+      document.removeEventListener('fullscreenchange', fc);
+      document.removeEventListener('webkitfullscreenchange', fc);
+    };
+  }, [hasFull, src, hlsUrl, armed]);
 
   useEffect(() => { if ((active || hover || preload) && !armed) setArmed(true); }, [active, hover, armed, preload]);
   const wrapRef = useRef(null);
@@ -259,11 +284,15 @@ function thumbSrc(u, forceProxy) {
   return forceProxy || NEEDS_PROXY.test(u) ? proxied(u) : u;
 }
 
+// Sites whose player an iPhone often shows black: on a phone their video file is played in the phone's own player
+// instead, through the Mac. Their own player stays the fallback.
+export const DIRECT = new Set(['pornhub', 'redtube', 'youporn', 'eporner']);
+
 // Only these permissions: the player can run and go fullscreen, but it cannot open new windows or tabs
 // (that is what the "first click opens your browser" ads do) and cannot navigate this page away.
 const SANDBOX = 'allow-scripts allow-same-origin allow-presentation allow-forms';
 
-export function EmbedPlayer({ item, active, onPlay, onReady, sandboxed = true }) {
+export function EmbedPlayer({ item, active, onPlay, onReady, onFull, sandboxed = true }) {
   const [m, setM] = useState(item.media);
   const thumbs = (m.thumbs?.length ? m.thumbs : [m.poster]).filter(Boolean);
   const [i, setI] = useState(0);
@@ -281,6 +310,22 @@ export function EmbedPlayer({ item, active, onPlay, onReady, sandboxed = true })
   const bad = useRef(new Set());
   const refreshed = useRef(false);
   const short = item.format === 'short';
+  // On a phone (where the full screen viewer exists) these sites play in the phone's own player.
+  const [direct, setDirect] = useState(null);
+  const tryDirect = !!onFull && DIRECT.has(item.source);
+  const iframeRef = useRef(null);
+  const fullRef = useRef(onFull);
+  fullRef.current = onFull;
+  useEffect(() => {
+    if (!onFull || !playing) return undefined;
+    const fc = () => {
+      const el = document.fullscreenElement || document.webkitFullscreenElement;
+      if (el && el === iframeRef.current) { document.exitFullscreen?.().catch(() => {}); fullRef.current?.(); }
+    };
+    document.addEventListener('fullscreenchange', fc);
+    document.addEventListener('webkitfullscreenchange', fc);
+    return () => { document.removeEventListener('fullscreenchange', fc); document.removeEventListener('webkitfullscreenchange', fc); };
+  }, [!!onFull, playing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const refresh = async () => {
     if (refreshed.current) { setDead(true); return; }
@@ -336,19 +381,33 @@ export function EmbedPlayer({ item, active, onPlay, onReady, sandboxed = true })
     setPlaying(true);
     track(item.id, 'play');
     onPlay?.();
+    if (tryDirect && direct === null) {
+      setDirect('wait');
+      api(`/items/${item.id}/direct`).then((r) => setDirect(r.direct || false)).catch(() => setDirect(false));
+    }
   }
 
   const c = item.kinks?.[0]?.color || '#E39A83';
   const shown = ready.current.has(thumbs[i]) || i === 0 ? thumbs[i] : m.poster;
   const embedUrl = m.embed && short && !/autoplay/.test(m.embed) ? `${m.embed}${m.embed.includes('?') ? '&' : '?'}autoplay=1` : m.embed;
+  if (playing && direct && direct !== 'wait') {
+    const vItem = { ...item, media: { kind: 'video', src: direct.kind === 'mp4' ? direct.src : undefined, hls: direct.kind === 'hls' ? direct.src : undefined, poster: m.poster ? proxied(m.poster) : undefined, hasAudio: true } };
+    return <VideoPlayer item={vItem} active={active} onReady={onReady} onFull={onFull} onFail={() => setDirect(false)} />;
+  }
+  const fsBtn = onFull ? <button type="button" className="fsbtn emb" onClick={(e) => { e.stopPropagation(); onFull(); }} aria-label={t('Full screen')} title={t('Full screen')}><Icon name="expand" /></button> : null;
   if (dead && !playing) {
     return <div className="media land embed-dead" style={{ '--c': rgba(c, 0.4), '--c2': rgba(c, 0.18) }}><span>{t('This video is no longer available on {provider}.', { provider: m.provider })}</span></div>;
   }
   return (
     <div ref={embedRef} tabIndex={-1} className={`vidwrap${short ? ' tube-short' : ''}`} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
       <div className={`media land${short ? ' shortland' : ''}`} style={{ '--c': rgba(c, 0.55), '--c2': rgba(c, 0.3) }}>
-        {playing ? (
-          <iframe key={sandboxed ? 's' : 'u'} src={embedUrl} title={item.title} sandbox={sandboxed ? SANDBOX : undefined} allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" />
+        {playing && direct === 'wait' ? (
+          <>
+            {shown && posterOk ? <img src={thumbSrc(shown, proxyAll)} alt="" referrerPolicy="no-referrer" /> : null}
+            <span className="spinner" aria-label={t('Loading video')} />
+          </>
+        ) : playing ? (
+          <iframe ref={iframeRef} key={sandboxed ? 's' : 'u'} src={embedUrl} title={item.title} sandbox={sandboxed ? SANDBOX : undefined} allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" />
         ) : (
           <>
             {shown && posterOk ? <img src={thumbSrc(shown, proxyAll)} alt="" loading={active ? 'eager' : 'lazy'} referrerPolicy="no-referrer" onError={onPosterError} onLoad={() => onReady?.()} /> : null}
@@ -358,6 +417,7 @@ export function EmbedPlayer({ item, active, onPlay, onReady, sandboxed = true })
             <button type="button" className="play" onClick={play} aria-label={t('Play in the {provider} player', { provider: m.provider })}><Icon name="play" filled /></button>
           </>
         )}
+        {fsBtn}
       </div>
       {!playing && thumbs.length > 1 ? <div className="longbar" aria-hidden="true"><i style={{ width: `${Math.round(((i + 1) / thumbs.length) * 100)}%` }} /></div> : null}
     </div>
@@ -505,7 +565,7 @@ export function Media({ item, active, near = true, height, onPlay, onReady, onPe
   const m = item.media || {};
   useEffect(() => { if (m.kind === 'text' || !m.kind) onReady?.(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   if (!near && m.kind !== 'text') return <div className="media-sleep" style={{ height: height || 320 }} aria-hidden="true" />;
-  if (m.kind === 'embed') return <EmbedPlayer item={item} active={active} onPlay={onPlay} onReady={onReady} sandboxed={sandboxed} />;
+  if (m.kind === 'embed') return <EmbedPlayer item={item} active={active} onPlay={onPlay} onReady={onReady} onFull={onFull} sandboxed={sandboxed} />;
   if (m.kind === 'video' || m.kind === 'redgifs') return <VideoPlayer item={item} active={active} onPlay={onPlay} onReady={onReady} onFull={onFull} />;
   if (m.kind === 'gallery') return <Gallery item={item} onReady={onReady} />;
   if (m.kind === 'image') return <ImageMedia item={item} src={m.src} mid={m.mid} onReady={onReady} />;

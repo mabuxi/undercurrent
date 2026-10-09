@@ -133,13 +133,13 @@ test('following is for people: subreddits and communities are sources, auto-adde
 
 import { points } from '../src/profile.js';
 
-test('scoring puts save and heat above like, and likes far above watching', () => {
+test('scoring puts save and heat above like, and longer watching above shorter', () => {
   const vid = { format: 'short' };
-  const watchAll = points('progress', 1, vid) + points('complete', null, vid) + points('rewatch', 1, vid) + points('rewatch', 2, vid) + points('dwell', 60000, vid);
   assert.ok(points('rewatch', 1, vid) > points('complete', null, vid));
   assert.ok(points('complete', null, vid) > points('progress', 1, vid));
   assert.ok(points('progress', 0.5, vid) > points('progress', 0.25, vid));
-  assert.ok(points('up') > watchAll, 'a like beats everything passive');
+  assert.ok(points('dwell', 120000, vid) > points('dwell', 9000, vid) * 3, 'two minutes counts far more than nine seconds');
+  assert.ok(points('progress', 1, vid) + points('complete', null, vid) < points('dwell', 60000, vid), 'watching to the end adds little next to the time itself');
   assert.ok(points('rate', 0.5) > points('up'), 'the lowest heat is still above a like');
   assert.ok(points('save') > points('up'));
   assert.ok(points('dwell', 500, vid) < 0, 'a fast skip is a small negative');

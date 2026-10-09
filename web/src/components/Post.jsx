@@ -10,6 +10,7 @@ import { t, tn } from '../i18n.js';
 import { useTranslate, TranslateButton, TranslatedNote } from './Translate.jsx';
 import { usePostActions } from '../postactions.js';
 import { useTkOpen } from '../tk.js';
+import { tapOnly } from '../tapguard.js';
 
 // A performer's photo from the Pornhub performer list, or their initials when there is none.
 function PerfAvatar({ p }) {
@@ -275,13 +276,9 @@ export default function Post({ item: initial, focus = false, onStrong, onImmersi
     const r = tap.current;
     if (!fromPointer && e.target.closest?.('video') && Date.now() - lastPtrTap.current < 700) return;
     if (r.pass) { r.pass = false; return; }
-    const full = narrowNow && onImmersive ? () => onImmersive(itemRef.current) : null;
-    // Players from other sites have no double-tap like at all: every click there is for the player. On a phone a tap
-    // on one opens it in the full screen viewer, where it plays.
-    if (item.media?.kind === 'embed') {
-      if (full && !e.target.closest('iframe, .embednote, a, .linkbtn')) { e.preventDefault(); e.stopPropagation(); full(); }
-      return;
-    }
+    // Players from other sites have no double-tap like at all: every click there is for the player. The full screen
+    // viewer only opens from the full screen button (or the player's own full screen).
+    if (item.media?.kind === 'embed') return;
     if (e.target.closest('a, input, select, textarea, .mutebtn, .linkbtn, .ghost-btn, .icon-btn, .play, .tbtn, .fsbox, .fsbtn')) return;
     const at = Date.now();
     if (at - r.t < 300 && Math.abs(e.clientX - r.x) < 40 && Math.abs(e.clientY - r.y) < 40) {
@@ -303,8 +300,7 @@ export default function Post({ item: initial, focus = false, onStrong, onImmersi
       r.timer = setTimeout(() => { r.pass = true; btn.click(); }, 300);
       return;
     }
-    // A tap on a video pauses or plays it (on a phone it opens the full screen viewer), but only once it is clear it
-    // was not the first tap of a double-tap, so liking never pauses the video. Taps on the player's own controls (the
+    // A tap on a video pauses or plays it, but only once it is clear it was not the first tap of a double-tap, so liking never pauses the video. Taps on the player's own controls (the
     // bar at the bottom) go straight through.
     const v = e.target.closest('video');
     if (v) {
@@ -313,10 +309,7 @@ export default function Post({ item: initial, focus = false, onStrong, onImmersi
       if (!fromPointer) e.preventDefault();
       e.stopPropagation();
       clearTimeout(r.timer);
-      r.timer = setTimeout(() => { if (full) full(); else if (v.paused) v.play().catch(() => {}); else v.pause(); }, 300);
-    } else if (full && e.target.closest('.vidwrap')) {
-      clearTimeout(r.timer);
-      r.timer = setTimeout(full, 300);
+      r.timer = setTimeout(() => { if (v.paused) v.play().catch(() => {}); else v.pause(); }, 300);
     }
   }
   useEffect(() => () => clearTimeout(tap.current.timer), []);
@@ -433,7 +426,7 @@ export default function Post({ item: initial, focus = false, onStrong, onImmersi
             </button>
           ))}
           {(item.people || []).map((p) => (
-            <button type="button" key={p.handle} className={`perf mentionchip${panel === `person:${p.platform}|${p.handle}` ? ' on' : ''}`} onClick={() => { openPerson(p); strong('performer'); }}><Avatar name={p.handle} size="s" />{String(p.handle).replace(/^@+/, '')}</button>
+            <button type="button" key={p.handle} className={`perf mentionchip${panel === `person:${p.platform}|${p.handle}` ? ' on' : ''}`} onClick={tapOnly(() => { openPerson(p); strong('performer'); })}><Avatar name={p.handle} size="s" />{String(p.handle).replace(/^@+/, '')}</button>
           ))}
         </div>
       ) : null}
@@ -452,8 +445,8 @@ export default function Post({ item: initial, focus = false, onStrong, onImmersi
         ) : null}
         {item.kinks?.map((k) => (
           <span key={k.id} className="chip link kchip" style={{ '--c': k.color, '--c2': rgba(k.color, 0.16) }}>
-            <button type="button" onClick={() => setFilters({ kink: k.id })} title={t('Show only {name}', { name: k.name })}>{k.name}</button>
-            <button type="button" className="kx" onClick={() => setKink(k, false)} aria-label={t('This post is not {name}', { name: k.name })} title={t('Not {name}: take it out', { name: k.name })}><Icon name="x" /></button>
+            <button type="button" onClick={tapOnly(() => setFilters({ kink: k.id }))} title={t('Show only {name}', { name: k.name })}>{k.name}</button>
+            <button type="button" className="kx" onClick={tapOnly(() => setKink(k, false))} aria-label={t('This post is not {name}', { name: k.name })} title={t('Not {name}: take it out', { name: k.name })}><Icon name="x" /></button>
           </span>
         ))}
         {kinkPick ? (
@@ -464,8 +457,8 @@ export default function Post({ item: initial, focus = false, onStrong, onImmersi
         ) : <button type="button" className="chip ghost more addkink" onClick={() => setKinkPick(true)} title={t('Add this post to one of your kinks')}>{t('+ kink')}</button>}
         {shownTags.map((tag) => (
           <span key={tag} className={`chip ghost tagx${item.liked?.includes(tag) ? ' mine' : ''}`}>
-            <button type="button" onClick={() => runSearch(tag).catch(() => setFilters({ tags: [tag] }))} title={t('Search everything for {tag}', { tag })}>{tag}</button>
-            <button type="button" className="kx" onClick={() => dropTag(tag)} aria-label={t('Take {tag} off this post', { tag })} title={t('Does not fit: take it off')}><Icon name="x" /></button>
+            <button type="button" onClick={tapOnly(() => runSearch(tag).catch(() => setFilters({ tags: [tag] })))} title={t('Search everything for {tag}', { tag })}>{tag}</button>
+            <button type="button" className="kx" onClick={tapOnly(() => dropTag(tag))} aria-label={t('Take {tag} off this post', { tag })} title={t('Does not fit: take it off')}><Icon name="x" /></button>
           </span>
         ))}
         {tagList.length > 9 || allTags ? <button type="button" className="chip ghost more" onClick={() => setAllTags((x) => !x)}>{allTags ? t('fewer') : t('+{n} tags', { n: tagList.length - 9 })}</button> : null}

@@ -5,7 +5,7 @@ import { getDb, getSetting, setSetting, now, normalizeTag } from './db.js';
 import { buildFeed, presentOne, popRaw } from './rank.js';
 import { blockCreator, unblockCreator, listBlocked } from './blocks.js';
 import { getItem, itemTags, setState, hydrate, recheckBlocks, upsertItem, followed, addTags, removeItemTag } from './store.js';
-import { applyEvents, applyEvent, topTags, rebuildProfile, points } from './profile.js';
+import { applyEvents, applyEvent, topTags, rebuildProfile, replayPoints } from './profile.js';
 import { topReplies } from './threads.js';
 import { lookupPerson, platformPosts, profileUrl } from './people.js';
 import { genderPrefs, setGenderPrefs, autoMale } from './gender.js';
@@ -788,7 +788,7 @@ api.get('/history', wrap((req, res) => {
   const rows = db.prepare(`SELECT e.item_id, MAX(e.ts) last FROM events e WHERE e.item_id IS NOT NULL AND e.type NOT IN ('impression', 'tagboost') ${type ? 'AND e.item_id IN (SELECT item_id FROM events WHERE type = ?)' : ''} GROUP BY e.item_id ORDER BY last DESC LIMIT ?`)
     .all(...(type ? [type] : []), want * 4);
   const cq = db.prepare('SELECT type, COUNT(*) c, COALESCE(SUM(value), 0) v, MAX(value) mx, MAX(ts) t FROM events WHERE item_id = ? GROUP BY type');
-  const evq = db.prepare("SELECT type, value FROM events WHERE item_id = ? AND type != 'impression'");
+  const evq = db.prepare("SELECT type, value FROM events WHERE item_id = ? AND type != 'impression' ORDER BY ts, id");
   const out = [];
   for (const r of rows) {
     if (out.length >= want) break;
@@ -808,12 +808,8 @@ api.get('/history', wrap((req, res) => {
     const dwellMs = counts.dwell?.v || 0;
     const meaningful = Object.keys(counts).some((k) => !['impression', 'dwell', 'progress', 'play', 'skip'].includes(k)) || dwellMs >= 6000 || ((counts.progress?.v || 0) >= 0.5 && dwellMs >= 3000);
     if (!meaningful) continue;
-    let pts = 0;
-    for (const e of evq.all(r.item_id)) if (!VOTES.includes(e.type)) pts += points(e.type, e.value, it);
-    if ((it.vote || 0) > 0) pts += points('up', null, it);
-    if ((it.vote || 0) < 0) pts += points('down', null, it);
-    if (it.saved) pts += points('save', null, it);
-    if ((it.rating || 0) > 0) pts += points('rate', it.rating, it);
+    // Played back in order, the same way the feed learned it.
+    const pts = replayPoints(evq.all(r.item_id), it);
     const video = ['long', 'short', 'gif'].includes(it.format);
     out.push({
       id: it.id, title: it.title, source: it.source, format: it.format, media: it.media, author: it.author, community: it.community, last: r.last,

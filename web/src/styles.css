@@ -1623,6 +1623,7 @@ html.narrow .hello-row>*{flex:none}
 .vidwrap:hover .fsbtn,.fsbtn:focus-visible{opacity:.9}
 @media (hover:none){.fsbtn{opacity:.75}}
 .fsbtn svg{width:16px;height:16px}
+.fsbtn.emb{top:10px}
 .media.fsbox{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;height:100dvh!important;max-width:none!important;max-height:none!important;aspect-ratio:auto!important;margin:0!important;border-radius:0!important;z-index:3000;background:#000;touch-action:none;overflow:hidden}
 .media.fsbox video,.media.fsbox>img{object-fit:contain!important;background:#000;transform:translate(var(--zx,0px),var(--zy,0px)) scale(var(--zs,1));transform-origin:center;will-change:transform}
 .media.fsbox .badge,.media.fsbox .dur{display:none}
@@ -1903,11 +1904,20 @@ html.tkopen .toast{z-index:3100;bottom:auto;top:calc(env(safe-area-inset-top,0px
 .tk-slide{position:relative;height:100%;width:100%;scroll-snap-align:start;scroll-snap-stop:always;overflow:hidden;contain:strict}
 .tk-s{position:absolute;inset:0;background:radial-gradient(90% 60% at 50% 40%,var(--c2,#221A29),transparent 70%),#000}
 .tk-far{background:#000}
+@property --amb{syntax:'<color>';inherits:false;initial-value:transparent}
+.tk-amb{position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 70% at 50% 46%,var(--amb),transparent 76%);transition:--amb 1.4s ease}
+@media (prefers-reduced-motion: reduce){.tk-amb{transition:none}}
+.tk-ctl{position:absolute;left:50%;transform:translateX(-50%);z-index:4;display:flex;align-items:center;gap:10px;transition:opacity .2s}
+.tk-ctl button{all:unset;cursor:pointer;height:34px;min-width:52px;padding:0 10px;box-sizing:border-box;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:700;font-variant-numeric:tabular-nums;color:#F4ECEF;background:rgba(20,14,22,.42);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);-webkit-tap-highlight-color:transparent}
+.tk-ctl button.fs{min-width:34px;width:34px;padding:0}
+.tk-ctl button svg{width:17px;height:17px}
+.tk-ctl button:active{transform:scale(.92)}
+.tk-s.zoomed .tk-ctl{opacity:0;pointer-events:none}
 .tk-stage{position:absolute;inset:0;touch-action:pan-y;overflow:hidden}
 .tk-zoom{position:absolute;inset:0;transform-origin:center;will-change:transform}
 .tk-zoom>.vidwrap{position:absolute;inset:0;display:block}
-.tk .tk-zoom .media{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;aspect-ratio:auto!important;margin:0!important;border-radius:0!important;background:#000!important;animation:none!important}
-.tk .tk-zoom .media video,.tk .tk-zoom .media>img{object-fit:contain!important;background:#000}
+.tk .tk-zoom .media{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;aspect-ratio:auto!important;margin:0!important;border-radius:0!important;background:transparent!important;animation:none!important}
+.tk .tk-zoom .media video,.tk .tk-zoom .media>img{object-fit:contain!important;background:transparent}
 .tk .tk-zoom .mediaerr{position:absolute;left:16px;right:16px;top:45%;text-align:center}
 .tk-img,.tk-gal{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
 .tk-img img{width:100%;height:100%;object-fit:contain;pointer-events:none}
@@ -2120,9 +2130,6 @@ html.narrow .dp-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 .tk-hotfill{position:absolute;left:0;right:0;bottom:0;height:calc(var(--h) * 100%);background:linear-gradient(to top,#F08A4B,#F6C35B);transition:height .08s linear}
 .tk-hotval{position:absolute;left:0;right:0;top:10px;text-align:center;font-size:13px;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6);font-variant-numeric:tabular-nums}
 .tk-hot.open .tk-b.hot svg{background:rgba(240,138,75,.3);color:#F6C35B}
-.tk-s.wide .tk-embed{padding:0;justify-content:center}
-.tk-s.wide .tk-player{width:min(100%,calc(var(--boxh) * 16 / 9));max-height:100%}
-.tk-s.wide .tk-embednote{display:none}
 .tk-fast{position:absolute;left:50%;top:calc(env(safe-area-inset-top,0px) + 64px);transform:translateX(-50%);z-index:5;display:inline-flex;align-items:center;gap:0;padding:6px 12px;border-radius:999px;background:rgba(20,14,22,.55);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);font-weight:700;font-size:14px;color:#fff;pointer-events:none}
 .tk-fast svg{width:13px;height:13px;margin-left:-3px}
 .tk-sheetbody .prof{grid-template-columns:auto minmax(0,1fr);gap:14px;margin-bottom:12px}
