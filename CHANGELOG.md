@@ -3,6 +3,21 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.22.1 · 9 October 2026
+
+### Full screen on a phone
+- Pornhub, RedTube, YouPorn and Eporner videos now play in the phone's own player: the Mac fetches the video file behind the site's player and passes it on (those links only work from the Mac that asked for them). The sites' own players often stayed black on an iPhone. They now start by themselves like other videos, can be paused with a tap, scrubbed, zoomed and sped up. When a file cannot be had, the site's player is used as before. Pornhub gives files up to 480p this way, Eporner up to 1080p, RedTube a stream.
+- Players from other sites that still load in their own player get the autoplay request.
+- Wide videos and players from other sites sit above the buttons on the right instead of under them: the video fits in the space between the top buttons and the column of buttons.
+- Heat is now a vertical slider: a tap on the flame grows it into a slider going up, or hold the flame and slide up to set the heat right away; let go and it is kept.
+- Hold the left or right side of a video to play it at 2x while you hold; a 2x badge shows at the top. (Not possible inside another site's player, so it works on all videos the phone plays itself.)
+- The button with the picture now always opens something: on videos from tube sites that do not say who uploaded them, a sheet explains that and offers only posts from that site and the original page, plus the people in the video.
+- The profile sheet is laid out for a phone: bigger name, stats in tiles, tags on one line, posts in three columns, buttons in two columns.
+- The dark shading over the video is lighter.
+
+### Players from other sites
+- The note under a playing player ("Player stays black? Load it without the blocker") is gone. "Load without the content blocker" (and turning it back on) is now in the ⋯ menu of the post, in the feed on the Mac and on a phone, and in the ⋯ sheet of the full screen viewer.
+
 ## 0.22.0 · 9 October 2026
 
 ### Full screen on a phone

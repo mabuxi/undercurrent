@@ -15,6 +15,7 @@ import { touchSession } from './sessions.js';
 import { listKinks, createKink, updateKink, deleteKink, mergeKinks, unlockKink, listFantasies, saveFantasy, deleteFantasy, setLink, removeLink, kinkIdsForTagNames } from './kinks.js';
 import { writeFantasy, tagsForText, conceptsFor } from './fantasywrite.js';
 import { deeperStep, fantasyTags } from './deeper.js';
+import { directMedia } from './direct.js';
 import { planDiscovery, journeyOutcome } from './discovery.js';
 import { removedConcepts, forgetRemoved, risingConcepts, RULES } from './kinkengine.js';
 import { conceptName } from './concepts.js';
@@ -210,6 +211,15 @@ api.post('/items/:id/refresh-media', wrap(async (req, res) => {
   res.json({ media: fresh.media, refreshed: true });
 }));
 
+// The video file behind a tube site's player, for the phone's own player (see direct.js).
+api.get('/items/:id/direct', wrap(async (req, res) => {
+  const it = getItem(Number(req.params.id));
+  if (!it) return res.status(404).json({ error: tr('Not found') });
+  // Test mode: Pornhub posts play a test file in the phone's player, the others keep the site's player.
+  if (config.mock) return res.json({ direct: it.source === 'pornhub' ? { kind: 'mp4', src: '/api/mock/video/landscape.webm', height: 360 } : null });
+  res.json({ direct: await directMedia(it) });
+}));
+
 api.get('/items/:id/similar', wrap((req, res) => {
   const id = Number(req.params.id);
   const all = tagsForItems([id]).get(id) || [];
@@ -384,13 +394,14 @@ api.get('/proxy', async (req, res) => {
   }
 });
 
-const HLS_HOSTS = [/^v\.redd\.it$/, /\.redd\.it$/, /\.redgifs\.com$/];
+const HLS_HOSTS = [/^v\.redd\.it$/, /\.redd\.it$/, /\.redgifs\.com$/, ...TUBE_CDNS.map(([re]) => re)];
 api.get('/hls', async (req, res) => {
   let u;
   try { u = new URL(String(req.query.url)); } catch { return res.status(400).end(); }
   if (u.protocol !== 'https:' || !HLS_HOSTS.some((re) => re.test(u.hostname))) return res.status(403).end();
   try {
-    const r = await fetch(u, { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15' } });
+    const referer = tubeReferer(u.href);
+    const r = await fetch(u, { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15', ...(referer ? { Referer: referer } : {}) } });
     if (!r.ok) return res.status(r.status).end();
     const text = await r.text();
     const abs = (x) => new URL(x, u).toString();

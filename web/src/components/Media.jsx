@@ -35,7 +35,7 @@ function useFar(ref, onFar) {
   }, [ref]);
 }
 
-export function VideoPlayer({ item, active, onPlay, onReady, onFull, inTk = false, preload = false, exposeRef }) {
+export function VideoPlayer({ item, active, onPlay, onReady, onFull, onFail, inTk = false, preload = false, exposeRef }) {
   // In the feed nothing plays while the full screen viewer covers it; the viewer's own players are not affected.
   const tkOpen = useTkOpen();
   const covered = tkOpen && !inTk;
@@ -53,6 +53,7 @@ export function VideoPlayer({ item, active, onPlay, onReady, onFull, inTk = fals
   useEffect(() => onSound((on) => applyMuted(!on)), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  useEffect(() => { if (error) onFail?.(error); }, [error]); // eslint-disable-line react-hooks/exhaustive-deps
   const [triedProxy, setTriedProxy] = useState(false);
   const [progress, setProgress] = useState(0);
   const readyFired = useRef(false);
@@ -262,7 +263,7 @@ function thumbSrc(u, forceProxy) {
 // (that is what the "first click opens your browser" ads do) and cannot navigate this page away.
 const SANDBOX = 'allow-scripts allow-same-origin allow-presentation allow-forms';
 
-export function EmbedPlayer({ item, active, onPlay, onReady }) {
+export function EmbedPlayer({ item, active, onPlay, onReady, sandboxed = true }) {
   const [m, setM] = useState(item.media);
   const thumbs = (m.thumbs?.length ? m.thumbs : [m.poster]).filter(Boolean);
   const [i, setI] = useState(0);
@@ -273,7 +274,6 @@ export function EmbedPlayer({ item, active, onPlay, onReady }) {
   // The full screen viewer takes over: the player in the feed stops, so two never play at once.
   const tkOpen = useTkOpen();
   useEffect(() => { if (tkOpen && playing) setPlaying(false); }, [tkOpen]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [sandboxed, setSandboxed] = useState(true);
   const [proxyAll, setProxyAll] = useState(false);
   const [dead, setDead] = useState(false);
   const [posterOk, setPosterOk] = useState(true);
@@ -360,13 +360,6 @@ export function EmbedPlayer({ item, active, onPlay, onReady }) {
         )}
       </div>
       {!playing && thumbs.length > 1 ? <div className="longbar" aria-hidden="true"><i style={{ width: `${Math.round(((i + 1) / thumbs.length) * 100)}%` }} /></div> : null}
-      {playing ? (
-        <div className="embednote">
-          {sandboxed
-            ? <>{t('Pop-ups from the player are blocked.')} <button type="button" className="linkbtn" onClick={() => setSandboxed(false)}>{t('Player stays black? Load it without the blocker')}</button></>
-            : <>{t('Loaded without the pop-up blocker.')} <button type="button" className="linkbtn" onClick={() => setSandboxed(true)}>{t('Turn the blocker back on')}</button></>}
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -508,11 +501,11 @@ export function TextBody({ item, onPerson }) {
   );
 }
 
-export function Media({ item, active, near = true, height, onPlay, onReady, onPerson, onLike, onFull }) {
+export function Media({ item, active, near = true, height, onPlay, onReady, onPerson, onLike, onFull, sandboxed }) {
   const m = item.media || {};
   useEffect(() => { if (m.kind === 'text' || !m.kind) onReady?.(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   if (!near && m.kind !== 'text') return <div className="media-sleep" style={{ height: height || 320 }} aria-hidden="true" />;
-  if (m.kind === 'embed') return <EmbedPlayer item={item} active={active} onPlay={onPlay} onReady={onReady} />;
+  if (m.kind === 'embed') return <EmbedPlayer item={item} active={active} onPlay={onPlay} onReady={onReady} sandboxed={sandboxed} />;
   if (m.kind === 'video' || m.kind === 'redgifs') return <VideoPlayer item={item} active={active} onPlay={onPlay} onReady={onReady} onFull={onFull} />;
   if (m.kind === 'gallery') return <Gallery item={item} onReady={onReady} />;
   if (m.kind === 'image') return <ImageMedia item={item} src={m.src} mid={m.mid} onReady={onReady} />;

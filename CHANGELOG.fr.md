@@ -2,6 +2,21 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.22.1 · 9 octobre 2026
+
+### Plein écran sur téléphone
+- Les vidéos Pornhub, RedTube, YouPorn et Eporner se lisent maintenant dans le lecteur du téléphone : le Mac récupère le fichier vidéo derrière le lecteur du site et le transmet (ces liens ne marchent que depuis le Mac qui les a demandés). Les lecteurs des sites restaient souvent noirs sur iPhone. Ces vidéos démarrent maintenant toutes seules comme les autres, se mettent en pause d’un toucher, se parcourent, se zooment et s’accélèrent. Quand le fichier est introuvable, le lecteur du site est utilisé comme avant. Pornhub donne des fichiers jusqu’à 480p de cette façon, Eporner jusqu’à 1080p, RedTube un flux.
+- Les lecteurs d’autres sites qui chargent encore dans leur propre lecteur reçoivent la demande de lecture automatique.
+- Les vidéos larges et les lecteurs d’autres sites se placent au-dessus des boutons de droite au lieu d’être dessous : la vidéo tient dans l’espace entre les boutons du haut et la colonne de boutons.
+- La chaleur est maintenant un curseur vertical : un toucher sur la flamme la déploie en curseur vers le haut, ou maintenez la flamme et glissez vers le haut pour régler la chaleur tout de suite ; en relâchant, elle est gardée.
+- Maintenez le côté gauche ou droit d’une vidéo pour la lire en 2x tant que vous maintenez ; un badge 2x s’affiche en haut. (Impossible dans le lecteur d’un autre site, donc ça marche sur toutes les vidéos que le téléphone lit lui-même.)
+- Le bouton avec l’image ouvre maintenant toujours quelque chose : sur les vidéos de sites qui ne disent pas qui les a mises en ligne, un panneau l’explique et propose seulement les publications de ce site et la page d’origine, plus les personnes dans la vidéo.
+- Le panneau de profil est pensé pour le téléphone : nom plus grand, statistiques en tuiles, tags sur une ligne, publications sur trois colonnes, boutons sur deux colonnes.
+- L’ombre sombre sur la vidéo est plus légère.
+
+### Lecteurs d’autres sites
+- La note sous un lecteur en cours (« Le lecteur reste noir ? Le charger sans le bloqueur ») a disparu. « Charger sans le bloqueur de contenu » (et le réactiver) se trouve maintenant dans le menu ⋯ de la publication, dans le fil sur Mac et sur téléphone, et dans le panneau ⋯ de la visionneuse plein écran.
+
 ## 0.22.0 · 9 octobre 2026
 
 ### Plein écran sur téléphone

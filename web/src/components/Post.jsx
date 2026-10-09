@@ -209,6 +209,10 @@ export default function Post({ item: initial, focus = false, onStrong, onImmersi
   const [leaving, setLeaving] = useState(false);
   const [menu, setMenu] = useState(false);
   const [over, setOver] = useState(0);
+  // Players from other sites load with a blocker for their pop-ups; when one stays black it can load without it.
+  const [unblocked, setUnblocked] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef(null);
   const chipsRef = useRef(null);
   const menuRef = useRef(null);
   // The reaction shows in the middle of the part of the picture you can see, or of the post when the picture is off screen.
@@ -381,6 +385,12 @@ export default function Post({ item: initial, focus = false, onStrong, onImmersi
     ro.observe(el);
     return () => ro.disconnect();
   }, [allTags, item.tags, item.kinks]);
+  useEffect(() => {
+    if (!moreOpen) return undefined;
+    const off = (e) => { if (!moreRef.current?.contains(e.target)) setMoreOpen(false); };
+    document.addEventListener('pointerdown', off, true);
+    return () => document.removeEventListener('pointerdown', off, true);
+  }, [moreOpen]);
   // The ⋯ menu on a phone closes when you tap anywhere else.
   useEffect(() => {
     if (!menu) return undefined;
@@ -393,6 +403,7 @@ export default function Post({ item: initial, focus = false, onStrong, onImmersi
   if (gone) return <div ref={goneRef} className="post gone fxin"><span>{gone === 'block' ? t('Blocked. Nothing from them shows up again; you can unblock them in Memory.') : t('Hidden. The feed will show less like this.')}</span><DislikeNote id={item.id} /></div>;
   const id = identity(item);
   const isText = item.media?.kind === 'text';
+  const isEmbed = item.media?.kind === 'embed';
   const liked = item.media?.rating;
   const votes = item.media?.votes;
   const tagList = item.tags || [];
@@ -427,7 +438,7 @@ export default function Post({ item: initial, focus = false, onStrong, onImmersi
         </div>
       ) : null}
       {!isText ? <p className="ptitle"><Linkify text={trTitle.text || item.title} source={item.source} onPerson={openPerson} /><TranslateButton tr={trTitle} small /><TranslatedNote tr={trTitle} /></p> : null}
-      <div ref={mediaRef} className="pmedia" onClickCapture={onMediaClick} onPointerDownCapture={onMediaPointerDown} onPointerUpCapture={onMediaPointerUp}><PostFx fx={fx} /><HeatFx heat={heat} /><Media item={item} active={active} near={near} height={lastH.current} onPlay={() => strong('play')} onReady={() => setReady(true)} onPerson={openPerson} onLike={item.media?.kind === 'embed' ? undefined : likeByTap} onFull={narrowNow && onImmersive ? () => onImmersive(itemRef.current) : undefined} /></div>
+      <div ref={mediaRef} className="pmedia" onClickCapture={onMediaClick} onPointerDownCapture={onMediaPointerDown} onPointerUpCapture={onMediaPointerUp}><PostFx fx={fx} /><HeatFx heat={heat} /><Media item={item} active={active} near={near} height={lastH.current} onPlay={() => strong('play')} onReady={() => setReady(true)} onPerson={openPerson} onLike={item.media?.kind === 'embed' ? undefined : likeByTap} onFull={narrowNow && onImmersive ? () => onImmersive(itemRef.current) : undefined} sandboxed={!unblocked} /></div>
       {!isText && item.body ? <p className="ptext caption"><Linkify text={trBody.text || item.body} source={item.source} onPerson={openPerson} /><TranslateButton tr={trBody} small /><TranslatedNote tr={trBody} /></p> : null}
       {item.aiSummary && !isText ? <p className="aisum">{item.aiSummary}</p> : null}
       <div className={`chipwrap${over && !allTags ? ' over' : ''}`}>
@@ -482,7 +493,18 @@ export default function Post({ item: initial, focus = false, onStrong, onImmersi
           <button type="button" className={`pb icon${panel === 'why' ? ' on' : ''}`} onClick={() => toggle('why')} aria-label={t('Why this')} title={t('Why this')}><Icon name="why" /><span className="pblabel">{t('Why this')}</span></button>
           <button type="button" className={`pb icon savebtn${item.saved ? ' on' : ''}`} onClick={save} aria-label={item.saved ? t('Unsave') : t('Save')} title={item.saved ? plain(t('Saved [button state]')) : t('Save')}><Icon name="save" filled={item.saved} /><span className="pblabel">{item.saved ? t('Unsave') : t('Save')}</span></button>
           <button type="button" className="pb icon" onClick={less} aria-label={t('Less like this')} title={t('Less like this')}><Icon name="less" /><span className="pblabel">{t('Less like this')}</span></button>
+          {isEmbed ? <button type="button" className="pb icon blockerbtn" onClick={() => { setUnblocked((x) => !x); toast(unblocked ? t('The content blocker is on again for this player.') : t('Player loaded without the content blocker.')); }} title={unblocked ? t('Turn the content blocker back on') : t('Load without the content blocker')}><Icon name={unblocked ? 'block' : 'key'} /><span className="pblabel">{unblocked ? t('Turn the content blocker back on') : t('Load without the content blocker')}</span></button> : null}
           {item.url ? <a className="pb icon" href={item.url} target="_blank" rel="noreferrer noopener" aria-label={t('Open on source')} title={t('Open on the original site')} onClick={() => track(item.id, 'open')}><Icon name="open" /><span className="pblabel">{t('Open on the original site')}</span></a> : null}
+          {isEmbed && !narrowNow ? (
+            <div className={`embedmore${moreOpen ? ' open' : ''}`} ref={moreRef}>
+              <button type="button" className={`pb icon${moreOpen ? ' on' : ''}`} onClick={() => setMoreOpen((x) => !x)} aria-label={t('More actions')} aria-expanded={moreOpen} title={t('More actions')}><Icon name="dots" filled /></button>
+              {moreOpen ? (
+                <div className="embedmenu">
+                  <button type="button" onClick={() => { setUnblocked((x) => !x); setMoreOpen(false); toast(unblocked ? t('The content blocker is on again for this player.') : t('Player loaded without the content blocker.')); }}><Icon name={unblocked ? 'block' : 'key'} />{unblocked ? t('Turn the content blocker back on') : t('Load without the content blocker')}</button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
         </div>
       </div>

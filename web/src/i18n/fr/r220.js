@@ -83,5 +83,11 @@ export default {
   "Fantasy added.": "Fantasme ajouté.",
   "Link it to your kinks (optional, the tags link it too):": "Le relier à vos kinks (facultatif, les tags le relient aussi) :",
   "Discover something new": "Découvrir quelque chose de nouveau",
-  "Remove {tag}": "Retirer {tag}"
+  "Remove {tag}": "Retirer {tag}",
+  "{site} does not say who uploaded this video, so there is no profile to show.": "{site} ne dit pas qui a mis cette vidéo en ligne, il n’y a donc pas de profil à montrer.",
+  "Only posts from {site}": "Seulement les publications de {site}",
+  "Load without the content blocker": "Charger sans le bloqueur de contenu",
+  "Turn the content blocker back on": "Réactiver le bloqueur de contenu",
+  "The content blocker is on again for this player.": "Le bloqueur de contenu est de nouveau actif pour ce lecteur.",
+  "Player loaded without the content blocker.": "Lecteur chargé sans le bloqueur de contenu."
 };

@@ -5,7 +5,7 @@ import { useApp } from '../context.jsx';
 import { Icon } from '../icons.jsx';
 import { VideoPlayer } from './Media.jsx';
 import { PostFx, HeatFx } from './PostFx.jsx';
-import { AskPanel, Avatar, CommentsPanel, ProfilePanel, PerformerPanel, PersonPanel, HeatSlider, WhyPanel } from './Panels.jsx';
+import { AskPanel, Avatar, CommentsPanel, ProfilePanel, PerformerPanel, PersonPanel, WhyPanel } from './Panels.jsx';
 import { DislikeNote, HAS_COMMENTS, identity } from './Post.jsx';
 import { usePostActions } from '../postactions.js';
 import { setTkOpen, withChanges } from '../tk.js';
@@ -29,9 +29,14 @@ function SafeImg({ url, className, onLoad, onFail }) {
   return <img className={className} src={stage === 0 ? imgSrc(url) : proxied(url)} alt="" referrerPolicy="no-referrer" onLoad={onLoad} onError={() => { if (stage === 1) onFail?.(); setStage((s) => s + 1); }} draggable={false} />;
 }
 
-function TkEmbed({ item, active, onReady }) {
+// Sites whose player an iPhone often shows black: their video file is played in the phone's own player instead,
+// through the Mac, so it starts by itself, can go 2x and fills the screen. Their own player stays the fallback.
+const DIRECT = new Set(['pornhub', 'redtube', 'youporn', 'eporner']);
+
+function TkEmbed({ item, active, preload, onReady, vref, onPlay, sandboxed, onNative }) {
   const [m, setM] = useState(item.media);
-  const [sandboxed, setSandboxed] = useState(true);
+  const [direct, setDirect] = useState(DIRECT.has(item.source) ? undefined : null);
+  const [failed, setFailed] = useState(false);
   const refreshed = useRef(false);
   const short = item.format === 'short';
   const url = m.embed ? (/autoplay/.test(m.embed) ? m.embed : `${m.embed}${m.embed.includes('?') ? '&' : '?'}autoplay=1`) : null;
@@ -41,23 +46,33 @@ function TkEmbed({ item, active, onReady }) {
     refreshed.current = true;
     try { const r = await api(`/items/${item.id}/refresh-media`, { method: 'POST', body: {} }); if (r.media) setM(r.media); } catch {}
   };
+  useEffect(() => {
+    if (direct !== undefined || !(active || preload)) return undefined;
+    let alive = true;
+    const give = setTimeout(() => { if (alive) setDirect((d) => (d === undefined ? null : d)); }, 9000);
+    api(`/items/${item.id}/direct`).then((r) => { if (alive) setDirect(r.direct || null); }).catch(() => { if (alive) setDirect(null); });
+    return () => { alive = false; clearTimeout(give); };
+  }, [active, preload, direct, item.id]);
+  const native = !!direct && !failed;
+  useEffect(() => { onNative?.(native); }, [native]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (native) {
+    const vItem = { ...item, media: { kind: 'video', src: direct.kind === 'mp4' ? direct.src : undefined, hls: direct.kind === 'hls' ? direct.src : undefined, poster: poster ? proxied(poster) : undefined, hasAudio: true } };
+    return <VideoPlayer item={vItem} active={active} preload={preload} inTk exposeRef={vref} onReady={onReady} onPlay={onPlay} onFail={() => setFailed(true)} />;
+  }
   return (
     <div className={`tk-embed${short ? ' short' : ''}`}>
       <div className="tk-player">
-        {active && url ? (
+        {active && url && direct !== undefined ? (
           <iframe key={sandboxed ? 's' : 'u'} src={url} title={item.title} sandbox={sandboxed ? SANDBOX : undefined} allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" onLoad={onReady} />
         ) : (
           <>
             <SafeImg key={poster} url={poster} onLoad={onReady} onFail={refresh} />
-            <span className="tk-embplay"><Icon name="play" filled /></span>
+            {active && direct === undefined ? <span className="spinner" /> : <span className="tk-embplay"><Icon name="play" filled /></span>}
           </>
         )}
       </div>
       <div className="tk-embednote">
         <span>{m.provider}</span>
-        {active ? (sandboxed
-          ? <button type="button" className="linkbtn" onClick={() => setSandboxed(false)}>{t('Player stays black? Load it without the blocker')}</button>
-          : <button type="button" className="linkbtn" onClick={() => setSandboxed(true)}>{t('Turn the blocker back on')}</button>) : null}
         {active ? <span className="tk-swipehint">{t('Swipe outside the player to go on')}</span> : null}
       </div>
     </div>
@@ -85,10 +100,10 @@ function TkGallery({ item, active, onReady }) {
   );
 }
 
-function TkMedia({ item, active, preload, vref, onReady, onPlay }) {
+function TkMedia({ item, active, preload, vref, onReady, onPlay, sandboxed, onNative }) {
   const m = item.media || {};
   if (m.kind === 'video' || m.kind === 'redgifs') return <VideoPlayer item={item} active={active} preload={preload} inTk exposeRef={vref} onReady={onReady} onPlay={onPlay} />;
-  if (m.kind === 'embed') return <TkEmbed item={item} active={active} onReady={onReady} />;
+  if (m.kind === 'embed') return <TkEmbed item={item} active={active} preload={preload} vref={vref} onReady={onReady} onPlay={onPlay} sandboxed={sandboxed} onNative={onNative} />;
   if (m.kind === 'gallery') return <TkGallery item={item} active={active} onReady={onReady} />;
   if (m.kind === 'image') return <div className="tk-img"><SafeImg url={m.src || m.mid} onLoad={onReady} /></div>;
   return null;
@@ -231,6 +246,68 @@ function usePinch(stageRef, zoomRef, active, onZoomed) {
   return { reset, zoomedNow: () => z.current.s > 1.001, recentGesture: () => Date.now() - lastGesture.current < 400 };
 }
 
+// Heat on the right: a tap on the flame grows it into a slider going up; holding the flame and moving up sets the
+// heat right away, and letting go keeps it. Two flames or more also likes the post.
+function HeatRail({ value, onChange, onLive }) {
+  const [open, setOpen] = useState(false);
+  const [v, setV] = useState(value);
+  const root = useRef(null);
+  const track = useRef(null);
+  const drag = useRef(null);
+  const closeT = useRef(null);
+  useEffect(() => { setV(value); }, [value]);
+  useEffect(() => () => clearTimeout(closeT.current), []);
+  useEffect(() => {
+    if (!open) return undefined;
+    const off = (e) => { if (!root.current?.contains(e.target)) setOpen(false); };
+    document.addEventListener('pointerdown', off, true);
+    return () => document.removeEventListener('pointerdown', off, true);
+  }, [open]);
+  const at = (y) => {
+    const r = track.current?.getBoundingClientRect();
+    if (!r || !r.height) return v;
+    return Math.max(0, Math.min(5, Math.round((1 - (y - r.top) / r.height) * 10) / 2));
+  };
+  const commit = (n) => { onLive?.(n, 'end'); if (n !== value) onChange(n); };
+  const down = (e, onTrack) => {
+    e.preventDefault();
+    e.stopPropagation();
+    clearTimeout(closeT.current);
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    drag.current = { y: e.clientY, moved: false, onTrack, wasOpen: open };
+    setOpen(true);
+    if (onTrack) { const n = at(e.clientY); drag.current.moved = true; setV(n); onLive?.(n, 'live'); }
+  };
+  const move = (e) => {
+    const d = drag.current;
+    if (!d) return;
+    if (!d.moved && Math.abs(e.clientY - d.y) < 6) return;
+    d.moved = true;
+    const n = at(e.clientY);
+    setV(n);
+    onLive?.(n, 'live');
+  };
+  const up = (e) => {
+    const d = drag.current;
+    drag.current = null;
+    if (!d) return;
+    if (d.moved) { const n = at(e.clientY); setV(n); commit(n); closeT.current = setTimeout(() => setOpen(false), 700); return; }
+    // A tap on the flame while it is open closes it.
+    if (d.wasOpen) setOpen(false);
+  };
+  return (
+    <div ref={root} className={`tk-hot${open ? ' open' : ''}${v ? ' on' : ''}`} style={{ '--h': v / 5 }}>
+      <div className="tk-hottrack" ref={track} onPointerDown={(e) => down(e, true)} onPointerMove={move} onPointerUp={up} onPointerCancel={up} aria-hidden={!open}>
+        <i className="tk-hotfill" />
+        <span className="tk-hotval">{v ? String(v).replace('.', ',') : '0'}</span>
+      </div>
+      <button type="button" className="tk-b hot" onPointerDown={(e) => down(e, false)} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onClick={(e) => e.preventDefault()} aria-label={t('How hot was this')} aria-expanded={open}>
+        <Icon name="flame" filled={!!v} /><span>{v ? String(v).replace('.', ',') : ''}</span>
+      </button>
+    </div>
+  );
+}
+
 function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave }) {
   const { toast, refreshMeta, setFilters, runSearch, kinks: allKinks } = useApp();
   const [item, setItem] = useState(() => withChanges(initial));
@@ -242,7 +319,12 @@ function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave
   const [open, setOpen] = useState(false);
   const [ready, setReady] = useState(false);
   const [kinkPick, setKinkPick] = useState(false);
+  const [native, setNative] = useState(false);
+  const [sandboxed, setSandboxed] = useState(true);
+  const [fast, setFast] = useState(false);
+  const [box, setBox] = useState(null);
   const vref = useRef(null);
+  const railRef = useRef(null);
   const slideRef = useRef(null);
   const stageRef = useRef(null);
   const zoomRef = useRef(null);
@@ -282,13 +364,55 @@ function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave
     if (active && ready && !impressed.current) { impressed.current = true; track(item.id, 'impression'); shownAt.current = Date.now(); }
   }, [active, ready, item.id]);
 
-  const isVideo = item.media?.kind === 'video' || item.media?.kind === 'redgifs';
   const isEmbed = item.media?.kind === 'embed';
+  const isVideo = item.media?.kind === 'video' || item.media?.kind === 'redgifs' || (isEmbed && native);
+  // A wide video or a player from another site sits above the buttons instead of under them: its box ends where
+  // the buttons start, and the video fits inside it.
+  const wide = (isEmbed && item.format !== 'short') || ((item.media?.kind === 'video' || item.media?.kind === 'redgifs') && ((item.width && item.height && item.width > item.height * 1.1) || (!item.height && item.format === 'long')));
+  useLayoutEffect(() => {
+    if (!wide) { setBox(null); return undefined; }
+    const fit = () => {
+      const sl = slideRef.current?.getBoundingClientRect();
+      const rail = railRef.current?.getBoundingClientRect();
+      const topBtn = document.querySelector('.tk-top .tk-tb')?.getBoundingClientRect();
+      if (!sl || !rail) return;
+      // The top buttons stay put while the slides move, so their bottom is the same distance into every slide.
+      const top = Math.max(0, (topBtn ? topBtn.bottom : 56) + 6);
+      const h = Math.max(120, rail.top - sl.top - top - 10);
+      setBox((b) => (b && b.top === top && b.h === h ? b : { top, h }));
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, [wide, active]);
+  // Holding the left or right side of a video plays it at 2x until you let go.
+  const hold = useRef({ timer: null, x: 0, y: 0, until: 0 });
+  const holdStart = (e) => {
+    const v = vref.current;
+    if (!isVideo || !v || e.target.closest('button, a, iframe, .tk-prog')) return;
+    const b = stageRef.current.getBoundingClientRect();
+    const fx = (e.clientX - b.left) / b.width;
+    if (fx > 0.3 && fx < 0.7) return;
+    const h = hold.current;
+    h.x = e.clientX; h.y = e.clientY;
+    clearTimeout(h.timer);
+    h.timer = setTimeout(() => { const vv = vref.current; if (!vv) return; vv.playbackRate = 2; if (vv.paused) vv.play().catch(() => {}); setFast(true); h.until = Infinity; }, 380);
+  };
+  const holdMove = (e) => { const h = hold.current; if (h.timer && Math.hypot(e.clientX - h.x, e.clientY - h.y) > 10) { clearTimeout(h.timer); h.timer = null; } };
+  const holdEnd = () => {
+    const h = hold.current;
+    clearTimeout(h.timer);
+    h.timer = null;
+    if (fast) { const v = vref.current; if (v) v.playbackRate = 1; setFast(false); h.until = Date.now() + 450; }
+  };
+  useEffect(() => { if (!active && fast) holdEnd(); }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
   const tap = useRef({ t: 0, timer: null });
   useEffect(() => () => clearTimeout(tap.current.timer), []);
   function onTap(e) {
     if (e.target.closest('button, a, iframe, input, select, .tk-embednote')) return;
     if (pinch.recentGesture()) return;
+    // The end of a 2x hold is not a tap.
+    if (Date.now() < hold.current.until) return;
     const r = tap.current;
     const now = Date.now();
     const box = stageRef.current.getBoundingClientRect();
@@ -297,7 +421,7 @@ function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave
       r.t = 0;
       if (pinch.zoomedNow()) { pinch.reset(); return; }
       // Players from other sites never like on a tap.
-      if (!isEmbed) { fxAt.current = { y: Math.round(e.clientY - box.top), x: Math.round(e.clientX - box.left) }; acts.like(); }
+      if (!isEmbed || native) { fxAt.current = { y: Math.round(e.clientY - box.top), x: Math.round(e.clientX - box.left) }; acts.like(); }
       return;
     }
     r.t = now;
@@ -311,7 +435,8 @@ function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave
   const id = identity(item);
   const c = item.kinks?.[0]?.color || '#E39A83';
   const tags = item.tags || [];
-  const who = id.handle ? 'profile' : id.performer ? `performer:${id.performer}` : null;
+  // Tube sites never say who uploaded a video: then the button shows where it comes from.
+  const who = id.handle ? 'profile' : id.performer ? `performer:${id.performer}` : 'source';
   const leaveTo = (fn) => { onLeave(); setTimeout(fn, 30); };
   const title = item.title || '';
   const sub = [id.sub[0], ago(item.created)].filter(Boolean).join(' · ');
@@ -319,11 +444,16 @@ function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave
   const sheetView = (() => {
     if (!sheet) return null;
     const close = () => setSheet(null);
-    if (sheet === 'heat') {
+    if (sheet === 'source') {
+      const site = item.media?.provider || id.sub[0] || item.source;
       return (
-        <Sheet title={t('How hot was this')} onClose={close}>
-          <div className="tk-heat"><HeatSlider value={item.rating || 0} onChange={acts.rate} onLive={(v, phase) => setHeat((cur) => (cur && cur.phase === 'live' ? { ...cur, v, phase } : { v, phase, key: Date.now() }))} /></div>
-          <p className="wnote">{t('Two flames or more also likes it.')}</p>
+        <Sheet title={site} onClose={close}>
+          <p className="wtext">{t('{site} does not say who uploaded this video, so there is no profile to show.', { site })}</p>
+          {item.performers?.length ? <div className="chiprow all">{item.performers.map((p) => <button type="button" key={p} className="chip ghost btn" onClick={() => setSheet(`performer:${p}`)}><Icon name="person" />{p}</button>)}</div> : null}
+          <div className="tk-list">
+            <button type="button" onClick={() => leaveTo(() => setFilters({ sources: [item.source] }))}><Icon name="globe" />{t('Only posts from {site}', { site })}</button>
+            {item.url ? <a href={item.url} target="_blank" rel="noreferrer noopener" onClick={() => track(item.id, 'open')}><Icon name="open" />{t('Open on the original site')}</a> : null}
+          </div>
         </Sheet>
       );
     }
@@ -377,6 +507,7 @@ function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave
             <button type="button" onClick={() => setSheet('why')}><Icon name="why" />{t('Why this')}</button>
             <button type="button" onClick={() => setSheet('tags')}><Icon name="tag" />{t('Kinks and tags')}</button>
             <button type="button" onClick={() => acts.less()}><Icon name="less" />{t('Less like this')}</button>
+            {isEmbed && !native ? <button type="button" onClick={() => { setSandboxed((x) => !x); close(); }}><Icon name={sandboxed ? 'key' : 'block'} />{sandboxed ? t('Load without the content blocker') : t('Turn the content blocker back on')}</button> : null}
             {item.url ? <a href={item.url} target="_blank" rel="noreferrer noopener" onClick={() => track(item.id, 'open')}><Icon name="open" />{t('Open on the original site')}</a> : null}
           </div>
           <p className="wnote">{[LABELS[item.label], t('{n}% match', { n: item.match }), formatMeta(item)].filter(Boolean).join(' · ')}</p>
@@ -387,29 +518,30 @@ function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave
   })();
 
   return (
-    <div ref={slideRef} className={`tk-s${zoomed ? ' zoomed' : ''}${open ? ' open' : ''}`} style={{ '--c': c, '--c2': rgba(c, 0.3) }}>
-      <div className="tk-stage" ref={stageRef} onClick={onTap}>
-        <div className="tk-zoom" ref={zoomRef}>
-          <TkMedia item={item} active={active && !hidden} preload={preload} vref={vref} onReady={() => setReady(true)} onPlay={() => strong('play')} />
+    <div ref={slideRef} className={`tk-s${zoomed ? ' zoomed' : ''}${open ? ' open' : ''}${box ? ' wide' : ''}`} style={{ '--c': c, '--c2': rgba(c, 0.3) }}>
+      <div className="tk-stage" ref={stageRef} onClick={onTap} onPointerDown={holdStart} onPointerMove={holdMove} onPointerUp={holdEnd} onPointerCancel={holdEnd} onContextMenu={(e) => e.preventDefault()}>
+        <div className="tk-zoom" ref={zoomRef} style={box ? { top: box.top, height: box.h, bottom: 'auto', '--boxh': `${box.h}px` } : undefined}>
+          <TkMedia item={item} active={active && !hidden} preload={preload} vref={vref} onReady={() => setReady(true)} onPlay={() => strong('play')} sandboxed={sandboxed} onNative={setNative} />
         </div>
+        {fast ? <span className="tk-fast" aria-live="polite">2× <Icon name="chevR" /><Icon name="chevR" /></span> : null}
         <PostFx fx={fx} />
         <HeatFx heat={heat} />
         {isVideo ? <span className="tk-pausedicon" aria-hidden="true"><Icon name="play" filled /></span> : null}
       </div>
       <div className="tk-shade" aria-hidden="true" />
-      <div className="tk-rail">
-        <button type="button" className="tk-av" onClick={() => who && setSheet(who)} aria-label={t('Show profile of {name}', { name: id.name })} disabled={!who}>
+      <div className="tk-rail" ref={railRef}>
+        <button type="button" className="tk-av" onClick={() => setSheet(who)} aria-label={t('Show profile of {name}', { name: id.name })}>
           {item.media?.avatar ? <img className="avatar av-m avimg" src={item.media.avatar} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.display = 'none'; }} /> : <Avatar name={id.name} />}
         </button>
         <button type="button" className={`tk-b up${item.vote > 0 ? ' on' : ''}`} onClick={() => acts.vote(1)} aria-label={t('I like this')}><Icon name="up" /><span>{item.upvotes != null ? fmtNum(item.upvotes) : ''}</span></button>
         <button type="button" className={`tk-b down${item.vote < 0 ? ' on' : ''}`} onClick={() => acts.vote(-1)} aria-label={t("I don't like this")}><Icon name="down" /></button>
-        <button type="button" className={`tk-b hot${item.rating ? ' on' : ''}`} style={{ '--h': (item.rating || 0) / 5 }} onClick={() => setSheet('heat')} aria-label={t('How hot was this')}><Icon name="flame" filled={!!item.rating} /><span>{item.rating ? String(item.rating).replace('.', ',') : ''}</span></button>
+        <HeatRail value={item.rating || 0} onChange={acts.rate} onLive={(v, phase) => setHeat((cur) => (cur && cur.phase === 'live' ? { ...cur, v, phase } : { v, phase, key: Date.now() }))} />
         {HAS_COMMENTS.has(item.source) ? <button type="button" className="tk-b" onClick={() => { setSheet('comments'); strong('comments'); }} aria-label={t('Comments')}><Icon name="comment" /><span>{item.comments ? fmtNum(item.comments) : ''}</span></button> : null}
         <button type="button" className={`tk-b save${item.saved ? ' on' : ''}`} onClick={acts.save} aria-label={item.saved ? t('Unsave') : t('Save')}><Icon name="save" filled={item.saved} /></button>
         <button type="button" className="tk-b" onClick={() => setSheet('more')} aria-label={t('More actions')}><Icon name="dots" filled /></button>
       </div>
       <div className="tk-info">
-        <button type="button" className="tk-who" onClick={() => who && setSheet(who)} disabled={!who}><strong>{id.name}</strong><span>{sub}</span></button>
+        <button type="button" className="tk-who" onClick={() => setSheet(who)}><strong>{id.name}</strong><span>{sub}</span></button>
         {title ? <button type="button" className="tk-title" onClick={() => setOpen((o) => !o)} aria-expanded={open}>{title}</button> : null}
         {open ? (
           <div className="tk-text">
@@ -527,7 +659,7 @@ export default function Immersive({ items, startId, onClose, onMore, loading, do
     <div className="tk" role="dialog" aria-modal="true" aria-label={t('Full screen')}>
       <div ref={sc} className={`tk-scroll${locks.size ? ' locked' : ''}`} onScroll={onScroll}>
         {list.map((it, i) => (
-          <section key={it.id} className="tk-slide" aria-hidden={i !== cur}>
+          <section key={it.id} className="tk-slide" data-id={it.id} data-source={it.source} data-kind={it.media?.kind} aria-hidden={i !== cur}>
             {Math.abs(i - cur) <= 2
               ? <Slide item={it} active={i === cur} preload={i === cur + 1} onStrong={onStrong} lock={lock} onNext={() => go(1)} onLeave={close} />
               : <div className="tk-s tk-far" />}
