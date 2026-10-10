@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, rgba, FORMATS, ago } from '../api.js';
 import { useApp } from '../context.jsx';
 import BrainCanvas from './BrainCanvas.jsx';
-import KinkBoard, { evidenceLine } from './KinkBoard.jsx';
+import KinkBoard, { evidenceLine, ColorDot } from './KinkBoard.jsx';
 import { deeperSpec } from './Windows.jsx';
 import { Icon } from '../icons.jsx';
 import { t, tn } from '../i18n.js';
@@ -36,19 +36,21 @@ function AiWidget({ nodeKey }) {
   };
   useEffect(() => { setText(null); load(); }, [nodeKey]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <div className="bw ai">
+    <div className="bw ai wide">
       <div className="bw-h"><span>{t('What the assistant thinks')}</span><button type="button" className="linkbtn" onClick={() => load(true)} disabled={busy}>{busy ? t('thinking…') : t('refresh')}</button></div>
       {text ? <p className="aitext">{text}</p> : <p className="aitext dim"><span className="spinner inline" /> {t('Thinking about this…')}</p>}
     </div>
   );
 }
 
-function Detail({ nodeKey, brain, reload, onSelect }) {
+function Detail({ nodeKey, brain, reload, onSelect, startEdit = false }) {
   const { setFilters, openMode, toast, refreshMeta, kinks: allKinks } = useApp();
   const node = brain.nodes.find((n) => n.key === nodeKey);
   const [d, setD] = useState(null);
   const [posts, setPosts] = useState([]);
   const [name, setName] = useState(node?.name || '');
+  const [editing, setEditing] = useState(startEdit);
+  const [combine, setCombine] = useState(false);
   const [tagIn, setTagIn] = useState('');
   const kinks = useMemo(() => brain.nodes.filter((n) => n.type === 'kink'), [brain]);
   const loadDetail = () => api(`/brain/node/${nodeKey}`).then((r) => {
@@ -60,55 +62,116 @@ function Detail({ nodeKey, brain, reload, onSelect }) {
   const kinkObj = node.type === 'kink' ? node : null;
   const full = kinkObj ? allKinks.find((k) => k.id === node.id) : null;
   const edited = full && (Object.keys(full.locks || {}).length > 0 || full.origin === 'user');
+  // Always every tag of the kink, with its weight, so changing one never loses the others.
+  const allTags = d?.kinkTags || full?.tags?.map((x) => ({ name: x.name, weight: x.weight ?? 1 })) || (node.tags || []).map((x) => ({ name: x, weight: 1 }));
   async function patch(body, msg) {
     try { await api(`/kinks/${node.id}`, { method: 'PATCH', body }); if (msg) toast(msg); await reload(); refreshMeta(); loadDetail(); } catch (e) { toast(e.message); }
+  }
+  const setTags = (list, msg) => patch({ tags: list }, msg);
+  const addTag = (tag, msg) => { const v = tag.trim().toLowerCase(); if (!v || allTags.some((x) => x.name === v)) return; setTags([...allTags, { name: v, weight: 1 }], msg); };
+  async function saveName() {
+    const v = name.trim();
+    setEditing(false);
+    if (v && v !== node.name) await patch({ name: v }, t('Renamed.'));
+  }
+  async function combineWith(k) {
+    setCombine(false);
+    try { const r = await api(`/kinks/${node.id}/merge`, { method: 'POST', body: { into: k.id } }); toast(t('Combined into {name}, with every tag of both.', { name: k.name })); await reload(); refreshMeta(); onSelect(`k${r.id}`); } catch (err) { toast(err.message); }
   }
   const links = brain.edges.filter((e) => e.a === nodeKey || e.b === nodeKey).map((e) => ({ ...e, other: brain.nodes.find((x) => x.key === (e.a === nodeKey ? e.b : e.a)) })).filter((e) => e.other).sort((a, b) => b.w - a.w);
   const d7 = node.lately - node.allTime;
   const groups = brain.groups;
+  const journey = (mode) => openMode('journey', { ...(node.type === 'fantasy' ? { fantasy: node.id } : { kink: node.id }), mode });
+  const color = full?.color || node.color;
   return (
-    <div className="braindetail">
-      <div className="bw head">
-        <button type="button" className="ghost-btn small backbtn" onClick={() => onSelect(null)}><Icon name="chevL" />{t('All kinks')}</button>
-        {kinkObj ? <label className="colorpick" title={t('Colour')}><input type="color" value={full?.color || node.color} onChange={(e) => patch({ color: e.target.value })} aria-label={t('Colour')} /></label> : <span className="win-dot" style={{ '--c': node.color }} />}
-        {node.type === 'kink' ? <input className="kname" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => name.trim() && name !== node.name && patch({ name: name.trim() }, t('Renamed.'))} aria-label={t('Name')} /> : <b className="kname static">{node.name}</b>}
-        <span className="count">{TYPE_LABEL[node.type]}{node.origin === 'tag' ? ` · ${t('grew from a tag you kept coming back to')}` : ''}{node.status === 'proposed' ? ` · ${t('suggested')}` : ''}</span>
-        <div className="wbtns">
-          <button type="button" className="ghost-btn small accent" onClick={() => setFilters(d?.filter || (node.type === 'tag' ? { tags: [node.name] } : node.type === 'fantasy' ? { fantasy: node.id } : { kink: node.id }))}><Icon name="eye" />{t('Show in feed')}</button>
-          {node.type !== 'tag' ? (
+    <div className="braindetail" style={{ '--c': color }}>
+      <div className="kback-wrap"><button type="button" className="kback" onClick={() => onSelect(null)}><Icon name="chevL" />{t('All kinks')}</button></div>
+      <div className="bw head khead">
+        <div className="ktitle">
+          {kinkObj ? <ColorDot big color={color} onChange={(c) => patch({ color: c })} label={t('Colour')} /> : <span className="win-dot" style={{ '--c': node.color }} />}
+          {kinkObj && editing ? (
+            <form className="kname-form" onSubmit={(e) => { e.preventDefault(); saveName(); }}>
+              <input className="kname" value={name} onChange={(e) => setName(e.target.value)} autoFocus aria-label={t('Name')} />
+              <button type="submit" className="ghost-btn small accent"><Icon name="check" />{t('Save')}</button>
+              <button type="button" className="ghost-btn small" onClick={() => { setName(node.name); setEditing(false); }}>{t('Cancel')}</button>
+            </form>
+          ) : (
             <>
-              {node.type === 'fantasy' ? <button type="button" className="ghost-btn small accent" onClick={async () => { const fs = await api('/fantasies').then((r) => r.fantasies).catch(() => []); const f = fs.find((x) => x.id === node.id); if (f) openMode('deeper', { fantasy: deeperSpec(f) }); }}><Icon name="spark" />{t('Go deeper')}</button> : null}
-              <button type="button" className="ghost-btn small" onClick={() => openMode('journey', { ...(node.type === 'fantasy' ? { fantasy: node.id } : { kink: node.id }), mode: 'close' })}><Icon name="route" />{t('Dive deeper')}</button>
-              <button type="button" className="ghost-btn small" onClick={() => openMode('journey', { ...(node.type === 'fantasy' ? { fantasy: node.id } : { kink: node.id }), mode: 'branch' })}><Icon name="route" />{t('Branch out')}</button>
-              <button type="button" className="ghost-btn small" onClick={() => openMode('journey', { ...(node.type === 'fantasy' ? { fantasy: node.id } : { kink: node.id }), mode: 'genre' })}><Icon name="route" />{t('Discover something new near it')}</button>
+              <b className="kname static">{node.name}</b>
+              {kinkObj ? <button type="button" className="icon-btn kedit" onClick={() => setEditing(true)} aria-label={t('Edit {name}', { name: node.name })} title={t('Rename')}><Icon name="edit" /></button> : null}
             </>
-          ) : null}
-          {node.type === 'tag' ? <button type="button" className="ghost-btn small" onClick={async () => { const r = await api(`/brain/promote/${node.id}`, { method: 'POST', body: {} }); toast(t('It is a kink now.')); await reload(); refreshMeta(); onSelect(`k${r.id}`); }}><Icon name="flame" />{t('Make it a kink')}</button> : null}
-          {kinkObj?.status === 'proposed' ? <button type="button" className="ghost-btn small" onClick={() => patch({ status: 'active' }, t('Kept.'))}><Icon name="check" />{t('Keep')}</button> : null}
-          {kinkObj ? <button type="button" className="ghost-btn small" onClick={() => patch({ status: 'hidden' }, t('Hidden. It stays hidden until you bring it back.'))}><Icon name="less" />{t('Hide')}</button> : null}
-          {kinkObj ? <button type="button" className="ghost-btn small" onClick={async () => { await api(`/kinks/${node.id}`, { method: 'DELETE' }); toast(t("Removed. It won't come back by itself.")); onSelect(null); reload(); refreshMeta(); }}><Icon name="trash" />{t('Remove')}</button> : null}
-          {node.type === 'fantasy' ? <button type="button" className="ghost-btn small" onClick={async () => { await api(`/fantasies/${node.id}`, { method: 'DELETE' }); onSelect(null); reload(); }}><Icon name="trash" />{t('Delete')}</button> : null}
+          )}
         </div>
+        <span className="count ktype">{TYPE_LABEL[node.type]}{node.origin === 'tag' ? ` · ${t('grew from a tag you kept coming back to')}` : ''}{node.status === 'proposed' ? ` · ${t('suggested')}` : ''}</span>
+
+        <div className="kacts">
+          <button type="button" className="kact-main" onClick={() => setFilters(d?.filter || (node.type === 'tag' ? { tags: [node.name] } : node.type === 'fantasy' ? { fantasy: node.id } : { kink: node.id }))}><Icon name="eye" />{t('Show in feed')}</button>
+          {node.type !== 'tag' ? (
+            <div className="kact-explore">
+              {node.type === 'fantasy' ? <button type="button" onClick={async () => { const fs = await api('/fantasies').then((r) => r.fantasies).catch(() => []); const f = fs.find((x) => x.id === node.id); if (f) openMode('deeper', { fantasy: deeperSpec(f) }); }}><Icon name="spark" /><span>{t('Go deeper')}</span></button> : null}
+              <button type="button" onClick={() => journey('close')}><Icon name="route" /><span>{t('Dive deeper')}</span></button>
+              <button type="button" onClick={() => journey('branch')}><Icon name="route" /><span>{t('Branch out')}</span></button>
+              <button type="button" onClick={() => journey('genre')}><Icon name="spark" /><span>{t('Something new near it')}</span></button>
+            </div>
+          ) : null}
+          <div className="kact-manage">
+            {node.type === 'tag' ? <button type="button" className="ghost-btn small accent" onClick={async () => { const r = await api(`/brain/promote/${node.id}`, { method: 'POST', body: {} }); toast(t('It is a kink now.')); await reload(); refreshMeta(); onSelect(`k${r.id}`); }}><Icon name="flame" />{t('Make it a kink')}</button> : null}
+            {kinkObj?.status === 'proposed' ? <button type="button" className="ghost-btn small accent" onClick={() => patch({ status: 'active' }, t('Kept.'))}><Icon name="check" />{t('Keep')}</button> : null}
+            {kinkObj ? <button type="button" className={`ghost-btn small${editing ? ' accent' : ''}`} onClick={() => setEditing((x) => !x)}><Icon name="edit" />{t('Edit')}</button> : null}
+            {kinkObj ? <button type="button" className={`ghost-btn small${combine ? ' accent' : ''}`} onClick={() => setCombine((x) => !x)} aria-expanded={combine}><Icon name="grid" />{t('Combine')}</button> : null}
+            {kinkObj ? <button type="button" className="ghost-btn small" onClick={() => patch({ status: 'hidden' }, t('Hidden. It stays hidden until you bring it back.'))}><Icon name="less" />{t('Hide')}</button> : null}
+            {kinkObj ? <button type="button" className="ghost-btn small danger" onClick={async () => { await api(`/kinks/${node.id}`, { method: 'DELETE' }); toast(t("Removed. It won't come back by itself.")); onSelect(null); reload(); refreshMeta(); }}><Icon name="trash" />{t('Remove')}</button> : null}
+            {node.type === 'fantasy' ? <button type="button" className="ghost-btn small danger" onClick={async () => { await api(`/fantasies/${node.id}`, { method: 'DELETE' }); onSelect(null); reload(); }}><Icon name="trash" />{t('Delete')}</button> : null}
+          </div>
+          {combine ? (
+            <div className="kcombine">
+              <p className="wnote">{t('Combine {name} into which kink? The one you pick stays, with every tag of both.', { name: node.name })}</p>
+              <div className="chiprow">{allKinks.filter((k) => !k.isGroup && k.id !== node.id && k.status !== 'hidden').sort((a, b) => a.name.localeCompare(b.name)).map((k) => <button type="button" key={k.id} className="chip btn" style={{ '--c': k.color }} onClick={() => combineWith(k)}><span className="kc-dot" />{k.name}</button>)}</div>
+            </div>
+          ) : null}
+        </div>
+
+        {node.type === 'kink' ? (
+          <div className="ktags">
+            <div className="bw-h"><span>{t('Tags')}</span><span className="count">{allTags.length}</span></div>
+            <div className="chiprow">
+              {allTags.map((x) => <span key={x.name} className="chip ghost">{x.name}<button type="button" className="chipx" aria-label={t('Remove {tag}', { tag: x.name })} onClick={() => setTags(allTags.filter((y) => y.name !== x.name))}>×</button></span>)}
+              <form onSubmit={(e) => { e.preventDefault(); if (tagIn.trim()) { addTag(tagIn, t('Tag added.')); setTagIn(''); } }}><input className="tagadd" value={tagIn} onChange={(e) => setTagIn(e.target.value)} placeholder={t('+ tag')} aria-label={t('Add tag')} /></form>
+            </div>
+            <div className="rowline wrapline kgroup"><span className="fb-label">{t('Group')}</span>
+              <select value={node.group || ''} onChange={(e) => patch({ parentId: e.target.value ? Number(e.target.value) : null }, t('Moved.'))} aria-label={t('Group')}>
+                <option value="">{t('No group')}</option>
+                {groups.map((g) => <option key={g.id} value={g.id}>{g.parentId ? `  ${groups.find((x) => x.id === g.parentId)?.name || ''} › ${g.name}` : g.name}</option>)}
+              </select>
+            </div>
+            {d?.relatedTags?.length ? (
+              <div className="kimprove">
+                <div className="kimprove-h"><Icon name="spark" /><b>{t('Update tags to kink to improve')}</b></div>
+                <p className="wnote">{t('These often come with it in your posts. Tap one to add it to {name}, so the feed finds more of it.', { name: node.name })}</p>
+                <div className="chiprow">{d.relatedTags.map((tag) => <button type="button" key={tag} className="chip btn" onClick={() => addTag(tag, t('Added {tag}.', { tag }))} title={t('Add to this kink')}>+ {tag}</button>)}</div>
+              </div>
+            ) : null}
+          </div>
+        ) : node.type === 'tag' && d?.relatedTags?.length ? (
+          <div className="ktags"><div className="bw-h"><span>{t('Often comes with')}</span></div><div className="chiprow">{d.relatedTags.map((x) => <button type="button" key={x} className="chip btn" onClick={() => setFilters({ tags: [node.name, x] })}>{x}</button>)}</div></div>
+        ) : null}
       </div>
-      <div className="bwgrid">
+
+      <div className="bwgrid kgridw">
         {kinkObj ? (
-          <div className="bw">
+          <div className="bw wide">
             <div className="bw-h"><span>{t('Why this is a kink')}</span></div>
-            <p className="aitext">{full?.evidence ? evidenceLine(full.evidence) : full?.origin === 'user' ? t('You made this one yourself.') : t('Not enough clear likes behind it yet.')}</p>
+            <p className="aitext small">{full?.evidence ? evidenceLine(full.evidence) : full?.origin === 'user' ? t('You made this one yourself.') : t('Not enough clear likes behind it yet.')}</p>
             {edited ? (
               <div className="rowline wrapline">
                 <span className="wnote">{t('You changed {what} by hand, so that stays as you set it.', { what: Object.keys(full.locks || {}).filter((x) => full.locks[x]).map((x) => ({ name: t('the name'), tags: t('the tags'), parent: t('the group'), color: t('the colour'), status: t('whether it shows') }[x])).filter(Boolean).join(', ') || t('this') })}</span>
                 <button type="button" className="linkbtn" onClick={async () => { try { await api(`/kinks/${node.id}/unlock`, { method: 'POST', body: {} }); toast(t('It updates by itself again.')); await reload(); refreshMeta(); loadDetail(); } catch (e) { toast(e.message); } }}>{t('Let it update by itself again')}</button>
               </div>
             ) : <p className="wnote">{t('It updates by itself: tags join as you like them, and it fades if you stop.')}</p>}
-            <select value="" onChange={async (e) => { const v = Number(e.target.value); if (!v) return; try { const r = await api(`/kinks/${node.id}/merge`, { method: 'POST', body: { into: v } }); toast(t('Combined into one kink.')); await reload(); refreshMeta(); onSelect(`k${r.id}`); } catch (err) { toast(err.message); } }} aria-label={t('Combine with another kink')}>
-              <option value="">{t('Combine with…')}</option>
-              {allKinks.filter((k) => !k.isGroup && k.id !== node.id && k.status !== 'hidden').sort((a, b) => a.name.localeCompare(b.name)).map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
-            </select>
           </div>
         ) : null}
         <AiWidget nodeKey={nodeKey} />
-        <div className="bw">
+        <div className="bw half">
           <div className="bw-h"><span>{t('This week vs before')}</span></div>
           <div className="bars">
             <div className="barrow"><div className="bt"><span>{t('All time')}</span><em>{node.allTime}%</em></div><div className="track2"><i style={{ width: `${node.allTime}%`, background: rgba(node.color, 0.5) }} /></div></div>
@@ -117,7 +180,7 @@ function Detail({ nodeKey, brain, reload, onSelect }) {
           </div>
           {d ? <p className="wnote">{tn(d.week, '{n} post this week, {before} a week before that.', '{n} posts this week, {before} a week before that.', { before: d.perWeekBefore })} {Object.entries(d.counts || {}).filter(([ev]) => ev !== 'impression').map(([ev, c]) => `${c} ${EVENT_LABEL[ev] || ev}`).slice(0, 5).join(', ')}</p> : null}
         </div>
-        <div className="bw">
+        <div className="bw half">
           <div className="bw-h"><span>{t('Linked with')}</span><span className="count">{links.length}</span></div>
           <div className="linklist">
             {links.slice(0, 10).map((l) => (
@@ -135,24 +198,6 @@ function Detail({ nodeKey, brain, reload, onSelect }) {
             </select>
           ) : null}
         </div>
-        {node.type === 'kink' ? (
-          <div className="bw">
-            <div className="bw-h"><span>{t('Tags and group')}</span></div>
-            <div className="chiprow">
-              {(node.tags || []).map((tag) => <span key={tag} className="chip ghost">{tag}<button type="button" className="chipx" aria-label={t('Remove {tag}', { tag })} onClick={() => patch({ tags: node.tags.filter((x) => x !== tag).map((x) => ({ name: x, weight: 1 })) })}>×</button></span>)}
-              <form onSubmit={(e) => { e.preventDefault(); if (tagIn.trim()) { patch({ tags: [...(node.tags || []), tagIn.trim()].map((x) => ({ name: x, weight: 1 })) }, t('Tag added.')); setTagIn(''); } }}><input className="tagadd" value={tagIn} onChange={(e) => setTagIn(e.target.value)} placeholder={t('+ tag')} aria-label={t('Add tag')} /></form>
-            </div>
-            {d?.relatedTags?.length ? <><div className="fb-label">{t('Often comes with')}</div><div className="chiprow">{d.relatedTags.map((tag) => <button type="button" key={tag} className="chip btn" onClick={() => patch({ tags: [...(node.tags || []), tag].map((x) => ({ name: x, weight: 1 })) }, t('Added {tag}.', { tag }))} title={t('Add to this kink')}>+ {tag}</button>)}</div></> : null}
-            <div className="rowline wrapline"><span className="fb-label">{t('Group')}</span>
-              <select value={node.group || ''} onChange={(e) => patch({ parentId: e.target.value ? Number(e.target.value) : null }, t('Moved.'))} aria-label={t('Group')}>
-                <option value="">{t('No group')}</option>
-                {groups.map((g) => <option key={g.id} value={g.id}>{g.parentId ? `  ${groups.find((x) => x.id === g.parentId)?.name || ''} › ${g.name}` : g.name}</option>)}
-              </select>
-            </div>
-          </div>
-        ) : node.type === 'tag' && d?.relatedTags?.length ? (
-          <div className="bw"><div className="bw-h"><span>{t('Often comes with')}</span></div><div className="chiprow">{d.relatedTags.map((t) => <button type="button" key={t} className="chip btn" onClick={() => setFilters({ tags: [node.name, t] })}>{t}</button>)}</div></div>
-        ) : null}
         <div className="bw wide">
           <div className="bw-h"><span>{t('Best matches')}</span></div>
           <div className="postrow">
@@ -206,6 +251,7 @@ export default function MapView() {
   const [brain, setBrain] = useState(null);
   const [data, setData] = useState(null);
   const [sel, setSel] = useState(null);
+  const [editSel, setEditSel] = useState(false);
   const [hover, setHover] = useState(null);
   const [busy, setBusy] = useState(null);
   const [newFantasy, setNewFantasy] = useState(false);
@@ -226,18 +272,19 @@ export default function MapView() {
     return () => clearInterval(t);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function select(key) {
+  function select(key, { edit = false } = {}) {
     setSel(key);
+    setEditSel(edit);
     setNewFantasy(false);
-    setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: key ? 'nearest' : 'start' }), 60);
+    setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
   }
 
   // A kink that faded is brought back when you open it: opening it says you still care.
-  async function openKink(k) {
+  async function openKink(k, how = {}) {
     if (k.status === 'hidden') {
       try { await api(`/kinks/${k.id}`, { method: 'PATCH', body: { status: 'active' } }); toast(t('{name} is back and stays.', { name: k.name })); await load(); refreshMeta(); } catch (e) { toast(e.message); return; }
     }
-    select(`k${k.id}`);
+    select(`k${k.id}`, how);
   }
 
   async function run(name, fn) {
@@ -281,8 +328,8 @@ export default function MapView() {
         {brain ? <HoverCard hover={hover} brain={brain} /> : null}
         {counts ? <div className="brainlegend"><span><i className="lg kink" />{tn(counts.kinks, '{n} kink', '{n} kinks')}</span><span><i className="lg tag" />{tn(counts.tags, '{n} hot tag', '{n} hot tags')}</span><span><i className="lg fant" />{tn(counts.fantasies, '{n} fantasy', '{n} fantasies')}</span><span><i className="lg link" />{tn(counts.links, '{n} link', '{n} links')}</span><span><i className="lg pulse" />{t('recent activity')}</span></div> : null}
       </div>
-      <div ref={detailRef}>
-        {sel && brain ? <Detail key={sel} nodeKey={sel} brain={brain} reload={load} onSelect={select} /> : null}
+      <div ref={detailRef} className="detailwrap">
+        {sel && brain ? <Detail key={sel} nodeKey={sel} brain={brain} reload={load} onSelect={select} startEdit={editSel} /> : null}
         {newFantasy && brain ? <FantasyEditor brain={brain} reload={load} onDone={() => setNewFantasy(false)} /> : null}
         {!sel && !newFantasy ? <KinkBoard onOpen={openKink} onChange={async () => { await load(); refreshMeta(); }} /> : null}
       </div>

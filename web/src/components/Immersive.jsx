@@ -377,6 +377,27 @@ function useAmbient(active, vref, zoomRef, ambRef, item) {
   }, [active, item.id]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
+// A small round picture for someone in a post: the performer's picture when known, the person's profile picture
+// from the sites that have it, otherwise their initials.
+const PEOPLE_PICS = new Map();
+function PersonPic({ name, thumb, lookup = false, platform = 'any' }) {
+  const [src, setSrc] = useState(thumb || PEOPLE_PICS.get(name) || null);
+  const [bad, setBad] = useState(false);
+  useEffect(() => {
+    if (thumb || !lookup || PEOPLE_PICS.has(name)) return undefined;
+    let alive = true;
+    PEOPLE_PICS.set(name, null);
+    api(`/people/lookup?handle=${encodeURIComponent(name)}&platform=${platform}`).then((d) => {
+      const pic = (d.profiles || []).find((x) => x.avatar)?.avatar || null;
+      PEOPLE_PICS.set(name, pic);
+      if (alive && pic) setSrc(pic);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [name, thumb, lookup, platform]);
+  if (!src || bad) return <span className="tk-pic none" aria-hidden="true">{String(name).replace(/^@+/, '').slice(0, 1).toUpperCase()}</span>;
+  return <img className="tk-pic" src={imgSrc(src)} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBad(true)} />;
+}
+
 function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave }) {
   const { toast, refreshMeta, setFilters, runSearch, kinks: allKinks } = useApp();
   const [item, setItem] = useState(() => withChanges(initial));
@@ -391,6 +412,7 @@ function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave
   const [native, setNative] = useState(false);
   const [sandboxed, setSandboxed] = useState(true);
   const [fast, setFast] = useState(0);
+  const [whoData, setWhoData] = useState(null);
   const [vmeta, setVmeta] = useState(null);
   const [ctlTop, setCtlTop] = useState(null);
   const vref = useRef(null);
@@ -413,7 +435,14 @@ function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave
   const pinch = usePinch(stageRef, zoomRef, active, setZoomed);
   useEffect(() => { lock(`z${item.id}`, active && zoomed); }, [active, zoomed]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { lock(`s${item.id}`, active && !!sheet); }, [active, sheet]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => () => { lock(`z${item.id}`, false); lock(`s${item.id}`, false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { lock(`f${item.id}`, active && !!fast); }, [active, fast]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => { lock(`z${item.id}`, false); lock(`s${item.id}`, false); lock(`f${item.id}`, false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Who posted it and who is in it, and whether you follow them, for the follow button and their pictures.
+  useEffect(() => {
+    if (!active || whoData) return;
+    const perf = (item.performers || []).slice(0, 6).join('|');
+    api(`/items/${item.id}/who${perf ? `?performers=${encodeURIComponent(perf)}` : ''}`).then(setWhoData).catch(() => {});
+  }, [active, item.id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!active) { setSheet(null); setOpen(false); } }, [active]);
 
   // Time spent on it counts like in the feed; a minute on it is being into it. Swiping past one that had not even
@@ -536,6 +565,31 @@ function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave
   const tags = item.tags || [];
   // Tube sites never say who uploaded a video: then the button shows where it comes from.
   const who = id.handle ? 'profile' : id.performer ? `performer:${id.performer}` : 'source';
+  const thumbOf = (name) => item.performerCards?.find((p) => p.name === name)?.thumb || whoData?.performers?.find((p) => p.name === name)?.thumb || null;
+  // The + under the picture follows who posted it (or the first person in it when the site does not say who
+  // posted it); a check shows you already do, and tapping it again unfollows.
+  const followTarget = who === 'profile' ? (whoData?.author?.canFollow ? { kind: 'author', name: whoData.author.name, on: whoData.author.followed } : null)
+    : id.performer ? { kind: 'performer', name: id.performer, on: !!whoData?.performers?.find((p) => p.name === id.performer)?.followed } : null;
+  async function toggleFollow() {
+    if (!followTarget || !whoData) return;
+    const on = !followTarget.on;
+    const patch = (d) => (followTarget.kind === 'author' ? { ...d, author: { ...d.author, followed: on } } : { ...d, performers: d.performers.map((p) => (p.name === followTarget.name ? { ...p, followed: on } : p)) });
+    setWhoData((d) => patch(d));
+    try {
+      if (followTarget.kind === 'author') {
+        if (on) { const r = await api('/follow-creator', { method: 'POST', body: { source: item.source, name: followTarget.name, itemId: item.id } }); toast(tn(r.followed?.length || 1, 'Following {name} on {n} source.', 'Following {name} on {n} sources.', { name: followTarget.name })); }
+        else { await api('/follow', { method: 'POST', body: { kind: whoData.author.kind, value: whoData.author.followValue, on: false } }); toast(t('Unfollowed {name}.', { name: followTarget.name })); }
+      } else {
+        await api(`/performers/${encodeURIComponent(followTarget.name)}/follow`, { method: 'POST', body: { on } });
+        toast(on ? t('Following {name} on every source that has them.', { name: followTarget.name }) : t('Unfollowed {name}.', { name: followTarget.name }));
+      }
+      if (on) strong('follow');
+    } catch (e) {
+      toast(e.message);
+      const perf = (item.performers || []).slice(0, 6).join('|');
+      api(`/items/${item.id}/who${perf ? `?performers=${encodeURIComponent(perf)}` : ''}`).then(setWhoData).catch(() => {});
+    }
+  }
   const leaveTo = (fn) => { onLeave(); setTimeout(fn, 30); };
   const title = item.title || '';
   const sub = [id.sub[0], ago(item.created)].filter(Boolean).join(' · ');
@@ -568,8 +622,8 @@ function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave
         <Sheet title={t('Kinks and tags')} onClose={close}>
           {item.performers?.length || item.people?.length ? (
             <div className="tk-sec"><span className="fb-label">{t('In this video')}</span><div className="chiprow all">
-              {(item.performers || []).map((p) => <button type="button" key={p} className="chip ghost btn" onClick={() => { setSheet(`performer:${p}`); strong('performer'); }}><Icon name="person" />{String(p).replace(/^@+/, '')}</button>)}
-              {(item.people || []).map((p) => <button type="button" key={p.handle} className="chip ghost btn" onClick={() => setSheet(`person:${p.platform || 'any'}|${p.handle}`)}><Icon name="person" />{String(p.handle).replace(/^@+/, '')}</button>)}
+              {(item.performers || []).map((p) => <button type="button" key={p} className="chip ghost btn picchip" onClick={() => { setSheet(`performer:${p}`); strong('performer'); }}><PersonPic name={p} thumb={thumbOf(p)} />{String(p).replace(/^@+/, '')}</button>)}
+              {(item.people || []).map((p) => <button type="button" key={p.handle} className="chip ghost btn picchip" onClick={() => setSheet(`person:${p.platform || 'any'}|${p.handle}`)}><PersonPic name={p.handle} lookup platform={p.platform || 'any'} />{String(p.handle).replace(/^@+/, '')}</button>)}
             </div></div>
           ) : null}
           <div className="tk-sec"><span className="fb-label">{t('Kinks')}</span><div className="chiprow all">
@@ -637,9 +691,16 @@ function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave
         </div>
       ) : null}
       <div className="tk-rail">
-        <button type="button" className="tk-av" onClick={() => setSheet(who)} aria-label={t('Show profile of {name}', { name: id.name })}>
-          {item.media?.avatar ? <img className="avatar av-m avimg" src={item.media.avatar} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.display = 'none'; }} /> : <Avatar name={id.name} />}
-        </button>
+        <div className="tk-avwrap">
+          <button type="button" className="tk-av" onClick={() => setSheet(who)} aria-label={t('Show profile of {name}', { name: id.name })}>
+            {item.media?.avatar ? <img className="avatar av-m avimg" src={item.media.avatar} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.display = 'none'; }} /> : id.performer && thumbOf(id.performer) ? <img className="avatar av-m avimg" src={imgSrc(thumbOf(id.performer))} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.display = 'none'; }} /> : <Avatar name={id.name} />}
+          </button>
+          {followTarget ? (
+            <button type="button" className={`tk-follow${followTarget.on ? ' on' : ''}`} onClick={toggleFollow} aria-pressed={followTarget.on} aria-label={followTarget.on ? t('You follow {name}. Tap to unfollow.', { name: followTarget.name }) : t('Follow {name}', { name: followTarget.name })}>
+              <Icon name={followTarget.on ? 'check' : 'plus'} />
+            </button>
+          ) : null}
+        </div>
         <button type="button" className={`tk-b up${item.vote > 0 ? ' on' : ''}`} onClick={() => acts.vote(1)} aria-label={t('I like this')}><Icon name="up" /><span>{item.upvotes != null ? fmtNum(item.upvotes) : ''}</span></button>
         <button type="button" className={`tk-b down${item.vote < 0 ? ' on' : ''}`} onClick={() => acts.vote(-1)} aria-label={t("I don't like this")}><Icon name="down" /></button>
         <HeatRail value={item.rating || 0} onChange={acts.rate} onLive={(v, phase) => setHeat((cur) => (cur && cur.phase === 'live' ? { ...cur, v, phase } : { v, phase, key: Date.now() }))} />
@@ -658,7 +719,7 @@ function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave
           </div>
         ) : null}
         <div className="tk-tags">
-          {(item.performers || []).slice(0, 3).map((p) => <button type="button" key={`p${p}`} className="tk-chip perf" onClick={tapOnly(() => { setSheet(`performer:${p}`); strong('performer'); })}><Icon name="person" />{String(p).replace(/^@+/, '')}</button>)}
+          {(item.performers || []).slice(0, 3).map((p) => <button type="button" key={`p${p}`} className="tk-chip perf" onClick={tapOnly(() => { setSheet(`performer:${p}`); strong('performer'); })}><PersonPic name={p} thumb={thumbOf(p)} />{String(p).replace(/^@+/, '')}</button>)}
           {(item.kinks || []).map((k) => <button type="button" key={`k${k.id}`} className="tk-chip kink" style={{ '--c': k.color }} onClick={tapOnly(() => leaveTo(() => setFilters({ kink: k.id })))}>{k.name}</button>)}
           {tags.slice(0, 12).map((tag) => <button type="button" key={tag} className="tk-chip" onClick={tapOnly(() => leaveTo(() => runSearch(tag).catch(() => setFilters({ tags: [tag] }))))}>#{tag}</button>)}
         </div>
@@ -683,7 +744,23 @@ function MuteBtn() {
   return <button type="button" className="tk-tb" onClick={() => setSound(!on)} aria-label={on ? t('Turn sound off') : t('Turn sound on')}><Icon name={on ? 'volume' : 'mute'} /></button>;
 }
 
-export default function Immersive({ items, startId, onClose, onMore, loading, done, onStrong, onCurrent }) {
+// Short form, mixed and long form at the top of the viewer: the same switch as the format filter of the feed, so
+// the viewer and the feed always show the same thing. Any other filter (a search, tags, a kink...) shows above it
+// and leaves no mode lit unless the formats match one.
+export const TK_MODES = [
+  { id: 'short', label: t('Short'), formats: ['short', 'gif', 'image', 'set'] },
+  { id: 'mixed', label: t('Mixed'), formats: [] },
+  { id: 'long', label: t('Long'), formats: ['long'] }
+];
+export function tkModeOf(filters, others) {
+  const f = [...(filters?.formats || [])].sort().join(',');
+  const m = TK_MODES.find((x) => [...x.formats].sort().join(',') === f);
+  if (!m) return 'custom';
+  if (m.id === 'mixed' && others) return 'custom';
+  return m.id;
+}
+
+export default function Immersive({ items, startId, onClose, onMore, loading, done, onStrong, onCurrent, mode = 'mixed', onMode, chips = [], onClearChip, onClearAll, gen = 0 }) {
   const list = items.filter(inViewer);
   const startAt = Math.max(0, list.findIndex((x) => x.id === startId));
   const [cur, setCur] = useState(startAt);
@@ -739,6 +816,7 @@ export default function Immersive({ items, startId, onClose, onMore, loading, do
   };
   // Posts coming in (more of the feed, or similar ones after one you liked) never move the one on screen.
   useLayoutEffect(() => {
+    if (curId.current == null && list[cur]) { curId.current = list[cur].id; const el = sc.current; if (el) el.scrollTop = cur * el.clientHeight; }
     const i = list.findIndex((x) => x.id === curId.current);
     if (i >= 0 && i !== cur) { setCur(i); const el = sc.current; if (el) el.scrollTop = i * el.clientHeight; }
   }, [list.map((x) => x.id).join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -756,6 +834,43 @@ export default function Immersive({ items, startId, onClose, onMore, loading, do
   }, [cur]); // eslint-disable-line react-hooks/exhaustive-deps
   // More posts load before you reach the end.
   useEffect(() => { if (!done && !loading && list.length - cur <= 3) onMore(); }, [cur, list.length, done, loading]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Another mode or filter: the viewer starts again at the top of what the feed shows now.
+  const firstGen = useRef(gen);
+  useLayoutEffect(() => {
+    if (gen === firstGen.current) return;
+    firstGen.current = gen;
+    curId.current = null;
+    setCur(0);
+    const el = sc.current;
+    if (el) el.scrollTop = 0;
+  }, [gen]);
+  // Swiping left or right switches between short form, mixed and long form.
+  const [flash, setFlash] = useState(null);
+  const flashT = useRef(null);
+  useEffect(() => () => clearTimeout(flashT.current), []);
+  const pickMode = (id) => {
+    if (!onMode || id === mode) return;
+    onMode(id);
+    setFlash(TK_MODES.find((x) => x.id === id)?.label || null);
+    clearTimeout(flashT.current);
+    flashT.current = setTimeout(() => setFlash(null), 900);
+  };
+  const swipe = useRef(null);
+  const swStart = (e) => {
+    if (e.touches.length !== 1 || locks.size || e.target.closest('.tk-galrow, .tk-hot, .tk-prog, .tk-tags, .tk-chips, .tk-sheetwrap, .tk-modes, input')) { swipe.current = null; return; }
+    swipe.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
+  };
+  const swEnd = (e) => {
+    const s0 = swipe.current;
+    swipe.current = null;
+    if (!s0 || !e.changedTouches.length || locks.size) return;
+    const dx = e.changedTouches[0].clientX - s0.x;
+    const dy = e.changedTouches[0].clientY - s0.y;
+    if (Date.now() - s0.t > 700 || Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8) return;
+    const at = Math.max(0, TK_MODES.findIndex((x) => x.id === (mode === 'custom' ? 'mixed' : mode)));
+    const next = TK_MODES[at + (dx < 0 ? 1 : -1)];
+    if (next) pickMode(next.id);
+  };
 
   const go = (d) => { const el = sc.current; if (el) el.scrollTo({ top: (cur + d) * el.clientHeight, behavior: reduced() ? 'auto' : 'smooth' }); };
   useEffect(() => {
@@ -770,7 +885,7 @@ export default function Immersive({ items, startId, onClose, onMore, loading, do
   });
 
   return createPortal(
-    <div className="tk" role="dialog" aria-modal="true" aria-label={t('Full screen')}>
+    <div className={`tk${chips.length ? ' haschips' : ''}`} role="dialog" aria-modal="true" aria-label={t('Full screen')} onTouchStart={swStart} onTouchEnd={swEnd}>
       <div ref={sc} className={`tk-scroll${locks.size ? ' locked' : ''}`} onScroll={onScroll}>
         {list.map((it, i) => (
           <section key={it.id} className="tk-slide" data-id={it.id} data-source={it.source} data-kind={it.media?.kind} aria-hidden={i !== cur}>
@@ -780,15 +895,27 @@ export default function Immersive({ items, startId, onClose, onMore, loading, do
           </section>
         ))}
         <section className="tk-slide tk-endslide">
-          {done ? (
+          {!list.length && loading ? <span className="finding"><span className="spin" />{t('Loading…')}</span> : done ? (
             <div className="tk-endmsg"><p>{t('Nothing more matches right now.')}</p><button type="button" className="ghost-btn small accent" onClick={close}><Icon name="x" />{t('Back to the feed')}</button></div>
           ) : <span className="finding"><span className="spin" />{t('Loading more…')}</span>}
         </section>
       </div>
       <div className="tk-top">
         <button type="button" className="tk-tb" onClick={close} aria-label={t('Close full screen')}><Icon name="chevD" /></button>
+        {onMode ? (
+          <div className="tk-modes" role="tablist" aria-label={t('What to show')}>
+            {TK_MODES.map((m) => <button type="button" key={m.id} role="tab" aria-selected={mode === m.id} className={mode === m.id ? 'on' : ''} onClick={() => pickMode(m.id)}>{m.label}</button>)}
+          </div>
+        ) : null}
         <MuteBtn />
       </div>
+      {chips.length ? (
+        <div className="tk-chips" aria-label={t('What the feed is showing')}>
+          {chips.map(([k, label]) => <span key={k} className="tk-fchip"><span>{label}</span><button type="button" onClick={() => onClearChip?.(k)} aria-label={t('Remove {name}', { name: label })}><Icon name="x" /></button></span>)}
+          {chips.length > 1 ? <button type="button" className="tk-fclear" onClick={() => onClearAll?.()}><Icon name="x" />{t('Clear all')}</button> : null}
+        </div>
+      ) : null}
+      {flash ? <div className="tk-modeflash" aria-live="polite">{flash}</div> : null}
     </div>,
     document.body
   );

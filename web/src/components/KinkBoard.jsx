@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, ago } from '../api.js';
 import { useApp } from '../context.jsx';
 import { Icon } from '../icons.jsx';
@@ -15,25 +15,45 @@ export function evidenceLine(e) {
   return `${tn(e.n, '{n} post you clearly liked', '{n} posts you clearly liked')}${did ? ` (${did})` : ''} · ${t('{lift}× more often than in everything you see', { lift: dec(e.lift) })} · ${tn(e.days, 'on {n} day', 'on {n} days')}`;
 }
 
+// The colour of a kink or a group as a plain dot; tapping it opens the colour picker.
+export function ColorDot({ color, onChange, label, big = false }) {
+  const [v, setV] = useState(color || '#B6A8B0');
+  const timer = useRef(null);
+  useEffect(() => { setV(color || '#B6A8B0'); }, [color]);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const pick = (c) => { setV(c); clearTimeout(timer.current); timer.current = setTimeout(() => onChange(c), 350); };
+  return (
+    <label className={`cdot${big ? ' big' : ''}`} style={{ '--c': v }} title={label}>
+      <input type="color" value={v} onChange={(e) => pick(e.target.value)} aria-label={label} />
+    </label>
+  );
+}
+
 function KinkCard({ k, onOpen }) {
   const fresh = k.created && Date.now() - k.created < 3 * DAY;
   const edited = Object.keys(k.locks || {}).length > 0 || k.origin === 'user';
+  const open = () => onOpen(k);
   return (
-    <button type="button" className={`kcard clickable${k.status !== 'active' ? ' dim' : ''}`} style={{ '--c': k.color }} onClick={() => onOpen(k)}>
+    <div role="button" tabIndex={0} className={`kcard clickable${k.status !== 'active' ? ' dim' : ''}`} style={{ '--c': k.color }} onClick={open} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } }}>
       <div className="kc-head">
         <span className="kc-dot" />
         <strong>{k.name}</strong>
-        {fresh && k.status === 'active' ? <span className="sugg">{t('New')}</span> : null}
-        {edited ? <span className="sugg pin" title={t('You changed this by hand, so it stays the way you set it')}>{t('Yours')}</span> : null}
-        {k.status === 'hidden' ? <span className="sugg">{k.fadedAt ? t('Faded {when}', { when: ago(Math.round(k.fadedAt / 1000)) }) : t('Hidden')}</span> : null}
+        <button type="button" className="kc-edit" onClick={(e) => { e.stopPropagation(); onOpen(k, { edit: true }); }} aria-label={t('Edit {name}', { name: k.name })} title={t('Edit')}><Icon name="edit" /></button>
       </div>
+      {(fresh && k.status === 'active') || edited || k.status === 'hidden' ? (
+        <div className="kc-badges">
+          {fresh && k.status === 'active' ? <span className="sugg">{t('New')}</span> : null}
+          {edited ? <span className="sugg pin" title={t('You changed this by hand, so it stays the way you set it')}>{t('Yours')}</span> : null}
+          {k.status === 'hidden' ? <span className="sugg">{k.fadedAt ? t('Faded {when}', { when: ago(Math.round(k.fadedAt / 1000)) }) : t('Hidden')}</span> : null}
+        </div>
+      ) : null}
       <div className="kc-bars">
         <div><span>{t('All time')}</span><div className="track2"><i style={{ width: `${k.allTime}%`, background: k.color }} /></div><em>{k.allTime}%</em></div>
         <div><span>{t('Lately')}</span><div className="track2"><i style={{ width: `${k.lately}%`, background: k.color }} /></div><em>{k.lately}%</em></div>
       </div>
       {k.evidence ? <p className="kc-why">{evidenceLine(k.evidence)}</p> : null}
-      <div className="kc-tags">{k.tags.slice(0, 5).map((t) => <span key={t.name} className="chip ghost">{t.name}</span>)}{k.tags.length > 5 ? <span className="chip ghost more">+{k.tags.length - 5}</span> : null}</div>
-    </button>
+      <div className="kc-tags">{k.tags.slice(0, 4).map((x) => <span key={x.name} className="chip ghost">{x.name}</span>)}{k.tags.length > 4 ? <span className="chip ghost more">+{k.tags.length - 4}</span> : null}</div>
+    </div>
   );
 }
 
@@ -46,7 +66,7 @@ function GroupHead({ g, count, onChange }) {
   }
   return (
     <div className="ks-head" style={{ '--c': g.color }}>
-      <span className="kc-dot" />
+      <ColorDot color={g.color || '#B6A8B0'} onChange={(c) => patch({ color: c })} label={t('Colour of {name}', { name: g.name })} />
       {edit ? (
         <form onSubmit={(e) => { e.preventDefault(); if (name.trim()) patch({ name: name.trim() }, t('Group renamed.')); setEdit(false); }}>
           <input className="ksname" value={name} onChange={(e) => setName(e.target.value)} autoFocus onBlur={() => setEdit(false)} aria-label={t('Group name')} />
@@ -54,7 +74,6 @@ function GroupHead({ g, count, onChange }) {
       ) : <span>{g.name}</span>}
       <span className="count">{count}</span>
       <span className="grow" />
-      <label className="colorpick" title={t('Group colour')}><input type="color" value={g.color || '#B6A8B0'} onChange={(e) => patch({ color: e.target.value })} aria-label={t('Colour of {name}', { name: g.name })} /></label>
       <button type="button" className="icon-btn" onClick={() => setEdit(true)} aria-label={t('Rename {name}', { name: g.name })} title={t('Rename')}><Icon name="edit" /></button>
       <button type="button" className="icon-btn" onClick={async () => { await api(`/kinks/${g.id}`, { method: 'DELETE' }); toast(t("{name} removed. Its kinks are on their own now and this family won't be grouped again.", { name: g.name })); onChange(); }} aria-label={t('Remove the group {name}', { name: g.name })} title={t('Remove the group (keeps the kinks)')}><Icon name="trash" /></button>
     </div>

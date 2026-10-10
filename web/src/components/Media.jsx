@@ -255,15 +255,15 @@ export function VideoPlayer({ item, active, onPlay, onReady, onFull, onFail, inT
             onLoadedMetadata={onMeta}
           />
         ) : poster ? <img src={poster} alt="" loading="lazy" referrerPolicy="no-referrer" /> : null}
-        {!inTk ? <Badge format={item.format} /> : null}
-        {item.duration && !inTk ? <span className="dur">{fmtDur(item.duration)}</span> : null}
+        {!inTk && !(onFull && armed) ? <Badge format={item.format} /> : null}
+        {item.duration && !inTk && !(onFull && armed) ? <span className="dur">{fmtDur(item.duration)}</span> : null}
         {loading && !error ? <span className="spinner" aria-label={t('Loading video')} /> : null}
         {!inTk && item.media.hasAudio !== false && (src || hlsUrl) && armed ? (
           <button type="button" className={`mutebtn${muted ? '' : ' on'}`} onClick={(e) => { e.stopPropagation(); if (muted) unmute(); else { setSound(false); } }} aria-label={muted ? t('Turn sound on') : t('Turn sound off')} title={muted ? t('Sound on for every video') : t('Sound off for every video')}>
             <Icon name={muted ? 'mute' : 'volume'} />
           </button>
         ) : null}
-        {(src || hlsUrl) && armed && !zoom.fs && !inTk ? <button type="button" className="fsbtn" onClick={(e) => { e.stopPropagation(); if (onFull) onFull(); else openFs(); }} aria-label={t('Full screen')} title={t('Full screen: pinch or double-tap to zoom')}><Icon name="expand" /></button> : null}
+        {(src || hlsUrl) && armed && !zoom.fs && !inTk ? <button type="button" className={`fsbtn${onFull ? ' tl' : ''}`} onClick={(e) => { e.stopPropagation(); if (onFull) onFull(); else openFs(); }} aria-label={t('Full screen')} title={onFull ? t('Full screen') : t('Full screen: pinch or double-tap to zoom')}><Icon name="expand" /></button> : null}
         {zoom.fs ? <button type="button" className="fsclose" onClick={(e) => { e.stopPropagation(); zoom.close(); }} aria-label={t('Close full screen')}><Icon name="x" /></button> : null}
         {error ? <div className="mediaerr">{error}</div> : null}
       </div>

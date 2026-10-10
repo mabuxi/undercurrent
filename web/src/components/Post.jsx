@@ -256,29 +256,15 @@ export default function Post({ item: initial, focus = false, onStrong, onImmersi
   if (near && mediaRef.current) lastH.current = mediaRef.current.offsetHeight || lastH.current;
   const c = item.kinks?.[0]?.color || '#E39A83';
 
-  // Double-tapping the picture or video likes the post, like on Instagram. A single tap on an image waits a moment
-  // so a double tap does not also open it.
+  // Double-tapping a picture likes the post, like on Instagram. A single tap on an image waits a moment so a double
+  // tap does not also open it. Videos and players from other sites in the feed are left to their own player:
+  // tapping, pausing and full screen work the way the phone or browser does it (only the full screen viewer has
+  // its own gestures).
   const tap = useRef({ t: 0, x: 0, y: 0, timer: null, pass: false });
-  // A video with its own controls gets no click from a finger tap (Safari and Chrome keep it for the controls), so
-  // on a touch screen a short tap on a video is picked up from the pointer itself.
-  const pdown = useRef(null);
-  const lastPtrTap = useRef(0);
-  function onMediaPointerDown(e) { pdown.current = e.pointerType === 'mouse' ? null : { x: e.clientX, y: e.clientY, t: Date.now() }; }
-  function onMediaPointerUp(e) {
-    const d = pdown.current;
-    pdown.current = null;
-    if (!d || !e.target.closest?.('video')) return;
-    if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 12 || Date.now() - d.t > 450) return;
-    lastPtrTap.current = Date.now();
-    onMediaClick(e, true);
-  }
-  function onMediaClick(e, fromPointer = false) {
+  function onMediaClick(e) {
     const r = tap.current;
-    if (!fromPointer && e.target.closest?.('video') && Date.now() - lastPtrTap.current < 700) return;
     if (r.pass) { r.pass = false; return; }
-    // Players from other sites have no double-tap like at all: every click there is for the player. The full screen
-    // viewer only opens from the full screen button (or the player's own full screen).
-    if (item.media?.kind === 'embed') return;
+    if (item.media?.kind === 'embed' || e.target.closest('video, .vidwrap')) return;
     if (e.target.closest('a, input, select, textarea, .mutebtn, .linkbtn, .ghost-btn, .icon-btn, .play, .tbtn, .fsbox, .fsbtn')) return;
     const at = Date.now();
     if (at - r.t < 300 && Math.abs(e.clientX - r.x) < 40 && Math.abs(e.clientY - r.y) < 40) {
@@ -298,18 +284,6 @@ export default function Post({ item: initial, focus = false, onStrong, onImmersi
       e.stopPropagation();
       clearTimeout(r.timer);
       r.timer = setTimeout(() => { r.pass = true; btn.click(); }, 300);
-      return;
-    }
-    // A tap on a video pauses or plays it, but only once it is clear it was not the first tap of a double-tap, so liking never pauses the video. Taps on the player's own controls (the
-    // bar at the bottom) go straight through.
-    const v = e.target.closest('video');
-    if (v) {
-      const box = v.getBoundingClientRect();
-      if (v.controls && e.clientY > box.bottom - 56) return;
-      if (!fromPointer) e.preventDefault();
-      e.stopPropagation();
-      clearTimeout(r.timer);
-      r.timer = setTimeout(() => { if (v.paused) v.play().catch(() => {}); else v.pause(); }, 300);
     }
   }
   useEffect(() => () => clearTimeout(tap.current.timer), []);
@@ -431,7 +405,7 @@ export default function Post({ item: initial, focus = false, onStrong, onImmersi
         </div>
       ) : null}
       {!isText ? <p className="ptitle"><Linkify text={trTitle.text || item.title} source={item.source} onPerson={openPerson} /><TranslateButton tr={trTitle} small /><TranslatedNote tr={trTitle} /></p> : null}
-      <div ref={mediaRef} className="pmedia" onClickCapture={onMediaClick} onPointerDownCapture={onMediaPointerDown} onPointerUpCapture={onMediaPointerUp}><PostFx fx={fx} /><HeatFx heat={heat} /><Media item={item} active={active} near={near} height={lastH.current} onPlay={() => strong('play')} onReady={() => setReady(true)} onPerson={openPerson} onLike={item.media?.kind === 'embed' ? undefined : likeByTap} onFull={narrowNow && onImmersive ? () => onImmersive(itemRef.current) : undefined} sandboxed={!unblocked} /></div>
+      <div ref={mediaRef} className="pmedia" onClickCapture={onMediaClick}><PostFx fx={fx} /><HeatFx heat={heat} /><Media item={item} active={active} near={near} height={lastH.current} onPlay={() => strong('play')} onReady={() => setReady(true)} onPerson={openPerson} onLike={item.media?.kind === 'embed' ? undefined : likeByTap} onFull={narrowNow && onImmersive ? () => onImmersive(itemRef.current) : undefined} sandboxed={!unblocked} /></div>
       {!isText && item.body ? <p className="ptext caption"><Linkify text={trBody.text || item.body} source={item.source} onPerson={openPerson} /><TranslateButton tr={trBody} small /><TranslatedNote tr={trBody} /></p> : null}
       {item.aiSummary && !isText ? <p className="aisum">{item.aiSummary}</p> : null}
       <div className={`chipwrap${over && !allTags ? ' over' : ''}`}>

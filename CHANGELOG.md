@@ -3,6 +3,36 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.23.0 · 10 October 2026
+
+### Full screen viewer on a phone
+- A switch at the top: Short (short videos, GIFs and pictures), Mixed and Long. It is the same as the format filter of the feed, so the viewer and the feed always show the same thing. Swipe left or right anywhere on a post to go to the next mode. A new session starts on Mixed unless your feed filters say otherwise; with other filters on (a search, tags, a kink...) no mode is lit.
+- What the feed is filtered on (a search, tags, a kink...) shows as chips at the top of the viewer, each with an ×, plus Clear all to go back to the normal viewer without leaving it.
+- A + under the picture on the right follows who posted it (or the person in the video when the site does not say who posted it); a check shows you already follow them, tap it again to unfollow.
+- People in a video now show their picture (performer pictures, or the profile picture from the sites that have one) instead of a generic icon.
+- Every button over the video has the same see-through look.
+- Holding the side of a video to play it faster no longer scrolls to another post when your finger moves.
+
+### Feed
+- Videos in the feed are left to the phone's or browser's own player everywhere: no more tap to pause or double-tap to like on videos (that was buggy). Pictures keep double-tap to like.
+- On a phone the full screen button sits right over the player's own full screen button (top left), so both open the full screen viewer.
+
+### Kinks on the map
+- Kinks are shown two per row on a phone, each with an edit button.
+- A kink's page is reorganised: a large "Show in feed", then Dive deeper, Branch out and Something new near it as tiles, then Edit, Combine, Hide and Remove as smaller buttons. Combine now sits with the other actions and shows the kinks to pick from.
+- The tags and group are right under the actions. "Often comes with" is now "Update tags to kink to improve", in its own highlighted box.
+- The colour next to the name is a plain coloured dot (tap it to change the colour), instead of the odd icon it showed. Changing the colour no longer saves on every step of the picker.
+- "All kinks" floats at the top so it is always easy to get back.
+- On a phone, smaller widgets sit two side by side; the assistant, best matches and recent interactions take the full width.
+- Fixed: combining two kinks now always keeps every tag of both. The kink page showed only the first 8 tags, and adding or removing a tag there saved only those 8, so tags of a combined kink could get lost.
+
+### Map
+- On a phone one finger scrolls the page past the map (a tap still opens a circle); two fingers move and zoom the map. Sliding sideways with one finger shows how.
+
+### Sources
+- Every few posts you see, the automatic sources are tuned right away instead of once an hour: sources whose last five or six posts you all skipped rest, sources for what you are into right now are added or woken up and fetched at once, and when the feed feels the same or nothing lands it adds searches for other things you like that were not on screen lately. Sources you follow yourself are never touched.
+- Automatic sources and searches now mostly bring what is popular this week, so you get better and fresher posts instead of the same ones or low-quality new ones.
+
 ## 0.22.2 · 9 October 2026
 
 ### Full screen on a phone

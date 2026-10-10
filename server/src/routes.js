@@ -44,6 +44,7 @@ import { queueDeep, deepNow } from './ai/tagger.js';
 import { autoDiscover, interestTerms } from './discover.js';
 import { brain, nodeDetail, strengthen, kinkIdForTag } from './brain.js';
 import { performerInfo } from './sources/stars.js';
+import { noteSeen } from './tune.js';
 import { tagsForItems, tagSpecificity } from './store.js';
 import { lustUrl, lustTest, TUBE_CDNS, tubeReferer } from './sources/lustpress.js';
 import { invalidatePool } from './searchstate.js';
@@ -114,6 +115,8 @@ api.post('/events', wrap((req, res) => {
   touchSession();
   const list = events.slice(0, 200).map((e) => ({ ...e, sessionId }));
   const signal = applyEvents(list);
+  // Every few posts seen, the automatic sources are tuned to what you just did (in the background).
+  try { noteSeen(list); } catch {}
   const strongIds = list.filter((e) => ['save', 'reason', 'complete', 'rewatch', 'up'].includes(e.type) || (e.type === 'rate' && Number(e.value) > 0)).map((e) => Number(e.itemId)).filter(Boolean);
   if (strongIds.length) { fetchForInsight(strongIds); for (const id of strongIds) { deepNow(id); try { keepSearchSource(id); } catch {} } }
   const hebb = list.filter((e) => ['save', 'reason', 'complete', 'rewatch', 'up', 'follow'].includes(e.type) || (e.type === 'rate' && Number(e.value) > 0) || (e.type === 'dwell' && Number(e.value) > 20000)).map((e) => Number(e.itemId)).filter(Boolean);
@@ -263,6 +266,26 @@ api.get('/performers/:name', wrap(async (req, res) => {
     // Their best known videos first: the most upvoted and viewed, from here and fetched from the sources.
     items: topFirst(items).slice(0, 12)
   });
+}));
+
+// Who posted a post and who is in it, and whether you follow them: for the follow button in the full screen viewer.
+api.get('/items/:id/who', wrap((req, res) => {
+  const it = getItem(Number(req.params.id));
+  if (!it) return res.status(404).json({ error: tr('Not found') });
+  const db = getDb();
+  let author = null;
+  const name = it.author && !['[deleted]', 'AutoModerator'].includes(it.author) ? it.author : null;
+  if (name && it.media?.kind !== 'embed') {
+    const followValue = `${it.source}|${name}`;
+    const followed = !!db.prepare("SELECT 1 FROM follows WHERE active = 1 AND ((kind = 'creator' AND lower(value) = lower(?)) OR (kind IN ('reddit_user','redgifs_user') AND lower(value) = lower(?)))").get(followValue, name);
+    author = { name, followed, kind: 'creator', followValue, canFollow: !!PROVIDERS[it.source]?.can?.creator };
+  }
+  const performers = (req.query.performers ? String(req.query.performers).split('|') : []).filter(Boolean).slice(0, 6).map((p) => {
+    const key = normalizeTag(p);
+    const info = performerInfo(key);
+    return { name: p, thumb: info?.thumb || null, followed: !!db.prepare("SELECT 1 FROM follows WHERE active = 1 AND lower(value) LIKE ?").get(`%|${key}`) };
+  });
+  res.json({ author, performers });
 }));
 
 api.post('/performers/:name/follow', wrap((req, res) => {

@@ -171,6 +171,8 @@ export function redditQueueSize() {
 }
 
 const pages = new Map();
+// More of a search starts with what is popular this week and keeps coming back to it.
+const TERM_SORTS = ['week', 'hot', 'week', 'month', 'week', 'new'];
 function nextPage(key) {
   const n = (pages.get(key) || 0) + 1;
   pages.set(key, n);
@@ -212,7 +214,7 @@ export async function fetchMore(filters = {}, { budgetMs = 14000 } = {}) {
     if (terms.length) {
       if (!p.can.search || id === 'reddit') continue;
       for (const term of terms) {
-        const sort = SORTS[(pages.get(`${id}|${term}|sortturn`) || 0) % SORTS.length];
+        const sort = TERM_SORTS[(pages.get(`${id}|${term}|sortturn`) || 0) % TERM_SORTS.length];
         pages.set(`${id}|${term}|sortturn`, (pages.get(`${id}|${term}|sortturn`) || 0) + 1);
         jobs.push({ t: { provider: id, mode: 'search', value: term }, label: tr('{source} more for "{term}"', { source: p.label, term }), page: nextPage(`${id}|${term}|${sort}`), sort });
       }
@@ -313,7 +315,9 @@ export async function runIngest({ force = false, only = null } = {}) {
       if (!t || t.mode === 'trending') continue;
       if (!config.mock && (!state[t.provider] || !state[t.provider].enabled)) continue;
       const label = f.label || `${PROVIDERS[t.provider]?.label || t.provider} ${t.value}`;
-      const fsort = f.synced_from === 'auto' ? SORTS[(cycle + f.id) % SORTS.length] : 'new';
+      // Automatic sources mostly bring what is popular this week, so it is not always the same old posts and not
+      // the low-quality new ones; now and then the newest or all-time best for variety.
+      const fsort = f.synced_from === 'auto' ? ((cycle + f.id) % 3 ? 'week' : SORTS[(cycle + f.id) % SORTS.length]) : 'new';
       if (t.provider === 'reddit' && !config.mock) { queueReddit(t, `${label} (${sortName(fsort)})`, f.id, fsort); continue; }
       const r = await runTarget(t, label, 1, fsort, f.id);
       getDb().prepare('UPDATE follows SET last_fetch = ? WHERE id = ?').run(now(), f.id);
@@ -331,6 +335,20 @@ export async function runIngest({ force = false, only = null } = {}) {
     if (added) invalidatePool();
   }
   return { added, blocked };
+}
+
+// Fetches one source right away (a source the quick tuning just added or woke up), so its posts are in the feed
+// within seconds instead of at the next round.
+export async function fetchFollowNow(id, sort = 'week') {
+  const f = getDb().prepare('SELECT * FROM follows WHERE id = ?').get(id);
+  const t = f && followTarget(f);
+  if (!t || t.mode === 'trending') return { added: 0 };
+  const label = f.label || `${PROVIDERS[t.provider]?.label || t.provider} ${t.value}`;
+  if (t.provider === 'reddit' && !config.mock) { queueReddit(t, `${label} (${sortName(sort)})`, f.id, sort); return { queued: true, added: 0 }; }
+  const r = await runTarget(t, label, 1, sort, f.id);
+  getDb().prepare('UPDATE follows SET last_fetch = ? WHERE id = ?').run(now(), f.id);
+  if (r.added) invalidatePool();
+  return r;
 }
 
 export async function testProvider(id) {

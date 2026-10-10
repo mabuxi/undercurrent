@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { t } from '../i18n.js';
 
 const TWO_PI = Math.PI * 2;
@@ -64,6 +64,7 @@ function blobPath(ctx, members, pad, t) {
 
 export default function BrainCanvas({ data, view, selected, onSelect, onHover, height = 560 }) {
   const canvasRef = useRef(null);
+  const [hint, setHint] = useState(false);
   const sim = useRef({ nodes: new Map(), edges: [], alpha: 1, cam: { x: 0, y: 0, k: 1 }, hover: null, drag: null, pan: null, moved: false, w: 800, h: height });
   const viewRef = useRef(view);
   const selRef = useRef(selected);
@@ -310,11 +311,14 @@ export default function BrainCanvas({ data, view, selected, onSelect, onHover, h
     return best?.n || null;
   }
 
+  // On a touch screen one finger scrolls the page past the map (a tap still opens a circle); two fingers move and
+  // zoom the map.
   function down(e) {
     const S = sim.current;
     const p = toWorld(e);
     const n = hit(p);
     S.moved = false;
+    if (e.pointerType === 'touch') { S.tap = { n, x: e.clientX, y: e.clientY }; return; }
     canvasRef.current.setPointerCapture(e.pointerId);
     if (n) { S.drag = n; n.fixed = true; S.alpha = Math.max(S.alpha, 0.3); }
     else S.pan = { x: p.sx - S.cam.x, y: p.sy - S.cam.y };
@@ -322,6 +326,7 @@ export default function BrainCanvas({ data, view, selected, onSelect, onHover, h
 
   function move(e) {
     const S = sim.current;
+    if (e.pointerType === 'touch') { if (S.tap && Math.hypot(e.clientX - S.tap.x, e.clientY - S.tap.y) > 10) S.tap = null; return; }
     const p = toWorld(e);
     if (S.drag) { S.drag.x = p.x; S.drag.y = p.y; S.moved = true; S.alpha = Math.max(S.alpha, 0.25); return; }
     if (S.pan) { S.cam.x = p.sx - S.pan.x; S.cam.y = p.sy - S.pan.y; S.moved = true; return; }
@@ -334,6 +339,12 @@ export default function BrainCanvas({ data, view, selected, onSelect, onHover, h
   function up(e) {
     const S = sim.current;
     const p = toWorld(e);
+    if (e.pointerType === 'touch') {
+      const tp = S.tap;
+      S.tap = null;
+      if (tp && !S.pinch && Date.now() - (S.pinchEnd || 0) > 300) onSelect?.(tp.n ? tp.n.key : null);
+      return;
+    }
     if (S.drag) {
       const n = S.drag;
       S.drag = null;
@@ -364,8 +375,45 @@ export default function BrainCanvas({ data, view, selected, onSelect, onHover, h
       zoomAt(e.deltaY < 0 ? 1.12 : 0.89, e.clientX - rect.left, e.clientY - rect.top);
     };
     c.addEventListener('wheel', w, { passive: false });
-    return () => c.removeEventListener('wheel', w);
-  }, []);
+    const S = sim.current;
+    const two = (e) => {
+      const rect = c.getBoundingClientRect();
+      const [a, b] = [e.touches[0], e.touches[1]];
+      return { x: (a.clientX + b.clientX) / 2 - rect.left, y: (a.clientY + b.clientY) / 2 - rect.top, d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1 };
+    };
+    const ts = (e) => {
+      if (e.touches.length >= 2) { e.preventDefault(); S.tap = null; S.pinch = { ...two(e) }; setHint(false); onHover?.(null); }
+      else S.one = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    };
+    const tm = (e) => {
+      if (e.touches.length >= 2 && S.pinch) {
+        e.preventDefault();
+        const g = two(e);
+        S.cam.x += g.x - S.pinch.x;
+        S.cam.y += g.y - S.pinch.y;
+        zoomAt(g.d / S.pinch.d, g.x, g.y);
+        S.pinch = g;
+      } else if (e.touches.length === 1 && !S.pinch && S.one && Math.abs(e.touches[0].clientX - S.one.x) > 24 && Math.abs(e.touches[0].clientX - S.one.x) > Math.abs(e.touches[0].clientY - S.one.y)) {
+        // Sideways with one finger does nothing on the page, so it says how to move the map.
+        clearTimeout(S.hintT);
+        setHint(true);
+        S.hintT = setTimeout(() => setHint(false), 1400);
+      }
+    };
+    const te = (e) => { if (S.pinch && e.touches.length < 2) { S.pinch = null; S.pinchEnd = Date.now(); } };
+    c.addEventListener('touchstart', ts, { passive: false });
+    c.addEventListener('touchmove', tm, { passive: false });
+    c.addEventListener('touchend', te);
+    c.addEventListener('touchcancel', te);
+    return () => {
+      c.removeEventListener('wheel', w);
+      c.removeEventListener('touchstart', ts);
+      c.removeEventListener('touchmove', tm);
+      c.removeEventListener('touchend', te);
+      c.removeEventListener('touchcancel', te);
+      clearTimeout(S.hintT);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const S = sim.current;
@@ -378,7 +426,8 @@ export default function BrainCanvas({ data, view, selected, onSelect, onHover, h
 
   return (
     <div className="brainbox">
-      <canvas ref={canvasRef} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={() => { sim.current.hover = null; onHover?.(null); }} role="img" aria-label={t('Live map of your kinks, tags and fantasies')} />
+      <canvas ref={canvasRef} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => { const S = sim.current; S.tap = null; S.pan = null; if (S.drag) { S.drag.fixed = false; S.drag = null; } }} onPointerLeave={() => { sim.current.hover = null; onHover?.(null); }} role="img" aria-label={t('Live map of your kinks, tags and fantasies')} />
+      <div className={`brainhint${hint ? ' on' : ''}`} aria-hidden="true">{t('Use two fingers to move and zoom the map')}</div>
       <div className="brainzoom">
         <button type="button" className="icon-btn" onClick={() => sim.current.api?.zoom(1.25)} aria-label={t('Zoom in')}>+</button>
         <button type="button" className="icon-btn" onClick={() => sim.current.api?.zoom(0.8)} aria-label={t('Zoom out')}>−</button>

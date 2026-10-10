@@ -2151,3 +2151,114 @@ html.narrow .pmenu .grp.end .blockerbtn{display:flex}
 .embedmenu button{all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;font-size:13.5px;color:var(--text)}
 .embedmenu button:hover{background:rgba(255,255,255,.06)}
 .embedmenu svg{width:17px;height:17px;color:var(--text-2)}
+
+/* 0.23.0: kink page */
+.cdot{position:relative;display:inline-block;width:20px;height:20px;border-radius:50%;background:var(--c);flex:none;cursor:pointer;box-shadow:0 0 0 2px rgba(255,255,255,.14),0 0 12px color-mix(in srgb,var(--c) 45%,transparent)}
+.cdot.big{width:30px;height:30px}
+.cdot input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}
+.cdot:focus-within{outline:2px solid var(--c);outline-offset:3px}
+.kcard.clickable{cursor:pointer;transition:transform .12s,border-color .12s;min-width:0;box-sizing:border-box}
+.kcard.clickable:hover{transform:translateY(-1px);border-color:color-mix(in srgb,var(--c) 55%,transparent)}
+.kcard.clickable:focus-visible{outline:2px solid var(--c);outline-offset:2px}
+.kcard .kc-head{flex-wrap:nowrap}
+.kcard .kc-head strong{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kc-edit{all:unset;cursor:pointer;flex:none;width:30px;height:30px;margin:-6px -6px -6px 0;border-radius:50%;display:grid;place-items:center;color:var(--text-2);background:color-mix(in srgb,var(--c) 14%,transparent)}
+.kc-edit:hover{color:var(--text);background:color-mix(in srgb,var(--c) 28%,transparent)}
+.kc-edit svg{width:15px;height:15px}
+.kc-badges{display:flex;gap:5px;flex-wrap:wrap}
+.kc-why{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+@media (max-width:640px){
+  .kgrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .kcard{padding:10px;gap:6px}
+  .kc-bars>div{grid-template-columns:40px 1fr 30px;font-size:10px;gap:4px}
+  .kc-why{font-size:10.5px;-webkit-line-clamp:2}
+  .kc-tags .chip{font-size:10px;padding:1px 6px}
+}
+.kback-wrap{position:sticky;top:calc(var(--toph,60px) + 8px);z-index:30;height:0;pointer-events:none}
+.kback{all:unset;pointer-events:auto;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:9px 16px 9px 11px;border-radius:999px;font-size:13.5px;font-weight:700;color:var(--text);background:color-mix(in srgb,var(--c,#E39A83) 22%,rgba(22,16,24,.86));border:1px solid color-mix(in srgb,var(--c,#E39A83) 50%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:0 8px 22px rgba(0,0,0,.45)}
+.kback svg{width:16px;height:16px}
+.kback:hover{border-color:var(--c,#E39A83)}
+.braindetail .khead{flex-direction:column;align-items:stretch;gap:12px;padding:56px 14px 14px;background:linear-gradient(170deg,color-mix(in srgb,var(--c) 13%,var(--surface)) 0%,var(--surface) 65%);border-color:color-mix(in srgb,var(--c) 30%,transparent)}
+.ktitle{display:flex;align-items:center;gap:10px;min-width:0}
+.ktitle .kname.static{font-family:var(--display);font-size:26px;font-weight:500;padding:0;line-height:1.1;min-width:0;overflow-wrap:anywhere}
+.ktitle .kedit{flex:none}
+.kname-form{display:flex;align-items:center;gap:6px;flex:1;min-width:0;flex-wrap:wrap}
+.kname-form .kname{border-color:var(--line-2);background:var(--surface-2);min-width:0;flex:1 1 160px}
+.ktype{margin-top:-6px}
+.kacts{display:flex;flex-direction:column;gap:10px}
+.kact-main{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;width:100%;min-height:50px;border-radius:14px;font-size:15.5px;font-weight:800;background:var(--accent);color:var(--accent-ink);box-shadow:0 8px 20px -10px var(--accent)}
+.kact-main svg{width:19px;height:19px}
+.kact-main:active{transform:scale(.985)}
+.kact-explore{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px}
+.kact-explore button{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:68px;padding:8px 6px;border-radius:12px;text-align:center;font-size:12.5px;font-weight:700;line-height:1.2;color:var(--text);background:color-mix(in srgb,var(--c) 12%,var(--surface-2,rgba(255,255,255,.04)));border:1px solid color-mix(in srgb,var(--c) 26%,transparent)}
+.kact-explore button svg{width:20px;height:20px;color:var(--c)}
+.kact-explore button:hover{border-color:color-mix(in srgb,var(--c) 60%,transparent)}
+.kact-manage{display:flex;flex-wrap:wrap;gap:6px}
+.kcombine{padding:10px;border-radius:12px;background:var(--surface-2,rgba(255,255,255,.04));border:1px dashed var(--line-2);display:flex;flex-direction:column;gap:8px}
+.kcombine .wnote{margin:0}
+.kcombine .chip .kc-dot{margin-right:6px}
+.ktags{display:flex;flex-direction:column;gap:8px;padding-top:12px;border-top:1px solid var(--line)}
+.ktags .tagadd{width:110px;font-size:12px;padding:4px 10px}
+.kgroup select{background:var(--surface-2);color:var(--text);border:1px solid var(--line-2);border-radius:999px;padding:5px 10px;font-size:12.5px}
+.kimprove{margin-top:4px;padding:12px;border-radius:12px;background:color-mix(in srgb,var(--c) 14%,var(--surface-2,rgba(255,255,255,.04)));border:1px solid color-mix(in srgb,var(--c) 45%,transparent);display:flex;flex-direction:column;gap:6px}
+.kimprove-h{display:flex;align-items:center;gap:7px;font-size:14.5px}
+.kimprove-h svg{width:17px;height:17px;color:var(--c)}
+.kimprove .wnote{margin:0}
+.kimprove .chip.btn{border-color:color-mix(in srgb,var(--c) 45%,transparent)}
+.bwgrid.kgridw{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.bwgrid.kgridw .bw.wide{grid-column:1/-1}
+.bwgrid.kgridw .bw.half{grid-column:span 1}
+.aitext.small{font-size:15px}
+@media (max-width:640px){
+  .bwgrid.kgridw{gap:8px}
+  .bwgrid.kgridw .bw.half{padding:10px}
+  .bwgrid.kgridw .bw.half .linkrow{grid-template-columns:8px minmax(0,1fr) 30px;font-size:11.5px;gap:6px}
+  .bwgrid.kgridw .bw.half .linkrow .lbar{display:none}
+  .bwgrid.kgridw .bw.half select{width:100%;font-size:11.5px}
+  .bwgrid.kgridw .bw.half .wnote{font-size:11px}
+  .bwgrid.kgridw .bw.half .bt{font-size:11px}
+  .ktitle .kname.static{font-size:23px}
+}
+.braindetail{scroll-margin-top:calc(var(--toph,60px) + 6px)}
+.kcard .sugg{font-size:9.5px;padding:2px 7px}
+@media (max-width:640px){.kcard .sugg{font-size:8.5px;padding:1px 6px}}
+.detailwrap{scroll-margin-top:calc(var(--toph,60px) + 6px)}
+.kcombine .chip .kc-dot{display:inline-block;vertical-align:middle}
+@media (pointer:coarse){.brainbox canvas{touch-action:pan-y}}
+.brainhint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:10px 16px;border-radius:999px;background:rgba(18,12,20,.82);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:var(--text);font-size:13px;font-weight:600;pointer-events:none;opacity:0;transition:opacity .25s;white-space:nowrap}
+.brainhint.on{opacity:1}
+/* On a phone the full screen button sits where the phone's own player has its full screen button (top left), so
+   both lead to the full screen viewer. */
+.fsbtn.tl{left:8px;right:auto;top:8px;width:38px;height:38px;opacity:.92;background:rgba(10,6,12,.62);z-index:4}
+.fsbtn.tl svg{width:18px;height:18px}
+
+/* 0.23.0: full screen viewer, one see-through glass look for every button over the video */
+.tk{--glass:rgba(20,14,22,.36);--glass-line:rgba(255,255,255,.1)}
+.tk .tk-tb,.tk .tk-b svg,.tk .tk-ctl button,.tk .tk-chip,.tk .tk-fast,.tk .tk-tagsbtn,.tk .tk-modes,.tk .tk-fchip,.tk .tk-fclear{background:var(--glass);-webkit-backdrop-filter:blur(12px) saturate(1.2);backdrop-filter:blur(12px) saturate(1.2);box-shadow:inset 0 0 0 1px var(--glass-line)}
+.tk .tk-chip.kink{background:color-mix(in srgb,var(--c) 30%,var(--glass))}
+.tk .tk-tagsbtn{border-radius:50%}
+.tk-modes{pointer-events:auto;display:flex;align-items:center;gap:2px;padding:3px;border-radius:999px;align-self:center}
+.tk-modes button{all:unset;cursor:pointer;padding:7px 13px;border-radius:999px;font-size:13px;font-weight:700;color:rgba(244,236,239,.7);transition:background .2s,color .2s;-webkit-tap-highlight-color:transparent}
+.tk-modes button.on{background:rgba(244,236,239,.92);color:#170f18}
+.tk-chips{position:absolute;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 58px);z-index:5;display:flex;gap:6px;overflow-x:auto;padding:0 10px;scrollbar-width:none}
+.tk-chips::-webkit-scrollbar{display:none}
+.tk-fchip{flex:none;display:inline-flex;align-items:center;gap:2px;padding:4px 4px 4px 11px;border-radius:999px;font-size:12.5px;font-weight:600;color:#F4ECEF;white-space:nowrap}
+.tk-fchip button{all:unset;cursor:pointer;width:24px;height:24px;border-radius:50%;display:grid;place-items:center}
+.tk-fchip button svg{width:13px;height:13px}
+.tk-fclear{all:unset;cursor:pointer;flex:none;display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:999px;font-size:12.5px;font-weight:700;color:#F4ECEF}
+.tk-fclear svg{width:13px;height:13px}
+.tk.haschips .tk-dots{top:calc(env(safe-area-inset-top,0px) + 100px)}
+.tk.haschips .tk-fast{top:calc(env(safe-area-inset-top,0px) + 104px)}
+.tk-modeflash{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);z-index:7;padding:12px 24px;border-radius:999px;font-size:20px;font-weight:800;color:#F4ECEF;background:rgba(20,14,22,.5);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);pointer-events:none;animation:tkflash .9s ease forwards}
+@keyframes tkflash{0%{opacity:0;transform:translate(-50%,-50%) scale(.9)}15%{opacity:1;transform:translate(-50%,-50%) scale(1)}75%{opacity:1}100%{opacity:0}}
+.tk-avwrap{position:relative;display:flex;flex-direction:column;align-items:center;margin-bottom:14px}
+.tk-follow{all:unset;cursor:pointer;position:absolute;left:50%;bottom:-10px;transform:translateX(-50%);width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--accent-ink);box-shadow:0 2px 6px rgba(0,0,0,.45);transition:background .2s,transform .15s}
+.tk-follow svg{width:14px;height:14px;stroke-width:2.6}
+.tk-follow.on{background:#F4ECEF;color:#170f18}
+.tk-follow:active{transform:translateX(-50%) scale(.88)}
+.tk-pic{width:18px;height:18px;border-radius:50%;object-fit:cover;flex:none;margin-left:-4px}
+.tk-pic.none{display:inline-grid;place-items:center;font-size:10px;font-weight:800;background:rgba(244,236,239,.22);color:#F4ECEF}
+.chip.picchip{display:inline-flex;align-items:center;gap:6px}
+.chip.picchip .tk-pic{width:20px;height:20px;margin-left:-3px}
+.tk-top{align-items:center}
+.tk-scroll{overflow-anchor:none}

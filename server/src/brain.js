@@ -82,7 +82,7 @@ export function brain({ maxTags = 18 } = {}) {
       key: `k${k.id}`, id: k.id, type: 'kink', name: k.label || k.name, baseName: k.name, status: k.status, origin: k.origin, description: k.description || '',
       color: tg ? groupColor.get(tg.id) || k.color : k.color, ownColor: k.color, group: k.parentId || null, topGroup: tg?.id || null,
       allTime: k.allTime, lately: k.lately, now: k.now, activity: Math.round((act.get(`k${k.id}`) || 0) * 10) / 10, last: last.get(`k${k.id}`) || null,
-      tags: k.tags.slice(0, 8).map((t) => t.name)
+      tags: k.tags.map((t) => t.name)
     });
   }
   for (const t of hotTags) {
@@ -147,10 +147,12 @@ export function nodeDetail(key) {
   const id = Number(key.slice(1));
   let tagNames = [];
   let filter = {};
+  let kinkTags = null;
   if (type === 'k') {
     const k = listKinks({ includeHidden: true }).find((x) => x.id === id);
     if (!k) return null;
     tagNames = k.tags.map((t) => t.name);
+    kinkTags = k.tags.map((t) => ({ name: t.name, weight: t.weight ?? 1 }));
     filter = { kink: id };
   } else if (type === 't') {
     const row = db.prepare('SELECT name FROM tags WHERE id = ?').get(id);
@@ -164,7 +166,7 @@ export function nodeDetail(key) {
     tagNames = ks.flatMap((k) => k.tags.map((t) => t.name));
     filter = { fantasy: id };
   }
-  if (!tagNames.length) return { filter, recent: [], counts: {} };
+  if (!tagNames.length) return { filter, recent: [], counts: {}, kinkTags };
   const ph = tagNames.map(() => '?').join(',');
   const recent = db.prepare(`SELECT e.item_id, e.type, e.value, e.ts FROM events e WHERE e.item_id IN (SELECT DISTINCT it.item_id FROM item_tags it JOIN tags t ON t.id = it.tag_id WHERE t.name IN (${ph}) AND it.weight >= 0.42)
     AND e.type NOT IN ('impression', 'play', 'progress', 'tagboost', 'search', 'skip') ORDER BY e.ts DESC LIMIT 200`).all(...tagNames);
@@ -193,7 +195,7 @@ export function nodeDetail(key) {
   const idOf = new Map(db.prepare(`SELECT id, name FROM tags WHERE name IN (${related.map(() => '?').join(',') || "''"})`).all(...related.map((r) => r.name)).map((r) => [r.name, r.id]));
   const relTags = related.filter((r) => conceptsOf(r.name).some(isKinkConcept)).map((r) => ({ name: r.name, score: r.c * (spec.map.get(idOf.get(r.name)) ?? 1) })).sort((a, b) => b.score - a.score).slice(0, 10).map((r) => r.name);
   return {
-    filter, counts, week, perWeekBefore: Math.round((before / 4) * 10) / 10, relatedTags: relTags,
+    filter, counts, week, perWeekBefore: Math.round((before / 4) * 10) / 10, relatedTags: relTags, kinkTags,
     recent: posts
   };
 }

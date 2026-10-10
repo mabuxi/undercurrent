@@ -4,7 +4,7 @@ import { useApp, MOODS, crumbList } from '../context.jsx';
 import { Icon } from '../icons.jsx';
 import Post from './Post.jsx';
 import { Window } from './Windows.jsx';
-import Immersive, { inViewer } from './Immersive.jsx';
+import Immersive, { inViewer, TK_MODES, tkModeOf } from './Immersive.jsx';
 import ErrorBoundary from './ErrorBoundary.jsx';
 import { refreshWindows } from './SideColumn.jsx';
 import { begin, end } from '../activity.js';
@@ -303,7 +303,7 @@ function Controls({ total, loading }) {
 }
 
 export default function FeedView() {
-  const { filters, opts, mix, feedKey, toast, refreshMeta, search, searchMore, withoutFilters } = useApp();
+  const { filters, opts, mix, feedKey, toast, refreshMeta, search, searchMore, withoutFilters, patchFilters, clearFilter, clearSearch, kinks, fantasies } = useApp();
   // The balance between women and men always narrows what a search finds, so a search can always be shown without it.
   const narrowing = !filters.noTune;
   const narrow = useNarrow();
@@ -325,6 +325,10 @@ export default function FeedView() {
   const [deeper, setDeeper] = useState({});
   // The full screen viewer on a phone: which post it opened on.
   const [tk, setTk] = useState(null);
+  const tkRef = useRef(null);
+  tkRef.current = tk;
+  // A change made from inside the viewer (its mode switch or its filter chips) keeps it open on the new feed.
+  const tkStay = useRef(false);
   const strongDone = useRef(new Set());
   const deeperCount = useRef(0);
   const shown = useRef(new Set());
@@ -421,7 +425,9 @@ export default function FeedView() {
     setItems([]);
     setWins([]);
     setDeeper({});
-    setTk(null);
+    if (tkStay.current && tkRef.current) setTk((x) => (x ? { ...x, gen: (x.gen || 0) + 1 } : x));
+    else setTk(null);
+    tkStay.current = false;
     strongDone.current = new Set();
     deeperCount.current = 0;
     setDone(false);
@@ -485,7 +491,24 @@ export default function FeedView() {
     } catch (e) { toast(e.message); }
   }
 
-  const openTk = useCallback((it) => { if (inViewer(it)) setTk({ id: it.id }); }, []);
+  const openTk = useCallback((it) => { if (inViewer(it)) setTk({ id: it.id, gen: 0 }); }, []);
+  // What the feed shows, as chips at the top of the viewer, and which of short, mixed and long form it is.
+  const tkCrumbs = crumbList(filters, { kinks, fantasies });
+  const tkOthers = tkCrumbs.filter(([k]) => k !== 'formats');
+  const tkMode = tkModeOf(filters, tkOthers.length);
+  const tkChips = tkMode === 'custom' && filters.formats?.length ? tkCrumbs : tkOthers;
+  const setTkMode = useCallback((id) => {
+    const m = TK_MODES.find((x) => x.id === id);
+    if (!m) return;
+    tkStay.current = true;
+    patchFilters({ formats: m.formats.length ? m.formats : null });
+  }, [patchFilters]);
+  const clearTkChip = useCallback((k) => {
+    tkStay.current = true;
+    if (k === 'formats') patchFilters({ formats: null });
+    else clearFilter(k);
+  }, [clearFilter, patchFilters]);
+  const clearTkAll = useCallback(() => { tkStay.current = true; clearSearch(); }, [clearSearch]);
   // The feed follows the viewer in the background (so what is above the post has loaded and settled by the time you
   // come back), and leaving the viewer puts it exactly on the post you were last on.
   const toPost = useCallback((id) => {
@@ -526,7 +549,7 @@ export default function FeedView() {
       {error ? <div className="empty">{error}</div> : null}
       {wider && items.length ? <div className="deeper"><span className="deeper-why">{t('Few exact matches left, now also showing close matches')}</span></div> : null}
       {fresh ? <button type="button" className="freshbar" onClick={() => { reset(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>{t('New results from your sources are in · Show them')}</button> : null}
-      {tk && narrow ? <ErrorBoundary name="Viewer"><Immersive items={flat} startId={tk.id} onClose={closeTk} onCurrent={toPost} onMore={() => loadMoreRef.current?.()} loading={loading || finding} done={done} onStrong={onStrong} /></ErrorBoundary> : null}
+      {tk && narrow ? <ErrorBoundary name="Viewer"><Immersive items={flat} startId={tk.id} gen={tk.gen || 0} onClose={closeTk} onCurrent={toPost} onMore={() => loadMoreRef.current?.()} loading={loading || finding} done={done} onStrong={onStrong} mode={tkMode} onMode={setTkMode} chips={tkChips} onClearChip={clearTkChip} onClearAll={clearTkAll} /></ErrorBoundary> : null}
       <div className="sentinel" ref={sentinel}>
         {finding || loading || waiting ? (
           <span className="finding"><span className="spin" />{finding ? t('Finding more like this on your sources…') : waiting ? t('Nothing left that matches. Checking your sources once more shortly…') : t('Loading more…')}</span>

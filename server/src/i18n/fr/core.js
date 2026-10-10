@@ -64,5 +64,6 @@ export default {
   "What catches your eye about them?": "Qu’est-ce qui vous attire chez eux ?",
   "What are they wearing?": "Que portent-ils ?",
   "Add a twist?": "Un rebondissement ?",
-  "How does it end?": "Comment ça finit ?"
+  "How does it end?": "Comment ça finit ?",
+  "resting: you skipped its last {n} posts": "au repos : vous avez passé ses {n} dernières publications"
 };

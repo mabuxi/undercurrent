@@ -2,6 +2,36 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.23.0 · 10 octobre 2026
+
+### Plein écran sur téléphone
+- Un sélecteur en haut : Court (vidéos courtes, GIF et images), Mélangé et Long. C’est le même que le filtre de format du fil, donc le plein écran et le fil montrent toujours la même chose. Balayez vers la gauche ou la droite sur un post pour passer au mode suivant. Une nouvelle session commence sur Mélangé sauf si vos filtres disent autre chose ; avec d’autres filtres (une recherche, des tags, un kink...), aucun mode n’est allumé.
+- Ce sur quoi le fil est filtré (une recherche, des tags, un kink...) s’affiche en puces en haut du plein écran, chacune avec un ×, plus Tout effacer pour revenir au plein écran normal sans le quitter.
+- Un + sous la photo à droite suit la personne qui a publié (ou la personne dans la vidéo quand le site ne dit pas qui a publié) ; une coche montre que vous la suivez déjà, touchez-la encore pour ne plus suivre.
+- Les personnes dans une vidéo montrent maintenant leur photo (photos des performeurs, ou la photo de profil des sites qui en ont une) au lieu d’une icône générique.
+- Tous les boutons sur la vidéo ont le même aspect transparent.
+- Maintenir le côté d’une vidéo pour l’accélérer ne fait plus défiler vers un autre post quand votre doigt bouge.
+
+### Fil
+- Les vidéos du fil sont laissées au lecteur du téléphone ou du navigateur partout : plus de toucher pour mettre en pause ni de double toucher pour liker sur les vidéos (c’était bogué). Les images gardent le double toucher pour liker.
+- Sur téléphone, le bouton plein écran se place juste sur le bouton plein écran du lecteur (en haut à gauche), donc les deux ouvrent le plein écran.
+
+### Kinks sur la carte
+- Les kinks s’affichent deux par ligne sur téléphone, chacun avec un bouton modifier.
+- La page d’un kink est réorganisée : un grand « Voir dans le fil », puis Approfondir, Explorer autour et Du nouveau tout près en tuiles, puis Modifier, Combiner, Masquer et Retirer en plus petits boutons. Combiner est maintenant avec les autres actions et montre les kinks à choisir.
+- Les tags et le groupe sont juste sous les actions. « Va souvent avec » devient « Ajoutez des tags au kink pour l’améliorer », dans son propre encadré mis en avant.
+- La couleur à côté du nom est un simple point de couleur (touchez-le pour changer la couleur), au lieu de l’icône bizarre d’avant. Changer la couleur n’enregistre plus à chaque pas du sélecteur.
+- « Tous les kinks » flotte en haut pour toujours revenir facilement.
+- Sur téléphone, les petits widgets se mettent deux côte à côte ; l’assistant, les meilleures correspondances et les interactions récentes prennent toute la largeur.
+- Corrigé : combiner deux kinks garde maintenant toujours tous les tags des deux. La page d’un kink ne montrait que les 8 premiers tags, et ajouter ou retirer un tag là n’enregistrait que ces 8, donc des tags d’un kink combiné pouvaient se perdre.
+
+### Carte
+- Sur téléphone, un doigt fait défiler la page au-delà de la carte (un toucher ouvre toujours un cercle) ; deux doigts déplacent et zooment la carte. Glisser de côté avec un doigt montre comment faire.
+
+### Sources
+- Toutes les quelques publications vues, les sources automatiques sont ajustées tout de suite au lieu d’une fois par heure : les sources dont vous avez passé les cinq ou six dernières publications se mettent au repos, des sources pour ce qui vous plaît en ce moment sont ajoutées ou réveillées et récupérées aussitôt, et quand le fil se répète ou que rien ne vous plaît, il ajoute des recherches pour d’autres choses que vous aimez et qui n’étaient pas à l’écran récemment. Les sources que vous suivez vous-même ne sont jamais modifiées.
+- Les sources et recherches automatiques ramènent maintenant surtout ce qui est populaire cette semaine, pour des publications meilleures et plus fraîches au lieu des mêmes ou de nouvelles de faible qualité.
+
 ## 0.22.2 · 9 octobre 2026
 
 ### Plein écran sur téléphone
