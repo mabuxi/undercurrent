@@ -2262,3 +2262,29 @@ html.narrow .pmenu .grp.end .blockerbtn{display:flex}
 .chip.picchip .tk-pic{width:20px;height:20px;margin-left:-3px}
 .tk-top{align-items:center}
 .tk-scroll{overflow-anchor:none}
+
+/* 0.23.1: heat slider in the viewer: the same frosted glass and rim as the reaction circle in the middle, the flame
+   colours inside and a springy open */
+.tk-hottrack{width:50px;height:224px;margin-left:-25px;bottom:calc(100% + 4px);border-radius:25px;overflow:hidden;
+  background:linear-gradient(180deg,rgba(52,40,50,.5),rgba(30,22,30,.6));
+  -webkit-backdrop-filter:blur(18px) saturate(170%);backdrop-filter:blur(18px) saturate(170%);
+  border:1px solid rgba(255,255,255,.14);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.16),inset 0 -1px 0 rgba(0,0,0,.28),0 16px 40px rgba(0,0,0,.42);
+  transform:translateY(14px) scale(.4);opacity:0;transition:transform .32s var(--spring,cubic-bezier(.34,1.56,.64,1)),opacity .16s}
+.tk-hot.open .tk-hottrack{transform:none;opacity:1}
+.tk-hotfill{left:4px;right:4px;bottom:4px;border-radius:19px;height:max(0px,calc(var(--h) * (100% - 8px)));
+  background:linear-gradient(to top,var(--flame,#F08A4B),var(--flame-2,#F6C35B));
+  box-shadow:0 0 16px rgba(240,138,75,calc(.2 + var(--h) * .4)),inset 0 1px 0 rgba(255,255,255,.35);
+  transition:height .16s var(--spring,cubic-bezier(.34,1.56,.64,1))}
+.tk-hot .tk-b.hot svg{transition:transform .25s var(--spring,cubic-bezier(.34,1.56,.64,1)),color .2s,background .2s}
+.tk-hot.on .tk-b.hot svg{transform:scale(calc(1 + var(--h) * .12))}
+.tk-hot.open .tk-b.hot svg{transform:scale(1.08)}
+.tk-hotword{font-size:11px;font-weight:700;text-align:center;white-space:nowrap}
+.tk-hotval{display:none}
+@media (prefers-reduced-motion: reduce){.tk-hottrack,.tk-hotfill,.tk-hot .tk-b.hot svg{transition:none}}
+.tk-cover{position:absolute;inset:0;z-index:2;pointer-events:none;display:flex;align-items:center;justify-content:center}
+.tk-cover img{width:100%;height:100%;object-fit:contain}
+.tk-coverspin{position:absolute;left:50%;top:50%;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;border:3px solid rgba(239,230,234,.2);border-top-color:#F4ECEF;animation:spin .8s linear infinite}
+.tk-farimg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:.9}
+.tk-rail>*{transition:opacity .18s}
+.tk-rail:has(.tk-hot.open)>:not(.tk-hot){opacity:0;pointer-events:none}

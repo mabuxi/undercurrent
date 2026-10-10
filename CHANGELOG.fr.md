@@ -2,6 +2,23 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.23.1 · 10 octobre 2026
+
+### Plein écran sur téléphone
+- Le curseur de chaleur est en verre dépoli comme le cercle de réaction au milieu, avec le même bord, les couleurs de la flamme pour le remplir, une ouverture qui rebondit et les autres boutons qui s’effacent pendant qu’il est ouvert. Une fois la chaleur réglée, un toucher sur la flamme l’enlève (maintenez et glissez pour la changer). Plus de chiffre : sous la flamme, il est écrit Tiède, Chaud, Très chaud, Brûlant ou En feu. Seul le curseur du plein écran a changé ; celui du fil reste le même.
+- Pendant que vous faites défiler vers une vidéo, sa miniature s’affiche au lieu du noir, et pendant le chargement les autres aperçus de la vidéo défilent tour à tour, jusqu’au démarrage de la vidéo.
+- Passer entre Court, Mélangé et Long fait glisser le plein écran : un balayage de côté le tire sous votre doigt, un geste rapide ou un glissement de plus d’un tiers de l’écran le fait sortir et fait entrer le nouveau mode de l’autre côté, sinon il revient en place. Toucher un mode en haut glisse de la même façon.
+- Un dislike passe maintenant tout de suite au post suivant.
+
+### Fil
+- Un dislike fait passer le fil au post suivant.
+- Disliker, masquer ou bloquer un post retire les publications similaires qu’il venait d’ajouter (« aller plus loin »).
+- Appuyer sur lecture dans le lecteur d’un autre site n’ajoute plus de publications similaires.
+
+### Kinks
+- Le bouton modifier d’un kink ouvre sa page (il ne passe plus directement au renommage).
+- Explorer autour a sa propre icône, une flèche qui se sépare en deux comme un Y.
+
 ## 0.23.0 · 10 octobre 2026
 
 ### Plein écran sur téléphone

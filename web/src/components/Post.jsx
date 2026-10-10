@@ -196,7 +196,7 @@ export function identity(it) {
   return { name: it.author || it.community || it.source, handle: it.author, sub: [it.community] };
 }
 
-export default function Post({ item: initial, focus = false, onStrong, onImmersive }) {
+export default function Post({ item: initial, focus = false, onStrong, onWeak, onImmersive }) {
   const { toast, setFilters, runSearch, kinks: allKinks, refreshMeta } = useApp();
   const [item, setItem] = useState(initial);
   const itemRef = useRef(initial);
@@ -244,6 +244,16 @@ export default function Post({ item: initial, focus = false, onStrong, onImmersi
     fired.current = true;
     onStrong?.(item, why);
   };
+  // A dislike, hide or block takes back the similar posts it brought in ("going deeper").
+  const weak = () => { fired.current = false; onWeak?.(item); };
+  // After a dislike the feed moves on to the next post.
+  const toNext = () => setTimeout(() => {
+    const all = [...document.querySelectorAll('.feed article.post')];
+    const next = all[all.indexOf(ref.current) + 1];
+    if (!next) return;
+    const top = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--toph'), 10) || 60;
+    window.scrollTo({ top: window.scrollY + next.getBoundingClientRect().top - top - 6, behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  }, 450);
   const ref = useRef(null);
   const [ready, setReady] = useState(false);
   const tkOpen = useTkOpen();
@@ -290,8 +300,8 @@ export default function Post({ item: initial, focus = false, onStrong, onImmersi
   const [downNote, setDownNote] = useState(false);
   const acts = usePostActions(item, setItem, {
     play, strong, toast, refreshMeta,
-    onDown: setDownNote,
-    onHide: () => { setLeaving(true); setTimeout(() => setGone(true), window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 720); }
+    onDown: (on) => { setDownNote(on); if (on) { weak(); toNext(); } },
+    onHide: () => { weak(); setLeaving(true); setTimeout(() => setGone(true), window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 720); }
   });
   const { vote, save, less, rate } = acts;
   const likeByTap = () => acts.like();
@@ -319,7 +329,7 @@ export default function Post({ item: initial, focus = false, onStrong, onImmersi
     }, 60);
     return () => clearTimeout(tm);
   }, [gone]);
-  const blocked = () => { play('hide'); setLeaving(true); setTimeout(() => setGone('block'), 720); };
+  const blocked = () => { weak(); play('hide'); setLeaving(true); setTimeout(() => setGone('block'), 720); };
   const panelRef = useRef(null);
   // Opening a profile, a performer or any panel under the post scrolls it into view.
   useEffect(() => {
@@ -405,7 +415,7 @@ export default function Post({ item: initial, focus = false, onStrong, onImmersi
         </div>
       ) : null}
       {!isText ? <p className="ptitle"><Linkify text={trTitle.text || item.title} source={item.source} onPerson={openPerson} /><TranslateButton tr={trTitle} small /><TranslatedNote tr={trTitle} /></p> : null}
-      <div ref={mediaRef} className="pmedia" onClickCapture={onMediaClick}><PostFx fx={fx} /><HeatFx heat={heat} /><Media item={item} active={active} near={near} height={lastH.current} onPlay={() => strong('play')} onReady={() => setReady(true)} onPerson={openPerson} onLike={item.media?.kind === 'embed' ? undefined : likeByTap} onFull={narrowNow && onImmersive ? () => onImmersive(itemRef.current) : undefined} sandboxed={!unblocked} /></div>
+      <div ref={mediaRef} className="pmedia" onClickCapture={onMediaClick}><PostFx fx={fx} /><HeatFx heat={heat} /><Media item={item} active={active} near={near} height={lastH.current} onPlay={item.media?.kind === 'embed' ? undefined : () => strong('play')} onReady={() => setReady(true)} onPerson={openPerson} onLike={item.media?.kind === 'embed' ? undefined : likeByTap} onFull={narrowNow && onImmersive ? () => onImmersive(itemRef.current) : undefined} sandboxed={!unblocked} /></div>
       {!isText && item.body ? <p className="ptext caption"><Linkify text={trBody.text || item.body} source={item.source} onPerson={openPerson} /><TranslateButton tr={trBody} small /><TranslatedNote tr={trBody} /></p> : null}
       {item.aiSummary && !isText ? <p className="aisum">{item.aiSummary}</p> : null}
       <div className={`chipwrap${over && !allTags ? ' over' : ''}`}>

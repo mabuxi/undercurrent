@@ -38,7 +38,7 @@ function KinkCard({ k, onOpen }) {
       <div className="kc-head">
         <span className="kc-dot" />
         <strong>{k.name}</strong>
-        <button type="button" className="kc-edit" onClick={(e) => { e.stopPropagation(); onOpen(k, { edit: true }); }} aria-label={t('Edit {name}', { name: k.name })} title={t('Edit')}><Icon name="edit" /></button>
+        <button type="button" className="kc-edit" onClick={(e) => { e.stopPropagation(); onOpen(k); }} aria-label={t('Edit {name}', { name: k.name })} title={t('Edit')}><Icon name="edit" /></button>
       </div>
       {(fresh && k.status === 'active') || edited || k.status === 'hidden' ? (
         <div className="kc-badges">

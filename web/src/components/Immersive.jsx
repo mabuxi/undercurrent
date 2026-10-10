@@ -33,7 +33,7 @@ function SafeImg({ url, className, onLoad, onFail }) {
 // Sites whose player an iPhone often shows black (DIRECT): their video file is played in the phone's own player
 // instead, through the Mac, so it starts by itself, can go faster and fills the screen.
 
-function TkEmbed({ item, active, preload, onReady, vref, onPlay, sandboxed, onNative }) {
+function TkEmbed({ item, active, preload, onReady, onStart, vref, onPlay, sandboxed, onNative }) {
   const [m, setM] = useState(item.media);
   const [direct, setDirect] = useState(DIRECT.has(item.source) ? undefined : null);
   const [failed, setFailed] = useState(false);
@@ -57,13 +57,13 @@ function TkEmbed({ item, active, preload, onReady, vref, onPlay, sandboxed, onNa
   useEffect(() => { onNative?.(native); }, [native]); // eslint-disable-line react-hooks/exhaustive-deps
   if (native) {
     const vItem = { ...item, media: { kind: 'video', src: direct.kind === 'mp4' ? direct.src : undefined, hls: direct.kind === 'hls' ? direct.src : undefined, poster: poster ? proxied(poster) : undefined, hasAudio: true } };
-    return <VideoPlayer item={vItem} active={active} preload={preload} inTk exposeRef={vref} onReady={onReady} onPlay={onPlay} onFail={() => setFailed(true)} />;
+    return <VideoPlayer item={vItem} active={active} preload={preload} inTk exposeRef={vref} onReady={() => { onReady?.(); onStart?.(); }} onPlay={onPlay} onFail={() => setFailed(true)} />;
   }
   return (
     <div className={`tk-embed${short ? ' short' : ''}`}>
       <div className="tk-player">
         {active && url && direct !== undefined ? (
-          <iframe key={sandboxed ? 's' : 'u'} src={url} title={item.title} sandbox={sandboxed ? SANDBOX : undefined} allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" onLoad={onReady} />
+          <iframe key={sandboxed ? 's' : 'u'} src={url} title={item.title} sandbox={sandboxed ? SANDBOX : undefined} allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" onLoad={() => { onReady?.(); onStart?.(); }} />
         ) : (
           <>
             <SafeImg key={poster} url={poster} onLoad={onReady} onFail={refresh} />
@@ -75,6 +75,32 @@ function TkEmbed({ item, active, preload, onReady, vref, onPlay, sandboxed, onNa
         <span>{m.provider}</span>
         {active ? <span className="tk-swipehint">{t('Swipe outside the player to go on')}</span> : null}
       </div>
+    </div>
+  );
+}
+
+// The cover picture of a video while you scroll to it and while it loads: the main picture first, and once it is on
+// screen and still loading, the other previews of the video in turn. It goes away as soon as the video plays.
+export const coverOf = (m = {}) => m.poster || m.thumbs?.[0] || m.thumb || null;
+function TkCover({ item, active }) {
+  const m = item.media || {};
+  const main = coverOf(m);
+  const list = [...new Set([main, ...(m.thumbs || [])].filter(Boolean))];
+  const [i, setI] = useState(0);
+  const [failed, setFailed] = useState(() => new Set());
+  const [viaMac, setViaMac] = useState(() => new Set());
+  useEffect(() => {
+    if (!active || list.length < 2) { setI(0); return undefined; }
+    const tm = setInterval(() => setI((x) => (x + 1) % list.length), 650);
+    return () => clearInterval(tm);
+  }, [active, list.length]);
+  const ok = list.filter((u) => !failed.has(u));
+  const url = ok.length ? ok[i % ok.length] : null;
+  if (!url) return null;
+  return (
+    <div className="tk-cover" aria-hidden="true">
+      <img src={viaMac.has(url) ? proxied(url) : imgSrc(url)} alt="" referrerPolicy="no-referrer" draggable={false} onError={() => (viaMac.has(url) ? setFailed((f) => new Set([...f, url])) : setViaMac((f) => new Set([...f, url])))} />
+      {active ? <span className="tk-coverspin" /> : null}
     </div>
   );
 }
@@ -100,10 +126,10 @@ function TkGallery({ item, active, onReady }) {
   );
 }
 
-function TkMedia({ item, active, preload, vref, onReady, onPlay, sandboxed, onNative }) {
+function TkMedia({ item, active, preload, vref, onReady, onStart, onPlay, sandboxed, onNative }) {
   const m = item.media || {};
-  if (m.kind === 'video' || m.kind === 'redgifs') return <VideoPlayer item={item} active={active} preload={preload} inTk exposeRef={vref} onReady={onReady} onPlay={onPlay} />;
-  if (m.kind === 'embed') return <TkEmbed item={item} active={active} preload={preload} vref={vref} onReady={onReady} onPlay={onPlay} sandboxed={sandboxed} onNative={onNative} />;
+  if (m.kind === 'video' || m.kind === 'redgifs') return <VideoPlayer item={item} active={active} preload={preload} inTk exposeRef={vref} onReady={() => { onReady?.(); onStart?.(); }} onPlay={onPlay} />;
+  if (m.kind === 'embed') return <TkEmbed item={item} active={active} preload={preload} vref={vref} onReady={onReady} onStart={onStart} onPlay={onPlay} sandboxed={sandboxed} onNative={onNative} />;
   if (m.kind === 'gallery') return <TkGallery item={item} active={active} onReady={onReady} />;
   if (m.kind === 'image') return <div className="tk-img"><SafeImg url={m.src || m.mid} onLoad={onReady} /></div>;
   return null;
@@ -251,8 +277,12 @@ function usePinch(stageRef, zoomRef, active, onZoomed) {
   return { reset, zoomedNow: () => z.current.s > 1.001, recentGesture: () => Date.now() - lastGesture.current < 400 };
 }
 
-// Heat on the right: a tap on the flame grows it into a slider going up; holding the flame and moving up sets the
-// heat right away, and letting go keeps it. Two flames or more also likes the post.
+// Heat in words instead of a number: warm, hot, very hot, burning, on fire.
+const HEAT_WORDS = [null, t('Warm'), t('Hot'), t('Very hot'), t('Burning'), t('On fire')];
+export const heatWord = (v) => (v > 0 ? HEAT_WORDS[Math.min(5, Math.ceil(v))] : '');
+
+// Heat on the right: a tap on the flame grows it into a slider going up (or, when heat is already set, turns it
+// off); holding the flame and moving up sets the heat right away, and letting go keeps it. Two flames or more also likes the post.
 function HeatRail({ value, onChange, onLive }) {
   const [open, setOpen] = useState(false);
   const [v, setV] = useState(value);
@@ -279,7 +309,7 @@ function HeatRail({ value, onChange, onLive }) {
     e.stopPropagation();
     clearTimeout(closeT.current);
     e.currentTarget.setPointerCapture?.(e.pointerId);
-    drag.current = { y: e.clientY, moved: false, onTrack, wasOpen: open };
+    drag.current = { y: e.clientY, moved: false, onTrack, wasOpen: open, had: v };
     setOpen(true);
     if (onTrack) { const n = at(e.clientY); drag.current.moved = true; setV(n); onLive?.(n, 'live'); }
   };
@@ -297,17 +327,21 @@ function HeatRail({ value, onChange, onLive }) {
     drag.current = null;
     if (!d) return;
     if (d.moved) { const n = at(e.clientY); setV(n); commit(n); closeT.current = setTimeout(() => setOpen(false), 700); return; }
-    // A tap on the flame while it is open closes it.
-    if (d.wasOpen) setOpen(false);
+    // A tap on the flame while it is open closes it; a tap on a flame that is already set turns the heat off.
+    if (d.wasOpen) { setOpen(false); return; }
+    if (!d.onTrack && d.had > 0) { setOpen(false); setV(0); commit(0); }
   };
+  // A small bump on every half flame, so it feels like a real dial (phones that can vibrate).
+  const last = useRef(v);
+  useEffect(() => { if (open && v !== last.current) { try { navigator.vibrate?.(6); } catch {} } last.current = v; }, [v, open]);
+  const word = heatWord(v);
   return (
     <div ref={root} className={`tk-hot${open ? ' open' : ''}${v ? ' on' : ''}`} style={{ '--h': v / 5 }}>
-      <div className="tk-hottrack" ref={track} onPointerDown={(e) => down(e, true)} onPointerMove={move} onPointerUp={up} onPointerCancel={up} aria-hidden={!open}>
+      <div className="tk-hottrack" ref={track} onPointerDown={(e) => down(e, true)} onPointerMove={move} onPointerUp={up} onPointerCancel={up} role="slider" aria-valuemin={0} aria-valuemax={5} aria-valuenow={v} aria-valuetext={word || t('Not rated')} aria-hidden={!open}>
         <i className="tk-hotfill" />
-        <span className="tk-hotval">{v ? String(v).replace('.', ',') : '0'}</span>
       </div>
       <button type="button" className="tk-b hot" onPointerDown={(e) => down(e, false)} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onClick={(e) => e.preventDefault()} aria-label={t('How hot was this')} aria-expanded={open}>
-        <Icon name="flame" filled={!!v} /><span>{v ? String(v).replace('.', ',') : ''}</span>
+        <Icon name="flame" filled={!!v} /><span className="tk-hotword">{word}</span>
       </button>
     </div>
   );
@@ -398,7 +432,7 @@ function PersonPic({ name, thumb, lookup = false, platform = 'any' }) {
   return <img className="tk-pic" src={imgSrc(src)} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBad(true)} />;
 }
 
-function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave }) {
+function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext, onLeave }) {
   const { toast, refreshMeta, setFilters, runSearch, kinks: allKinks } = useApp();
   const [item, setItem] = useState(() => withChanges(initial));
   const [fx, setFx] = useState(null);
@@ -408,6 +442,7 @@ function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave
   const [zoomed, setZoomed] = useState(false);
   const [open, setOpen] = useState(false);
   const [ready, setReady] = useState(false);
+  const [started, setStarted] = useState(false);
   const [kinkPick, setKinkPick] = useState(false);
   const [native, setNative] = useState(false);
   const [sandboxed, setSandboxed] = useState(true);
@@ -423,13 +458,15 @@ function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave
   const zoomRef = useRef(null);
   const fired = useRef(false);
   const strong = (why) => { if (fired.current) return; fired.current = true; onStrong?.(item, why); };
+  const weak = () => { fired.current = false; onWeak?.(item); };
   // The heart shows where you double-tapped; other reactions in the middle.
   const fxAt = useRef(null);
   const play = (kind) => { setFx({ kind, key: Date.now() + Math.random(), ...(fxAt.current || {}) }); fxAt.current = null; };
   const acts = usePostActions(item, setItem, {
     play, strong, toast, refreshMeta,
-    onDown: (on) => { if (on) setSheet('dislike'); },
-    onHide: () => { setSheet(null); setHidden('hide'); }
+    // A dislike moves on to the next post right away.
+    onDown: (on) => { if (on) { weak(); setTimeout(() => onNext?.(), 450); } },
+    onHide: () => { weak(); setSheet(null); setHidden('hide'); }
   });
   useEffect(() => { if (item.hiddenNow && !hidden) setHidden('hide'); }, [item.hiddenNow]); // eslint-disable-line react-hooks/exhaustive-deps
   const pinch = usePinch(stageRef, zoomRef, active, setZoomed);
@@ -614,8 +651,8 @@ function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave
     if (sheet === 'comments') return <Sheet title={t('Comments')} onClose={close} tall><CommentsPanel item={item} /></Sheet>;
     if (sheet === 'why') return <Sheet title={t('Why this')} onClose={close} tall><WhyPanel item={item} /></Sheet>;
     if (sheet === 'ask') return <Sheet title={t('Ask the assistant')} onClose={close} tall><AskPanel item={item} onPatch={(p) => { if (p.hidden) setHidden('hide'); else if (p.reasonTags) acts.update({ tags: [...new Set([...p.reasonTags, ...(item.tags || [])])], liked: p.reasonTags }); else acts.update(p); }} /></Sheet>;
-    if (sheet === 'profile') return <Sheet title={id.name} onClose={close} tall><ProfilePanel item={item} onBlocked={() => { close(); setHidden('block'); }} /></Sheet>;
-    if (sheet.startsWith('performer:')) return <Sheet title={sheet.slice(10)} onClose={close} tall><PerformerPanel name={sheet.slice(10)} itemId={item.id} onBlocked={() => { close(); setHidden('block'); }} /></Sheet>;
+    if (sheet === 'profile') return <Sheet title={id.name} onClose={close} tall><ProfilePanel item={item} onBlocked={() => { weak(); close(); setHidden('block'); }} /></Sheet>;
+    if (sheet.startsWith('performer:')) return <Sheet title={sheet.slice(10)} onClose={close} tall><PerformerPanel name={sheet.slice(10)} itemId={item.id} onBlocked={() => { weak(); close(); setHidden('block'); }} /></Sheet>;
     if (sheet.startsWith('person:')) { const [platform, ...h] = sheet.slice(7).split('|'); return <Sheet title={h.join('|')} onClose={close} tall><PersonPanel key={sheet} item={item} person={{ platform, handle: h.join('|') }} /></Sheet>; }
     if (sheet === 'tags') {
       return (
@@ -675,7 +712,8 @@ function Slide({ item: initial, active, preload, onStrong, lock, onNext, onLeave
       <div className="tk-amb" ref={ambRef} aria-hidden="true" />
       <div className="tk-stage" ref={stageRef} onClick={onTap} onPointerDown={holdStart} onPointerMove={holdMove} onPointerUp={holdEnd} onPointerCancel={holdEnd} onContextMenu={(e) => e.preventDefault()}>
         <div className="tk-zoom" ref={zoomRef}>
-          <TkMedia item={item} active={active && !hidden} preload={preload} vref={vref} onReady={() => setReady(true)} onPlay={() => strong('play')} sandboxed={sandboxed} onNative={setNative} />
+          <TkMedia item={item} active={active && !hidden} preload={preload} vref={vref} onReady={() => setReady(true)} onStart={() => setStarted(true)} onPlay={() => strong('play')} sandboxed={sandboxed} onNative={setNative} />
+          {!started && (isVideo || isEmbed) && coverOf(item.media) ? <TkCover item={item} active={active && !hidden} /> : null}
         </div>
         {fast ? <span className="tk-fast" aria-live="polite">{String(fast).replace('.', ',')}× <Icon name="chevR" /><Icon name="chevR" /></span> : null}
         <PostFx fx={fx} />
@@ -760,7 +798,7 @@ export function tkModeOf(filters, others) {
   return m.id;
 }
 
-export default function Immersive({ items, startId, onClose, onMore, loading, done, onStrong, onCurrent, mode = 'mixed', onMode, chips = [], onClearChip, onClearAll, gen = 0 }) {
+export default function Immersive({ items, startId, onClose, onMore, loading, done, onStrong, onWeak, onCurrent, mode = 'mixed', onMode, chips = [], onClearChip, onClearAll, gen = 0 }) {
   const list = items.filter(inViewer);
   const startAt = Math.max(0, list.findIndex((x) => x.id === startId));
   const [cur, setCur] = useState(startAt);
@@ -848,29 +886,80 @@ export default function Immersive({ items, startId, onClose, onMore, loading, do
   const [flash, setFlash] = useState(null);
   const flashT = useRef(null);
   useEffect(() => () => clearTimeout(flashT.current), []);
-  const pickMode = (id) => {
-    if (!onMode || id === mode) return;
-    onMode(id);
-    setFlash(TK_MODES.find((x) => x.id === id)?.label || null);
-    clearTimeout(flashT.current);
-    flashT.current = setTimeout(() => setFlash(null), 900);
+  // Switching modes slides the whole viewer out to one side and the new one in from the other, and a sideways
+  // swipe drags it along under your finger first.
+  const slideTo = (dir, then) => {
+    const el = sc.current;
+    if (!el || reduced()) { then(); return; }
+    el.style.transition = 'transform .2s cubic-bezier(.4,0,.6,1), opacity .2s';
+    el.style.transform = `translateX(${dir < 0 ? '-100%' : '100%'})`;
+    el.style.opacity = '0.2';
+    setTimeout(() => {
+      then();
+      el.style.transition = 'none';
+      el.style.transform = `translateX(${dir < 0 ? '60%' : '-60%'})`;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        el.style.transition = 'transform .28s cubic-bezier(.2,.8,.2,1), opacity .28s';
+        el.style.transform = '';
+        el.style.opacity = '';
+      }));
+    }, 200);
+  };
+  const snapBack = () => {
+    const el = sc.current;
+    if (!el) return;
+    el.style.transition = 'transform .25s cubic-bezier(.34,1.4,.64,1), opacity .25s';
+    el.style.transform = '';
+    el.style.opacity = '';
+  };
+  const modeIndex = () => Math.max(0, TK_MODES.findIndex((x) => x.id === (mode === 'custom' ? 'mixed' : mode)));
+  const pickMode = (id, dirHint) => {
+    if (!onMode || id === mode) { snapBack(); return; }
+    const dir = dirHint ?? (TK_MODES.findIndex((x) => x.id === id) > modeIndex() ? -1 : 1);
+    slideTo(dir, () => {
+      onMode(id);
+      setFlash(TK_MODES.find((x) => x.id === id)?.label || null);
+      clearTimeout(flashT.current);
+      flashT.current = setTimeout(() => setFlash(null), 900);
+    });
   };
   const swipe = useRef(null);
   const swStart = (e) => {
     if (e.touches.length !== 1 || locks.size || e.target.closest('.tk-galrow, .tk-hot, .tk-prog, .tk-tags, .tk-chips, .tk-sheetwrap, .tk-modes, input')) { swipe.current = null; return; }
-    swipe.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
+    swipe.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), side: false };
+  };
+  const swMove = (e) => {
+    const s0 = swipe.current;
+    if (!s0 || e.touches.length !== 1) return;
+    const dx = e.touches[0].clientX - s0.x;
+    const dy = e.touches[0].clientY - s0.y;
+    if (!s0.side) {
+      if (Math.abs(dy) > 14 && Math.abs(dy) > Math.abs(dx)) { swipe.current = null; return; }
+      if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.4) s0.side = true;
+      else return;
+    }
+    const el = sc.current;
+    if (!el) return;
+    const next = TK_MODES[modeIndex() + (dx < 0 ? 1 : -1)];
+    const x = next && onMode ? dx : dx * 0.25;
+    el.style.transition = 'none';
+    el.style.transform = `translateX(${x}px)`;
+    el.style.opacity = String(Math.max(0.45, 1 - Math.abs(x) / 700));
   };
   const swEnd = (e) => {
     const s0 = swipe.current;
     swipe.current = null;
-    if (!s0 || !e.changedTouches.length || locks.size) return;
+    if (!s0 || !e.changedTouches.length) return;
     const dx = e.changedTouches[0].clientX - s0.x;
     const dy = e.changedTouches[0].clientY - s0.y;
-    if (Date.now() - s0.t > 700 || Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8) return;
-    const at = Math.max(0, TK_MODES.findIndex((x) => x.id === (mode === 'custom' ? 'mixed' : mode)));
-    const next = TK_MODES[at + (dx < 0 ? 1 : -1)];
-    if (next) pickMode(next.id);
+    const next = TK_MODES[modeIndex() + (dx < 0 ? 1 : -1)];
+    // A quick flick or a drag past a third of the screen switches; anything less springs back.
+    const far = Math.abs(dx) > window.innerWidth * 0.3;
+    const flick = Math.abs(dx) >= 70 && Date.now() - s0.t < 700;
+    if (!s0.side || locks.size || !next || (!far && !flick) || Math.abs(dx) < Math.abs(dy) * 1.8) { if (s0.side) snapBack(); return; }
+    pickMode(next.id, dx < 0 ? -1 : 1);
   };
+
 
   const go = (d) => { const el = sc.current; if (el) el.scrollTo({ top: (cur + d) * el.clientHeight, behavior: reduced() ? 'auto' : 'smooth' }); };
   useEffect(() => {
@@ -885,13 +974,13 @@ export default function Immersive({ items, startId, onClose, onMore, loading, do
   });
 
   return createPortal(
-    <div className={`tk${chips.length ? ' haschips' : ''}`} role="dialog" aria-modal="true" aria-label={t('Full screen')} onTouchStart={swStart} onTouchEnd={swEnd}>
+    <div className={`tk${chips.length ? ' haschips' : ''}`} role="dialog" aria-modal="true" aria-label={t('Full screen')} onTouchStart={swStart} onTouchMove={swMove} onTouchEnd={swEnd} onTouchCancel={() => { if (swipe.current?.side) snapBack(); swipe.current = null; }}>
       <div ref={sc} className={`tk-scroll${locks.size ? ' locked' : ''}`} onScroll={onScroll}>
         {list.map((it, i) => (
           <section key={it.id} className="tk-slide" data-id={it.id} data-source={it.source} data-kind={it.media?.kind} aria-hidden={i !== cur}>
             {Math.abs(i - cur) <= 2
-              ? <Slide item={it} active={i === cur} preload={i === cur + 1} onStrong={onStrong} lock={lock} onNext={() => go(1)} onLeave={close} />
-              : <div className="tk-s tk-far" />}
+              ? <Slide item={it} active={i === cur} preload={i === cur + 1} onStrong={onStrong} onWeak={onWeak} lock={lock} onNext={() => go(1)} onLeave={close} />
+              : <div className="tk-s tk-far">{Math.abs(i - cur) <= 6 && coverOf(it.media) ? <img className="tk-farimg" src={imgSrc(coverOf(it.media))} alt="" loading="lazy" referrerPolicy="no-referrer" draggable={false} /> : null}</div>}
           </section>
         ))}
         <section className="tk-slide tk-endslide">

@@ -110,7 +110,7 @@ function Detail({ nodeKey, brain, reload, onSelect, startEdit = false }) {
             <div className="kact-explore">
               {node.type === 'fantasy' ? <button type="button" onClick={async () => { const fs = await api('/fantasies').then((r) => r.fantasies).catch(() => []); const f = fs.find((x) => x.id === node.id); if (f) openMode('deeper', { fantasy: deeperSpec(f) }); }}><Icon name="spark" /><span>{t('Go deeper')}</span></button> : null}
               <button type="button" onClick={() => journey('close')}><Icon name="route" /><span>{t('Dive deeper')}</span></button>
-              <button type="button" onClick={() => journey('branch')}><Icon name="route" /><span>{t('Branch out')}</span></button>
+              <button type="button" onClick={() => journey('branch')}><Icon name="branch" /><span>{t('Branch out')}</span></button>
               <button type="button" onClick={() => journey('genre')}><Icon name="spark" /><span>{t('Something new near it')}</span></button>
             </div>
           ) : null}

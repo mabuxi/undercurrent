@@ -3,6 +3,23 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.23.1 · 10 October 2026
+
+### Full screen viewer on a phone
+- The heat slider is frosted glass like the reaction circle in the middle, with the same rim, the flame colours filling it, a springy open and the other buttons fading out while it is open. Once heat is set, a tap on the flame turns it off again (hold and slide to change it). No number any more: under the flame it says Warm, Hot, Very hot, Burning or On fire. Only the viewer's slider changed; the one in the feed is the same.
+- While you scroll to a video, its cover picture shows instead of black, and while it loads the other previews of the video play in turn, until the video starts.
+- Switching between Short, Mixed and Long slides the viewer: a sideways swipe drags it along under your finger, a quick flick or a drag past a third of the screen slides it out and the new mode in from the other side, anything less springs back. Tapping a mode at the top slides the same way.
+- A dislike now moves on to the next post right away.
+
+### Feed
+- A dislike moves the feed on to the next post.
+- Disliking, hiding or blocking a post takes away the similar posts it had just brought in ("going deeper").
+- Pressing play on a player from another site no longer brings in similar posts.
+
+### Kinks
+- The edit button on a kink opens its page (it no longer jumps straight into renaming).
+- Branch out has its own icon, an arrow that splits in two like a Y.
+
 ## 0.23.0 · 10 October 2026
 
 ### Full screen viewer on a phone

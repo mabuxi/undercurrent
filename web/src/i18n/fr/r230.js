@@ -12,5 +12,6 @@ export default {
   "Combine": "Combiner",
   "Combine {name} into which kink? The one you pick stays, with every tag of both.": "Combiner {name} dans quel kink ? Celui que vous choisissez reste, avec tous les tags des deux.",
   "Update tags to kink to improve": "Ajoutez des tags au kink pour l’améliorer",
-  "These often come with it in your posts. Tap one to add it to {name}, so the feed finds more of it.": "Ils l’accompagnent souvent dans vos publications. Touchez-en un pour l’ajouter à {name}, et le fil en trouvera davantage."
+  "These often come with it in your posts. Tap one to add it to {name}, so the feed finds more of it.": "Ils l’accompagnent souvent dans vos publications. Touchez-en un pour l’ajouter à {name}, et le fil en trouvera davantage.",
+  "Burning": "Brûlant"
 };

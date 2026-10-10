@@ -470,6 +470,12 @@ export default function FeedView() {
     } catch {} finally { end(`sim${item.id}`); }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // A dislike, hide or block takes back the "going deeper" posts it brought in.
+  const onWeak = useCallback((item) => {
+    strongDone.current.delete(item.id);
+    setDeeper((cur) => { if (!cur[item.id]) return cur; const n = { ...cur }; delete n[item.id]; return n; });
+  }, []);
+
   useEffect(() => {
     const el = sentinel.current;
     if (!el) return undefined;
@@ -527,11 +533,11 @@ export default function FeedView() {
   const flat = [];
   items.forEach((it, i) => {
     flat.push(it);
-    list.push(<ErrorBoundary key={it.id} name="Post"><Post item={it} focus={opts.focus === it.id} onStrong={onStrong} onImmersive={imm} /></ErrorBoundary>);
+    list.push(<ErrorBoundary key={it.id} name="Post"><Post item={it} focus={opts.focus === it.id} onStrong={onStrong} onWeak={onWeak} onImmersive={imm} /></ErrorBoundary>);
     const d = deeper[it.id];
     if (d) {
       list.push(<div key={`d${it.id}`} className="deeper"><span className="deeper-why">{d.why}</span></div>);
-      d.items.forEach((x) => { const dx = { ...x, label: 'deeper' }; flat.push(dx); list.push(<ErrorBoundary key={x.id} name="Post"><Post item={dx} onStrong={onStrong} onImmersive={imm} /></ErrorBoundary>); });
+      d.items.forEach((x) => { const dx = { ...x, label: 'deeper' }; flat.push(dx); list.push(<ErrorBoundary key={x.id} name="Post"><Post item={dx} onStrong={onStrong} onWeak={onWeak} onImmersive={imm} /></ErrorBoundary>); });
     }
     // On a phone a window comes after every 3 to 5 posts.
     const slot = WIN_AFTER.indexOf(i + 1);
@@ -549,7 +555,7 @@ export default function FeedView() {
       {error ? <div className="empty">{error}</div> : null}
       {wider && items.length ? <div className="deeper"><span className="deeper-why">{t('Few exact matches left, now also showing close matches')}</span></div> : null}
       {fresh ? <button type="button" className="freshbar" onClick={() => { reset(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>{t('New results from your sources are in · Show them')}</button> : null}
-      {tk && narrow ? <ErrorBoundary name="Viewer"><Immersive items={flat} startId={tk.id} gen={tk.gen || 0} onClose={closeTk} onCurrent={toPost} onMore={() => loadMoreRef.current?.()} loading={loading || finding} done={done} onStrong={onStrong} mode={tkMode} onMode={setTkMode} chips={tkChips} onClearChip={clearTkChip} onClearAll={clearTkAll} /></ErrorBoundary> : null}
+      {tk && narrow ? <ErrorBoundary name="Viewer"><Immersive items={flat} startId={tk.id} gen={tk.gen || 0} onClose={closeTk} onCurrent={toPost} onMore={() => loadMoreRef.current?.()} loading={loading || finding} done={done} onStrong={onStrong} onWeak={onWeak} mode={tkMode} onMode={setTkMode} chips={tkChips} onClearChip={clearTkChip} onClearAll={clearTkAll} /></ErrorBoundary> : null}
       <div className="sentinel" ref={sentinel}>
         {finding || loading || waiting ? (
           <span className="finding"><span className="spin" />{finding ? t('Finding more like this on your sources…') : waiting ? t('Nothing left that matches. Checking your sources once more shortly…') : t('Loading more…')}</span>
