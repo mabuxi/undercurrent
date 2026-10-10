@@ -255,15 +255,15 @@ export function VideoPlayer({ item, active, onPlay, onReady, onFull, onFail, inT
             onLoadedMetadata={onMeta}
           />
         ) : poster ? <img src={poster} alt="" loading="lazy" referrerPolicy="no-referrer" /> : null}
-        {!inTk && !(onFull && armed) ? <Badge format={item.format} /> : null}
-        {item.duration && !inTk && !(onFull && armed) ? <span className="dur">{fmtDur(item.duration)}</span> : null}
+        {!inTk && !armed ? <Badge format={item.format} /> : null}
+        {item.duration && !inTk && !armed ? <span className="dur">{fmtDur(item.duration)}</span> : null}
         {loading && !error ? <span className="spinner" aria-label={t('Loading video')} /> : null}
         {!inTk && item.media.hasAudio !== false && (src || hlsUrl) && armed ? (
           <button type="button" className={`mutebtn${muted ? '' : ' on'}`} onClick={(e) => { e.stopPropagation(); if (muted) unmute(); else { setSound(false); } }} aria-label={muted ? t('Turn sound on') : t('Turn sound off')} title={muted ? t('Sound on for every video') : t('Sound off for every video')}>
             <Icon name={muted ? 'mute' : 'volume'} />
           </button>
         ) : null}
-        {(src || hlsUrl) && armed && !zoom.fs && !inTk ? <button type="button" className={`fsbtn${onFull ? ' tl' : ''}`} onClick={(e) => { e.stopPropagation(); if (onFull) onFull(); else openFs(); }} aria-label={t('Full screen')} title={onFull ? t('Full screen') : t('Full screen: pinch or double-tap to zoom')}><Icon name="expand" /></button> : null}
+        {(src || hlsUrl) && armed && !zoom.fs && !inTk ? <button type="button" className="fsbtn tl" onClick={(e) => { e.stopPropagation(); if (onFull) onFull(); else openFs(); }} aria-label={t('Full screen')} title={onFull ? t('Full screen') : t('Full screen: pinch or double-tap to zoom')}><Icon name="expand" /></button> : null}
         {zoom.fs ? <button type="button" className="fsclose" onClick={(e) => { e.stopPropagation(); zoom.close(); }} aria-label={t('Close full screen')}><Icon name="x" /></button> : null}
         {error ? <div className="mediaerr">{error}</div> : null}
       </div>
@@ -312,7 +312,8 @@ export function EmbedPlayer({ item, active, onPlay, onReady, onFull, sandboxed =
   const short = item.format === 'short';
   // On a phone (where the full screen viewer exists) these sites play in the phone's own player.
   const [direct, setDirect] = useState(null);
-  const tryDirect = !!onFull && DIRECT.has(item.source);
+  // (only on a phone: on the Mac the site's own player works)
+  const tryDirect = !!onFull && DIRECT.has(item.source) && window.innerWidth <= 900;
   const iframeRef = useRef(null);
   const fullRef = useRef(onFull);
   fullRef.current = onFull;
@@ -394,13 +395,13 @@ export function EmbedPlayer({ item, active, onPlay, onReady, onFull, sandboxed =
     const vItem = { ...item, media: { kind: 'video', src: direct.kind === 'mp4' ? direct.src : undefined, hls: direct.kind === 'hls' ? direct.src : undefined, poster: m.poster ? proxied(m.poster) : undefined, hasAudio: true } };
     return <VideoPlayer item={vItem} active={active} onReady={onReady} onFull={onFull} onFail={() => setDirect(false)} />;
   }
-  const fsBtn = onFull ? <button type="button" className="fsbtn emb" onClick={(e) => { e.stopPropagation(); onFull(); }} aria-label={t('Full screen')} title={t('Full screen')}><Icon name="expand" /></button> : null;
+  const fsBtn = onFull ? <button type="button" className="fsbtn tl emb" onClick={(e) => { e.stopPropagation(); onFull(); }} aria-label={t('Full screen')} title={t('Full screen')}><Icon name="expand" /></button> : null;
   if (dead && !playing) {
     return <div className="media land embed-dead" style={{ '--c': rgba(c, 0.4), '--c2': rgba(c, 0.18) }}><span>{t('This video is no longer available on {provider}.', { provider: m.provider })}</span></div>;
   }
   return (
     <div ref={embedRef} tabIndex={-1} className={`vidwrap${short ? ' tube-short' : ''}`} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
-      <div className={`media land${short ? ' shortland' : ''}`} style={{ '--c': rgba(c, 0.55), '--c2': rgba(c, 0.3) }}>
+      <div className={`media land${short ? ' shortland' : ''}${onFull ? ' hasfs' : ''}`} style={{ '--c': rgba(c, 0.55), '--c2': rgba(c, 0.3) }}>
         {playing && direct === 'wait' ? (
           <>
             {shown && posterOk ? <img src={thumbSrc(shown, proxyAll)} alt="" referrerPolicy="no-referrer" /> : null}

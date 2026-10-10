@@ -2,6 +2,24 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.23.2 · 10 octobre 2026
+
+### Plein écran
+- Il s’ouvre maintenant avec le bouton plein écran sur tous les écrans, Mac compris, et a le même aspect que sur le téléphone.
+- Sur Mac, la molette de la souris ou un défilement à deux doigts sur le trackpad avance d’exactement un post par geste, et un balayage de côté à deux doigts passe entre Court, Mélangé et Long.
+- Pincer sur le trackpad zoome dans le post comme sur l’iPhone (dans l’app, Safari et Chrome). Une fois zoomé, défilez à deux doigts ou faites glisser pour vous déplacer ; pincez dans l’autre sens pour revenir.
+- Les lecteurs des autres sites gardent un peu de place autour d’eux sur les grands écrans, pour que le défilement marche toujours par-dessus.
+
+### Fil
+- Le bouton plein écran est toujours en haut à gauche, sur les vidéos et sur les lecteurs des autres sites, sur le téléphone comme sur le Mac. Le badge de format se place à côté.
+- Pornhub, RedTube, YouPorn et Eporner passent toujours au lecteur du téléphone sur le téléphone seulement ; sur le Mac, le lecteur du site reste.
+
+### Curseur de chaleur
+- Corrigé : le curseur basculait entre éteint et Tiède aux réglages les plus bas, parce que le mot qui apparaît sous la flamme poussait le curseur un peu vers le haut. Cette ligne garde maintenant toujours sa place.
+- Le curseur lit votre doigt par rapport au curseur entièrement ouvert, même pendant son ouverture.
+- Seul un toucher rapide sur la flamme enlève la chaleur ; un appui lent qui finit sur la flamme la garde.
+- Le remplissage de couleur reste une forme arrondie nette même à très faible chaleur.
+
 ## 0.23.1 · 10 octobre 2026
 
 ### Plein écran sur téléphone

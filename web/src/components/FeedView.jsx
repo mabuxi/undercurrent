@@ -528,7 +528,8 @@ export default function FeedView() {
     toPost(lastId);
     requestAnimationFrame(() => { toPost(lastId); setTimeout(() => toPost(lastId), 120); });
   }, [toPost]);
-  const imm = narrow ? openTk : undefined;
+  // The full screen viewer opens from the full screen button on every screen, the Mac too.
+  const imm = openTk;
   const list = [];
   const flat = [];
   items.forEach((it, i) => {
@@ -555,7 +556,7 @@ export default function FeedView() {
       {error ? <div className="empty">{error}</div> : null}
       {wider && items.length ? <div className="deeper"><span className="deeper-why">{t('Few exact matches left, now also showing close matches')}</span></div> : null}
       {fresh ? <button type="button" className="freshbar" onClick={() => { reset(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>{t('New results from your sources are in · Show them')}</button> : null}
-      {tk && narrow ? <ErrorBoundary name="Viewer"><Immersive items={flat} startId={tk.id} gen={tk.gen || 0} onClose={closeTk} onCurrent={toPost} onMore={() => loadMoreRef.current?.()} loading={loading || finding} done={done} onStrong={onStrong} onWeak={onWeak} mode={tkMode} onMode={setTkMode} chips={tkChips} onClearChip={clearTkChip} onClearAll={clearTkAll} /></ErrorBoundary> : null}
+      {tk ? <ErrorBoundary name="Viewer"><Immersive items={flat} startId={tk.id} gen={tk.gen || 0} onClose={closeTk} onCurrent={toPost} onMore={() => loadMoreRef.current?.()} loading={loading || finding} done={done} onStrong={onStrong} onWeak={onWeak} mode={tkMode} onMode={setTkMode} chips={tkChips} onClearChip={clearTkChip} onClearAll={clearTkAll} /></ErrorBoundary> : null}
       <div className="sentinel" ref={sentinel}>
         {finding || loading || waiting ? (
           <span className="finding"><span className="spin" />{finding ? t('Finding more like this on your sources…') : waiting ? t('Nothing left that matches. Checking your sources once more shortly…') : t('Loading more…')}</span>

@@ -2288,3 +2288,17 @@ html.narrow .pmenu .grp.end .blockerbtn{display:flex}
 .tk-farimg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:.9}
 .tk-rail>*{transition:opacity .18s}
 .tk-rail:has(.tk-hot.open)>:not(.tk-hot){opacity:0;pointer-events:none}
+/* 0.23.2: the full screen button is always top left; the format badge moves next to it */
+.fsbtn.tl.emb{top:8px}
+.media.hasfs>.badge{left:56px}
+@media (hover:hover){.fsbtn.tl{opacity:.8}.vidwrap:hover .fsbtn.tl,.fsbtn.tl:focus-visible{opacity:1}}
+/* 0.23.2: the heat fill follows the finger without bouncing, so the lowest steps do not jump; its shape is cut from
+   a full-height bar so a little heat is a clean rounded sliver instead of a squashed pill */
+.tk-hotfill{top:4px;height:auto;border-radius:19px;clip-path:inset(calc((1 - var(--h)) * 100%) 0 0 0 round 19px);transition:clip-path .12s ease-out}
+.tk-hot.on .tk-b.hot svg,.tk-hot .tk-b.hot svg{transition:transform .18s ease-out,color .2s,background .2s}
+/* The word under the flame always takes its line, also when empty, so the column (and the slider above it) never
+   moves when the first word appears: that made the lowest steps flip back and forth. */
+.tk-b.hot span.tk-hotword,.tk-b.hot span.tk-hotword:empty{display:block;min-height:14px;line-height:14px}
+/* On a wide screen a player from another site keeps room around it, so scrolling and swiping outside it still go on
+   to the next post (the site's player keeps the scroll for itself). */
+.tk-player{width:min(100%,calc((100dvh - 230px) * 16 / 9))}

@@ -3,6 +3,24 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.23.2 · 10 October 2026
+
+### Full screen viewer
+- It now opens from the full screen button on every screen, the Mac included, and looks the same as on the phone.
+- On a Mac, the mouse wheel or a two-finger scroll on the trackpad moves exactly one post per swipe, and a sideways two-finger swipe switches between Short, Mixed and Long.
+- Pinching on the trackpad zooms into the post like on the iPhone (in the app, Safari and Chrome). While zoomed, scroll with two fingers or drag to move around; pinch back out to reset.
+- Players from other sites keep some room around them on wide screens, so scrolling still works over them.
+
+### Feed
+- The full screen button always sits in the top left corner, on videos and on players from other sites, on the phone and on the Mac. The format badge moves next to it.
+- Pornhub, RedTube, YouPorn and Eporner still switch to the phone's own player on the phone only; on the Mac the site's player stays.
+
+### Heat slider
+- Fixed the slider flipping between off and Warm at the lowest steps: the word appearing under the flame pushed the slider up a little. That line now always keeps its room.
+- The slider reads your finger against the fully open slider, even while it is still opening.
+- Only a quick tap on the flame turns heat off; a slow press that ends on the flame keeps it.
+- The colour fill is a clean rounded shape even at very low heat.
+
 ## 0.23.1 · 10 October 2026
 
 ### Full screen viewer on a phone

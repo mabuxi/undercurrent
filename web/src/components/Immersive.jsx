@@ -258,7 +258,64 @@ function usePinch(stageRef, zoomRef, active, onZoomed) {
       if (!e.touches.length) pan = null;
       if (!pinch && z.current.s < 1.08 && z.current.s !== 1) reset();
     };
-    const gesture = (e) => e.preventDefault();
+    // On a Mac: a trackpad pinch zooms the same way (Chrome sends it as ctrl and the wheel, Safari and the Mac app
+    // as gesture events), two fingers or dragging with the mouse move around while zoomed in, and pinching back out
+    // goes back to normal.
+    const zoomTo = (s2, cx, cy) => {
+      const [mx, my] = rel(cx, cy);
+      const c = z.current;
+      const s = Math.max(1, Math.min(5, s2));
+      const k = s / c.s;
+      z.current = { s, x: mx - (mx - c.x) * k, y: my - (my - c.y) * k };
+      clamp();
+      apply(false);
+      onZoomed(z.current.s > 1.001);
+      lastGesture.current = Date.now();
+    };
+    const settle = () => { if (z.current.s < 1.08 && z.current.s !== 1) reset(); };
+    let settleT = null;
+    const wheel = (e) => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+        zoomTo(z.current.s * Math.exp(-e.deltaY * 0.012), e.clientX, e.clientY);
+        clearTimeout(settleT);
+        settleT = setTimeout(settle, 250);
+      } else if (z.current.s > 1.001) {
+        e.preventDefault();
+        z.current.x -= e.deltaX;
+        z.current.y -= e.deltaY;
+        clamp();
+        apply(false);
+      }
+    };
+    let g0 = 1;
+    const gesture = (e) => {
+      e.preventDefault();
+      // On a phone the fingers are already followed by the touch handlers above.
+      if (pinch || e.type === 'gestureend') { if (e.type === 'gestureend' && !pinch) settle(); return; }
+      if (e.type === 'gesturestart') { g0 = z.current.s; return; }
+      zoomTo(g0 * e.scale, e.clientX || el.getBoundingClientRect().left + el.clientWidth / 2, e.clientY || el.getBoundingClientRect().top + el.clientHeight / 2);
+    };
+    let mpan = null;
+    const mdown = (e) => {
+      if (e.pointerType !== 'mouse' || z.current.s <= 1.001 || e.target.closest('iframe, button, a, .tk-prog')) return;
+      mpan = { x0: e.clientX, y0: e.clientY, x: z.current.x, y: z.current.y, moved: false };
+    };
+    const mmove = (e) => {
+      if (!mpan) return;
+      if (Math.hypot(e.clientX - mpan.x0, e.clientY - mpan.y0) > 4) mpan.moved = true;
+      z.current.x = mpan.x + e.clientX - mpan.x0;
+      z.current.y = mpan.y + e.clientY - mpan.y0;
+      clamp();
+      apply(false);
+    };
+    const mup = () => { if (mpan?.moved) lastGesture.current = Date.now(); mpan = null; };
+    el.addEventListener('wheel', wheel, { passive: false });
+    el.addEventListener('gestureend', gesture);
+    el.addEventListener('pointerdown', mdown);
+    el.addEventListener('pointermove', mmove);
+    el.addEventListener('pointerup', mup);
+    el.addEventListener('pointercancel', mup);
     el.addEventListener('touchstart', start, { passive: false });
     el.addEventListener('touchmove', move, { passive: false });
     el.addEventListener('touchend', end);
@@ -272,6 +329,13 @@ function usePinch(stageRef, zoomRef, active, onZoomed) {
       el.removeEventListener('touchcancel', end);
       el.removeEventListener('gesturestart', gesture);
       el.removeEventListener('gesturechange', gesture);
+      el.removeEventListener('gestureend', gesture);
+      el.removeEventListener('wheel', wheel);
+      el.removeEventListener('pointerdown', mdown);
+      el.removeEventListener('pointermove', mmove);
+      el.removeEventListener('pointerup', mup);
+      el.removeEventListener('pointercancel', mup);
+      clearTimeout(settleT);
     };
   }, [stageRef]); // eslint-disable-line react-hooks/exhaustive-deps
   return { reset, zoomedNow: () => z.current.s > 1.001, recentGesture: () => Date.now() - lastGesture.current < 400 };
@@ -298,10 +362,16 @@ function HeatRail({ value, onChange, onLive }) {
     document.addEventListener('pointerdown', off, true);
     return () => document.removeEventListener('pointerdown', off, true);
   }, [open]);
+  // Where the finger is on the slider, measured from where the slider sits when fully open (not from the shape it
+  // has while it is still growing open), so the first and lowest steps do not jump around.
   const at = (y) => {
-    const r = track.current?.getBoundingClientRect();
-    if (!r || !r.height) return v;
-    return Math.max(0, Math.min(5, Math.round((1 - (y - r.top) / r.height) * 10) / 2));
+    const el = track.current;
+    const rt = root.current?.getBoundingClientRect();
+    if (!el || !rt || !el.offsetHeight) return v;
+    const h = el.offsetHeight;
+    const bottom = rt.top - 4;
+    const f = (bottom - y) / h;
+    return Math.max(0, Math.min(5, Math.round(Math.max(0, Math.min(1, f)) * 10) / 2));
   };
   const commit = (n) => { onLive?.(n, 'end'); if (n !== value) onChange(n); };
   const down = (e, onTrack) => {
@@ -309,7 +379,7 @@ function HeatRail({ value, onChange, onLive }) {
     e.stopPropagation();
     clearTimeout(closeT.current);
     e.currentTarget.setPointerCapture?.(e.pointerId);
-    drag.current = { y: e.clientY, moved: false, onTrack, wasOpen: open, had: v };
+    drag.current = { y: e.clientY, moved: false, onTrack, wasOpen: open, had: v, t: Date.now() };
     setOpen(true);
     if (onTrack) { const n = at(e.clientY); drag.current.moved = true; setV(n); onLive?.(n, 'live'); }
   };
@@ -329,7 +399,8 @@ function HeatRail({ value, onChange, onLive }) {
     if (d.moved) { const n = at(e.clientY); setV(n); commit(n); closeT.current = setTimeout(() => setOpen(false), 700); return; }
     // A tap on the flame while it is open closes it; a tap on a flame that is already set turns the heat off.
     if (d.wasOpen) { setOpen(false); return; }
-    if (!d.onTrack && d.had > 0) { setOpen(false); setV(0); commit(0); }
+    // Only a quick tap turns it off: holding the flame still opens the slider to change it.
+    if (!d.onTrack && d.had > 0 && Date.now() - d.t < 350) { setOpen(false); setV(0); commit(0); }
   };
   // A small bump on every half flame, so it feels like a real dial (phones that can vibrate).
   const last = useRef(v);
@@ -546,7 +617,7 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
   const hold = useRef({ timer: null, x: 0, y: 0, until: 0 });
   const holdStart = (e) => {
     const v = vref.current;
-    if (!isVideo || !v || e.target.closest('button, a, iframe, .tk-prog')) return;
+    if (!isVideo || !v || pinch.zoomedNow() || e.target.closest('button, a, iframe, .tk-prog')) return;
     const b = stageRef.current.getBoundingClientRect();
     const fx = (e.clientX - b.left) / b.width;
     if (fx > 0.3 && fx < 0.7) return;
@@ -923,6 +994,23 @@ export default function Immersive({ items, startId, onClose, onMore, loading, do
       flashT.current = setTimeout(() => setFlash(null), 900);
     });
   };
+  // On a Mac a sideways two-finger swipe on the trackpad switches modes the same way.
+  const wacc = useRef({ x: 0, t: 0, lock: 0 });
+  const onWheel = (e) => {
+    if (e.ctrlKey || locks.size || !onMode || Math.abs(e.deltaX) < Math.abs(e.deltaY) * 1.5) return;
+    const w = wacc.current;
+    const now = Date.now();
+    if (now < w.lock) return;
+    if (now - w.t > 300) w.x = 0;
+    w.t = now;
+    w.x += e.deltaX;
+    if (Math.abs(w.x) < 140) return;
+    const left = w.x > 0;
+    w.x = 0;
+    w.lock = now + 900;
+    const next = TK_MODES[modeIndex() + (left ? 1 : -1)];
+    if (next) pickMode(next.id, left ? -1 : 1);
+  };
   const swipe = useRef(null);
   const swStart = (e) => {
     if (e.touches.length !== 1 || locks.size || e.target.closest('.tk-galrow, .tk-hot, .tk-prog, .tk-tags, .tk-chips, .tk-sheetwrap, .tk-modes, input')) { swipe.current = null; return; }
@@ -962,6 +1050,32 @@ export default function Immersive({ items, startId, onClose, onMore, loading, do
 
 
   const go = (d) => { const el = sc.current; if (el) el.scrollTo({ top: (cur + d) * el.clientHeight, behavior: reduced() ? 'auto' : 'smooth' }); };
+  // A mouse wheel or a trackpad moves exactly one post per swipe, like TikTok on a computer: the first bit of the
+  // swipe goes on, the rest of it (and its momentum) is ignored until the swipe is over.
+  const goRef = useRef(go);
+  goRef.current = go;
+  const lockRef = useRef(0);
+  lockRef.current = locks.size;
+  useEffect(() => {
+    const el = sc.current;
+    if (!el) return undefined;
+    const w = { acc: 0, busy: false, t: null };
+    const onW = (e) => {
+      if (e.ctrlKey || Math.abs(e.deltaY) <= Math.abs(e.deltaX) || e.target.closest?.('.tk-sheetwrap, .tk-text, .tk-chips')) return;
+      e.preventDefault();
+      if (lockRef.current) return;
+      clearTimeout(w.t);
+      w.t = setTimeout(() => { w.busy = false; w.acc = 0; }, 220);
+      if (w.busy) return;
+      w.acc += e.deltaMode === 1 ? e.deltaY * 30 : e.deltaY;
+      if (Math.abs(w.acc) < 40) return;
+      w.busy = true;
+      goRef.current(w.acc > 0 ? 1 : -1);
+      w.acc = 0;
+    };
+    el.addEventListener('wheel', onW, { passive: false });
+    return () => { el.removeEventListener('wheel', onW); clearTimeout(w.t); };
+  }, []);
   useEffect(() => {
     const key = (e) => {
       if (e.target.closest?.('input, textarea, select')) return;
@@ -974,7 +1088,7 @@ export default function Immersive({ items, startId, onClose, onMore, loading, do
   });
 
   return createPortal(
-    <div className={`tk${chips.length ? ' haschips' : ''}`} role="dialog" aria-modal="true" aria-label={t('Full screen')} onTouchStart={swStart} onTouchMove={swMove} onTouchEnd={swEnd} onTouchCancel={() => { if (swipe.current?.side) snapBack(); swipe.current = null; }}>
+    <div className={`tk${chips.length ? ' haschips' : ''}`} role="dialog" aria-modal="true" aria-label={t('Full screen')} onWheel={onWheel} onTouchStart={swStart} onTouchMove={swMove} onTouchEnd={swEnd} onTouchCancel={() => { if (swipe.current?.side) snapBack(); swipe.current = null; }}>
       <div ref={sc} className={`tk-scroll${locks.size ? ' locked' : ''}`} onScroll={onScroll}>
         {list.map((it, i) => (
           <section key={it.id} className="tk-slide" data-id={it.id} data-source={it.source} data-kind={it.media?.kind} aria-hidden={i !== cur}>
