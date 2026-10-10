@@ -7,6 +7,18 @@ import { t, tn } from '../i18n.js';
 import { useTranslate, TranslateButton, TranslatedNote } from './Translate.jsx';
 import { useZoomFullscreen } from './Zoom.jsx';
 import { useTkOpen } from '../tk.js';
+import { useApp } from '../context.jsx';
+
+// The video under the mouse, if any: the arrow keys move that one instead of the one in focus.
+let pointed = null;
+
+// Where a longer video starts when the intro is skipped: a minute into a video of ten minutes or more, 15 seconds
+// into other long videos, nothing for short ones.
+export function introCut(format, d) {
+  if (!d || !isFinite(d)) return 0;
+  const cut = d >= 600 ? 60 : format === 'long' || d > 180 ? 15 : 0;
+  return cut && d > cut * 3 ? cut : 0;
+}
 
 let HlsLib = null;
 async function loadHls() {
@@ -42,6 +54,10 @@ export function VideoPlayer({ item, active, onPlay, onReady, onFull, onFail, inT
   const covered = tkOpen && !inTk;
   const [hover, setHover] = useState(false);
   const ref = useRef(null);
+  const { settings } = useApp() || {};
+  const skipIntro = useRef(true);
+  skipIntro.current = settings?.general?.skipIntros !== false;
+  const [jump, setJump] = useState(null);
   const hlsRef = useRef(null);
   const [src, setSrc] = useState(item.media.kind === 'video' ? item.media.src : item.media.hd || item.media.sd || null);
   const [hlsUrl, setHlsUrl] = useState(item.media.hls || null);
@@ -71,7 +87,7 @@ export function VideoPlayer({ item, active, onPlay, onReady, onFull, onFail, inT
     const go = () => {
       setTimeout(() => {
         try { if (v.webkitDisplayingFullscreen) v.webkitExitFullscreen?.(); } catch {}
-        if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+        if (document.fullscreenElement === v) document.exitFullscreen?.().catch(() => {});
       }, 60);
       fullRef.current?.();
     };
@@ -214,7 +230,34 @@ export function VideoPlayer({ item, active, onPlay, onReady, onFull, onFail, inT
   function onMeta() {
     const v = ref.current;
     if (v?.videoWidth && v?.videoHeight) setAr(v.videoWidth / v.videoHeight);
+    // Skip the intro of a longer video each time it loads from the start (Settings can turn this off).
+    if (v && skipIntro.current && v.currentTime < 1) {
+      const cut = introCut(item.format, v.duration);
+      if (cut) { try { v.currentTime = cut; } catch {} }
+    }
   }
+
+  // In the feed the left and right arrow keys go back or forward 15 seconds in the video in focus (or the one
+  // under the mouse).
+  useEffect(() => {
+    if (inTk || covered || !armed) return undefined;
+    let jt = null;
+    const key = (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      if (e.metaKey || e.ctrlKey || e.altKey || e.target.closest?.('input, textarea, select, [contenteditable]')) return;
+      const v = ref.current;
+      if (!v || (pointed ? pointed !== v : !active) || !v.duration || !isFinite(v.duration)) return;
+      e.preventDefault();
+      const s = e.key === 'ArrowLeft' ? -15 : 15;
+      v.currentTime = Math.max(0, Math.min(v.duration - 0.5, v.currentTime + s));
+      setJump({ s, k: Date.now() });
+      clearTimeout(jt);
+      jt = setTimeout(() => setJump(null), 650);
+    };
+    window.addEventListener('keydown', key);
+    return () => { window.removeEventListener('keydown', key); clearTimeout(jt); };
+  }, [inTk, covered, armed, active]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => { if (pointed === ref.current) pointed = null; }, []);
 
   function playing() {
     setLoading(false);
@@ -233,7 +276,7 @@ export function VideoPlayer({ item, active, onPlay, onReady, onFull, onFail, inT
   const c = item.kinks?.[0]?.color || '#E39A83';
   const style = { '--c': rgba(c, 0.55), '--c2': rgba(c, 0.3), ...(ar ? { '--ar': Math.max(0.4, Math.min(2.6, ar)) } : {}) };
   return (
-    <div className="vidwrap" ref={wrapRef} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} style={holdH ? { minHeight: holdH } : undefined}>
+    <div className="vidwrap" ref={wrapRef} onMouseEnter={() => { setHover(true); if (!inTk) pointed = ref.current; }} onMouseLeave={() => { setHover(false); if (pointed === ref.current) pointed = null; }} style={holdH ? { minHeight: holdH } : undefined}>
       <div className={`${cls}${zoom.fs ? ' fsbox' : ''}`} style={style} ref={boxRef}>
         {src || hlsUrl ? (
           <video
@@ -258,6 +301,7 @@ export function VideoPlayer({ item, active, onPlay, onReady, onFull, onFail, inT
         {!inTk && !armed ? <Badge format={item.format} /> : null}
         {item.duration && !inTk && !armed ? <span className="dur">{fmtDur(item.duration)}</span> : null}
         {loading && !error ? <span className="spinner" aria-label={t('Loading video')} /> : null}
+        {jump && !inTk ? <span key={jump.k} className="vjump" aria-live="polite">{jump.s > 0 ? `+${jump.s}` : `\u2212${-jump.s}`} s</span> : null}
         {!inTk && item.media.hasAudio !== false && (src || hlsUrl) && armed ? (
           <button type="button" className={`mutebtn${muted ? '' : ' on'}`} onClick={(e) => { e.stopPropagation(); if (muted) unmute(); else { setSound(false); } }} aria-label={muted ? t('Turn sound on') : t('Turn sound off')} title={muted ? t('Sound on for every video') : t('Sound off for every video')}>
             <Icon name={muted ? 'mute' : 'volume'} />

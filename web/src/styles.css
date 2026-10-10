@@ -2302,3 +2302,18 @@ html.narrow .pmenu .grp.end .blockerbtn{display:flex}
 /* On a wide screen a player from another site keeps room around it, so scrolling and swiping outside it still go on
    to the next post (the site's player keeps the scroll for itself). */
 .tk-player{width:min(100%,calc((100dvh - 230px) * 16 / 9))}
+.tk-hovtime{position:absolute;bottom:calc(100% + 4px);transform:translateX(-50%);padding:3px 7px;border-radius:7px;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;color:#fff;background:rgba(20,14,22,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);pointer-events:none;white-space:nowrap}
+.tk-hovmark{position:absolute;bottom:0;width:2px;height:5px;margin-left:-1px;background:#fff;pointer-events:none}
+@media (hover:hover) and (pointer:fine){
+.tk-prog{height:22px}
+.tk-tags:hover{flex-wrap:wrap;overflow:visible;-webkit-mask-image:none;mask-image:none;max-height:40vh;overflow-y:auto}
+.chipwrap{position:relative}
+}
+.chipwrap.hov>.chiprow{position:absolute;left:-8px;right:-8px;top:-6px;z-index:6;flex-wrap:wrap;overflow:visible;padding:6px 8px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 34px rgba(0,0,0,.35);-webkit-mask-image:none;mask-image:none;animation:chiphov .14s ease-out}
+.chipwrap.hov>.chiprow>*{flex:none}
+.chipwrap.hov>.chiprow>.chip.more:not(.addkink){display:none}
+.chipwrap.hov>button.chipmore{visibility:hidden}
+@keyframes chiphov{from{opacity:.6;transform:translateY(2px)}to{opacity:1;transform:none}}
+.tk-jump{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:5;padding:8px 16px;border-radius:999px;background:rgba(20,14,22,.6);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);font-weight:700;font-size:18px;font-variant-numeric:tabular-nums;color:#fff;pointer-events:none;animation:tkjump .65s ease-out both}
+@keyframes tkjump{0%{opacity:0;transform:translate(-50%,-50%) scale(.85)}15%{opacity:1;transform:translate(-50%,-50%) scale(1)}70%{opacity:1}100%{opacity:0}}
+.vjump{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:4;padding:7px 14px;border-radius:999px;background:rgba(20,14,22,.6);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);font-weight:700;font-size:16px;font-variant-numeric:tabular-nums;color:#fff;pointer-events:none;animation:tkjump .65s ease-out both}

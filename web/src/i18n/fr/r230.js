@@ -13,5 +13,8 @@ export default {
   "Combine {name} into which kink? The one you pick stays, with every tag of both.": "Combiner {name} dans quel kink ? Celui que vous choisissez reste, avec tous les tags des deux.",
   "Update tags to kink to improve": "Ajoutez des tags au kink pour l’améliorer",
   "These often come with it in your posts. Tap one to add it to {name}, so the feed finds more of it.": "Ils l’accompagnent souvent dans vos publications. Touchez-en un pour l’ajouter à {name}, et le fil en trouvera davantage.",
-  "Burning": "Brûlant"
+  "Burning": "Brûlant",
+  "Videos": "Vidéos",
+  "Skip intros": "Passer les intros",
+  "Long videos start 15 seconds in, videos of 10 minutes or more a minute in. Only for videos played here, not in players from other sites": "Les vidéos longues commencent à 15 secondes, celles de 10 minutes ou plus à une minute. Seulement pour les vidéos lues ici, pas dans les lecteurs des autres sites"
 };

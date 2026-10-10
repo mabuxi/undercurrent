@@ -205,6 +205,19 @@ export default function Post({ item: initial, focus = false, onStrong, onWeak, o
   const [panel, setPanel] = useState(null);
   const [gone, setGone] = useState(false);
   const [allTags, setAllTags] = useState(false);
+  // With a mouse, pointing at the tags shows all of them over the post (nothing below moves), after a short moment
+  // and only when the mouse itself moved there, so scrolling past does not open them.
+  const [tagHov, setTagHov] = useState(false);
+  const tagHovT = useRef(null);
+  const tagWrap = useRef(null);
+  const [tagH, setTagH] = useState(0);
+  const tagIn = (e) => {
+    if (e.pointerType !== 'mouse' || allTags) return;
+    clearTimeout(tagHovT.current);
+    if (!tagHov) tagHovT.current = setTimeout(() => { setTagH(tagWrap.current?.offsetHeight || 0); setTagHov(true); }, 160);
+  };
+  const tagOut = () => { clearTimeout(tagHovT.current); tagHovT.current = setTimeout(() => setTagHov(false), 180); };
+  useEffect(() => () => clearTimeout(tagHovT.current), []);
   const [fx, setFx] = useState(null);
   const [heat, setHeat] = useState(null);
   const [leaving, setLeaving] = useState(false);
@@ -384,7 +397,8 @@ export default function Post({ item: initial, focus = false, onStrong, onWeak, o
   const liked = item.media?.rating;
   const votes = item.media?.votes;
   const tagList = item.tags || [];
-  const shownTags = allTags ? tagList : tagList.slice(0, 9);
+  const hovTags = tagHov && !allTags;
+  const shownTags = allTags || hovTags ? tagList : tagList.slice(0, 9);
   const sub = [...id.sub, item.media?.repostedBy ? t('reposted by @{name}', { name: item.media.repostedBy }) : null, item.media?.views ? tn(item.media.views, '{n} view', '{n} views', { n: fmtNum(item.media.views) }) : null, ago(item.created)].filter(Boolean).join(' · ');
 
   return (
@@ -418,8 +432,8 @@ export default function Post({ item: initial, focus = false, onStrong, onWeak, o
       <div ref={mediaRef} className="pmedia" onClickCapture={onMediaClick}><PostFx fx={fx} /><HeatFx heat={heat} /><Media item={item} active={active} near={near} height={lastH.current} onPlay={item.media?.kind === 'embed' ? undefined : () => strong('play')} onReady={() => setReady(true)} onPerson={openPerson} onLike={item.media?.kind === 'embed' ? undefined : likeByTap} onFull={onImmersive ? () => onImmersive(itemRef.current) : undefined} sandboxed={!unblocked} /></div>
       {!isText && item.body ? <p className="ptext caption"><Linkify text={trBody.text || item.body} source={item.source} onPerson={openPerson} /><TranslateButton tr={trBody} small /><TranslatedNote tr={trBody} /></p> : null}
       {item.aiSummary && !isText ? <p className="aisum">{item.aiSummary}</p> : null}
-      <div className={`chipwrap${over && !allTags ? ' over' : ''}`}>
-      <div ref={chipsRef} className={`chiprow${allTags ? ' all' : ' one'}${over && !allTags ? ' over' : ''}`}>
+      <div className={`chipwrap${over && !allTags ? ' over' : ''}${hovTags ? ' hov' : ''}`} ref={tagWrap} style={hovTags ? { minHeight: tagH } : undefined} onPointerMove={tagIn} onPointerLeave={tagOut}>
+      <div ref={chipsRef} className={`chiprow${allTags ? ' all' : ' one'}${over && !allTags && !hovTags ? ' over' : ''}`}>
         {item.gender && (item.gender.women || item.gender.men || item.gender.trans) ? (
           <span className="gicons" title={`${item.gender.women ? tn(item.gender.women, '{n} woman', '{n} women') : ''}${item.gender.women && item.gender.men ? ', ' : ''}${item.gender.men ? tn(item.gender.men, '{n} man', '{n} men') : ''}${item.gender.trans ? ', trans' : ''}${item.gender.sure ? '' : t(' (guess until the AI looks closer)')}`}>
             {item.gender.women ? <><span className="gf"><Icon name="female" /></span>{item.gender.women > 1 ? <em>{item.gender.women}</em> : null}</> : null}

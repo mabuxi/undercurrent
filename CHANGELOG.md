@@ -3,6 +3,24 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.24.0 · 10 October 2026
+
+### Full screen viewer on the Mac
+- Scrolling is the browser's own again, so two fingers on the trackpad feel as smooth and quick as before. Only when a short turn of a mouse wheel is not enough to leave a post does it go on to the next one by itself.
+- The full screen button now also puts the window in full screen (in the app and in the browser). Leaving the viewer puts the window back the way it was, and leaving full screen yourself (Escape, the green button) leaves the viewer too.
+- Pointing at things with the mouse opens them, like a tap does on the phone: the time line at the bottom gets bigger and shows the time under the pointer, the tags show on more lines, and the flame opens its slider. With the slider open, click on it to set the heat, or click the flame to turn heat on (Warm) or off. Moving away closes it.
+- The left and right arrow keys go back or forward 15 seconds, with a small sign in the middle.
+
+### Full screen viewer
+- Holding anywhere on a video plays it faster, not only on the sides.
+
+### Feed
+- Pointing at the tags with the mouse shows all of them over the post, without moving anything below. Only with a mouse; on the phone nothing changes.
+- The left and right arrow keys go back or forward 15 seconds in the video under the mouse, or the one in focus.
+
+### Videos
+- Long videos skip their intro: they start 15 seconds in, and videos of 10 minutes or more start a minute in. Turn it off in Settings, under Videos. This works for videos played by the app, not inside players from other sites.
+
 ## 0.23.2 · 10 October 2026
 
 ### Full screen viewer

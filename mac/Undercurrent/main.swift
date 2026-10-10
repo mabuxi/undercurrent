@@ -88,6 +88,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     var ownServer = false
     var quitting = false
     var loadedApp = false
+    // The full screen viewer put the window in full screen (so leaving the viewer takes it out again).
+    var fullByViewer = false
+    var fullMoving = false
+    var leaveAfterMove = false
     var logHandle: FileHandle?
 
     lazy var mainDir: URL = {
@@ -173,6 +177,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             NSApp.dockTile.badgeLabel = L("Test")
         }
         window.makeKeyAndOrderFront(nil)
+        watchFullScreen()
         NSApp.activate(ignoringOtherApps: true)
 
         showSplash(TEST_MODE ? L("Starting Undercurrent in test mode…") : L("Starting Undercurrent…"))
@@ -195,7 +200,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         // While a video is full screen in the page, pinching zooms the video, not the whole window.
         if what == "pinch-off" { web.allowsMagnification = false; return }
         if what == "pinch-on" { web.allowsMagnification = true; return }
+        if what == "winfull-on" { viewerFull(true); return }
+        if what == "winfull-off" { viewerFull(false); return }
         if what == "drag" { dragWindow() }
+    }
+
+    // ---------- Full screen with the full screen viewer ----------
+
+    func isFull() -> Bool { window.styleMask.contains(.fullScreen) }
+
+    func viewerFull(_ on: Bool) {
+        if on {
+            leaveAfterMove = false
+            if isFull() || fullByViewer { return }
+            fullByViewer = true
+            window.toggleFullScreen(nil)
+        } else {
+            guard fullByViewer else { return }
+            if fullMoving { leaveAfterMove = true; return }
+            fullByViewer = false
+            if isFull() { window.toggleFullScreen(nil) }
+        }
+    }
+
+    func watchFullScreen() {
+        let nc = NotificationCenter.default
+        nc.addObserver(forName: NSWindow.willEnterFullScreenNotification, object: window, queue: .main) { [weak self] _ in self?.fullMoving = true }
+        nc.addObserver(forName: NSWindow.didEnterFullScreenNotification, object: window, queue: .main) { [weak self] _ in
+            guard let self = self else { return }
+            self.fullMoving = false
+            if self.leaveAfterMove { self.leaveAfterMove = false; self.fullByViewer = false; self.window.toggleFullScreen(nil) }
+        }
+        nc.addObserver(forName: NSWindow.willExitFullScreenNotification, object: window, queue: .main) { [weak self] _ in self?.fullMoving = true }
+        nc.addObserver(forName: NSWindow.didExitFullScreenNotification, object: window, queue: .main) { [weak self] _ in
+            guard let self = self else { return }
+            self.fullMoving = false
+            // You left full screen yourself while the viewer was open: the viewer closes too.
+            if self.fullByViewer {
+                self.fullByViewer = false
+                self.web.evaluateJavaScript("window.ucWinFullLeft && window.ucWinFullLeft()", completionHandler: nil)
+            }
+        }
     }
 
     func dragWindow() {

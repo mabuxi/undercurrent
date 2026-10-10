@@ -984,7 +984,8 @@ api.get('/settings', wrap((req, res) => {
     boorus: Object.fromEntries(Object.keys(BOORUS).map((b) => { const c = getSetting(`booru.${b}`, null); return [b, c ? { userId: c.userId, hasKey: !!c.apiKey } : null]; })),
     general: {
       syncVotes: getSetting('syncVotes', true), syncSaves: getSetting('syncSaves', false), syncFollows: getSetting('syncFollows', true),
-      taggerOn: getSetting('taggerOn', config.taggerEnabled), taggerVision: getSetting('taggerVision', true), tagBooru: getSetting('tagBooru', false)
+      taggerOn: getSetting('taggerOn', config.taggerEnabled), taggerVision: getSetting('taggerVision', true), tagBooru: getSetting('tagBooru', false),
+      skipIntros: getSetting('skipIntros', true)
     },
     mock: config.mock,
     lemmyInstance: getSetting('lemmyInstance', 'lemmynsfw.com'),
@@ -1048,7 +1049,7 @@ api.post('/discover', wrap(async (req, res) => {
 api.post('/items/:id/deep', wrap((req, res) => { deepNow(Number(req.params.id)); res.json({ ok: true }); }));
 
 api.put('/settings/general', wrap((req, res) => {
-  for (const k of ['syncVotes', 'syncSaves', 'syncFollows', 'taggerOn', 'taggerVision', 'tagBooru']) if (k in (req.body || {})) setSetting(k, !!req.body[k]);
+  for (const k of ['syncVotes', 'syncSaves', 'syncFollows', 'taggerOn', 'taggerVision', 'tagBooru', 'skipIntros']) if (k in (req.body || {})) setSetting(k, !!req.body[k]);
   res.json({ ok: true });
 }));
 

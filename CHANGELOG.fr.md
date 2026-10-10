@@ -2,6 +2,24 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.24.0 · 10 octobre 2026
+
+### Plein écran sur Mac
+- Le défilement est de nouveau celui du navigateur, donc deux doigts sur le trackpad sont aussi fluides et réactifs qu’avant. Seulement quand un petit tour de molette de souris ne suffit pas à quitter un post, il passe tout seul au suivant.
+- Le bouton plein écran met aussi la fenêtre en plein écran (dans l’app et dans le navigateur). Quitter la vue remet la fenêtre comme elle était, et quitter le plein écran vous-même (Échap, le bouton vert) quitte aussi la vue.
+- Pointer avec la souris ouvre les choses, comme un toucher sur le téléphone : la ligne du temps en bas grossit et montre le temps sous le pointeur, les tags s’affichent sur plusieurs lignes, et la flamme ouvre son curseur. Curseur ouvert, cliquez dessus pour régler la chaleur, ou cliquez sur la flamme pour l’allumer (Tiède) ou l’éteindre. S’éloigner le referme.
+- Les flèches gauche et droite reculent ou avancent de 15 secondes, avec un petit signe au milieu.
+
+### Plein écran
+- Maintenir n’importe où sur une vidéo l’accélère, plus seulement sur les côtés.
+
+### Fil
+- Pointer les tags avec la souris les affiche tous par-dessus le post, sans rien déplacer en dessous. Seulement avec une souris ; sur le téléphone rien ne change.
+- Les flèches gauche et droite reculent ou avancent de 15 secondes dans la vidéo sous la souris, ou celle en cours.
+
+### Vidéos
+- Les vidéos longues passent leur intro : elles commencent à 15 secondes, et celles de 10 minutes ou plus à une minute. Désactivable dans Réglages, sous Vidéos. Cela marche pour les vidéos lues par l’app, pas dans les lecteurs des autres sites.
+
 ## 0.23.2 · 10 octobre 2026
 
 ### Plein écran

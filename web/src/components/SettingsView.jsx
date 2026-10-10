@@ -271,6 +271,15 @@ function TaggerSection({ s, reload }) {
   );
 }
 
+function VideoSection({ s, reload }) {
+  return (
+    <div className="card2">
+      <h3>{t('Videos')}</h3>
+      <Toggle id="skipIntros" label={t('Skip intros')} hint={t('Long videos start 15 seconds in, videos of 10 minutes or more a minute in. Only for videos played here, not in players from other sites')} value={s?.general.skipIntros !== false} onChange={(v) => api('/settings/general', { method: 'PUT', body: { skipIntros: v } }).then(reload)} />
+    </div>
+  );
+}
+
 function LimitsSection() {
   const { toast } = useApp();
   const [d, setD] = useState(null);
@@ -380,6 +389,7 @@ export default function SettingsView() {
       <LanguageCard />
       <ProfilesCard />
       <VersionCard />
+      <VideoSection s={settings} reload={reload} />
       <ProvidersSection />
       <ScraperSection />
       <ExtremeSection />

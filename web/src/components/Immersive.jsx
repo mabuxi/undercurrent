@@ -9,6 +9,7 @@ import { AskPanel, Avatar, CommentsPanel, ProfilePanel, PerformerPanel, PersonPa
 import { DislikeNote, HAS_COMMENTS, identity } from './Post.jsx';
 import { usePostActions } from '../postactions.js';
 import { setTkOpen, withChanges } from '../tk.js';
+import { enterWindowFull, leaveWindowFull } from '../winfull.js';
 import { soundOn, setSound, onSound } from '../sound.js';
 import { t, tn } from '../i18n.js';
 import { tapOnly } from '../tapguard.js';
@@ -139,6 +140,7 @@ function TkMedia({ item, active, preload, vref, onReady, onStart, onPlay, sandbo
 function TkProgress({ vref, active, slideRef, onMeta }) {
   const bar = useRef(null);
   const [scrub, setScrub] = useState(null);
+  const [hov, setHov] = useState(null);
   const sent = useRef('');
   useEffect(() => {
     if (!active) return undefined;
@@ -162,17 +164,28 @@ function TkProgress({ vref, active, slideRef, onMeta }) {
     const f = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
     if (v && v.duration && isFinite(v.duration)) { v.currentTime = f * v.duration; setScrub({ at: f * v.duration, d: v.duration }); }
   };
+  // With a mouse, pointing at the line already makes it bigger and shows the time under the pointer.
+  const point = (e) => {
+    const v = vref.current;
+    if (e.pointerType !== 'mouse' || !v || !v.duration || !isFinite(v.duration)) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    const f = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    setHov({ f, at: f * v.duration });
+  };
   return (
     <div
-      className={`tk-prog${scrub ? ' on' : ''}`}
+      className={`tk-prog${scrub || hov ? ' on' : ''}`}
       onPointerDown={(e) => { e.stopPropagation(); e.currentTarget.setPointerCapture?.(e.pointerId); seek(e); }}
-      onPointerMove={(e) => { if (scrub) seek(e); }}
+      onPointerMove={(e) => { if (scrub) seek(e); else point(e); }}
       onPointerUp={() => setScrub(null)}
       onPointerCancel={() => setScrub(null)}
+      onPointerLeave={() => setHov(null)}
       role="slider"
       aria-label={t('Video position')}
     >
       {scrub ? <span className="tk-time">{fmtDur(Math.round(scrub.at))} / {fmtDur(Math.round(scrub.d))}</span> : null}
+      {!scrub && hov ? <span className="tk-hovtime" style={{ left: `${hov.f * 100}%` }}>{fmtDur(Math.round(hov.at))}</span> : null}
+      {!scrub && hov ? <i className="tk-hovmark" style={{ left: `${hov.f * 100}%` }} /> : null}
       <div className="tk-track"><i ref={bar} /></div>
     </div>
   );
@@ -354,8 +367,24 @@ function HeatRail({ value, onChange, onLive }) {
   const track = useRef(null);
   const drag = useRef(null);
   const closeT = useRef(null);
+  const hov = useRef(false);
   useEffect(() => { setV(value); }, [value]);
   useEffect(() => () => clearTimeout(closeT.current), []);
+  // With a mouse, pointing at the flame opens the slider and moving away closes it; a click on the slider sets the
+  // heat, a click on the flame turns it on (Warm) or off.
+  const enter = (e) => {
+    if (e.pointerType !== 'mouse') return;
+    hov.current = true;
+    clearTimeout(closeT.current);
+    setOpen(true);
+  };
+  const leave = (e) => {
+    if (e.pointerType !== 'mouse') return;
+    hov.current = false;
+    if (drag.current) return;
+    clearTimeout(closeT.current);
+    closeT.current = setTimeout(() => setOpen(false), 280);
+  };
   useEffect(() => {
     if (!open) return undefined;
     const off = (e) => { if (!root.current?.contains(e.target)) setOpen(false); };
@@ -379,7 +408,7 @@ function HeatRail({ value, onChange, onLive }) {
     e.stopPropagation();
     clearTimeout(closeT.current);
     e.currentTarget.setPointerCapture?.(e.pointerId);
-    drag.current = { y: e.clientY, moved: false, onTrack, wasOpen: open, had: v, t: Date.now() };
+    drag.current = { y: e.clientY, moved: false, onTrack, wasOpen: open, had: v, t: Date.now(), mouse: e.pointerType === 'mouse' };
     setOpen(true);
     if (onTrack) { const n = at(e.clientY); drag.current.moved = true; setV(n); onLive?.(n, 'live'); }
   };
@@ -396,7 +425,8 @@ function HeatRail({ value, onChange, onLive }) {
     const d = drag.current;
     drag.current = null;
     if (!d) return;
-    if (d.moved) { const n = at(e.clientY); setV(n); commit(n); closeT.current = setTimeout(() => setOpen(false), 700); return; }
+    if (d.moved) { const n = at(e.clientY); setV(n); commit(n); if (!hov.current) closeT.current = setTimeout(() => setOpen(false), 700); return; }
+    if (d.mouse && hov.current) { const n = d.had > 0 ? 0 : 1; setV(n); commit(n); return; }
     // A tap on the flame while it is open closes it; a tap on a flame that is already set turns the heat off.
     if (d.wasOpen) { setOpen(false); return; }
     // Only a quick tap turns it off: holding the flame still opens the slider to change it.
@@ -407,7 +437,7 @@ function HeatRail({ value, onChange, onLive }) {
   useEffect(() => { if (open && v !== last.current) { try { navigator.vibrate?.(6); } catch {} } last.current = v; }, [v, open]);
   const word = heatWord(v);
   return (
-    <div ref={root} className={`tk-hot${open ? ' open' : ''}${v ? ' on' : ''}`} style={{ '--h': v / 5 }}>
+    <div ref={root} className={`tk-hot${open ? ' open' : ''}${v ? ' on' : ''}`} style={{ '--h': v / 5 }} onPointerEnter={enter} onPointerLeave={leave}>
       <div className="tk-hottrack" ref={track} onPointerDown={(e) => down(e, true)} onPointerMove={move} onPointerUp={up} onPointerCancel={up} role="slider" aria-valuemin={0} aria-valuemax={5} aria-valuenow={v} aria-valuetext={word || t('Not rated')} aria-hidden={!open}>
         <i className="tk-hotfill" />
       </div>
@@ -598,11 +628,31 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
     window.addEventListener('resize', fit);
     return () => window.removeEventListener('resize', fit);
   }, [isLong, active, vmeta, open]); // eslint-disable-line react-hooks/exhaustive-deps
-  const skipBy = (s2) => {
+  const [jump, setJump] = useState(null);
+  const jumpT = useRef(null);
+  useEffect(() => () => clearTimeout(jumpT.current), []);
+  const skipBy = (s2, show = false) => {
     const v = vref.current;
     if (!v || !v.duration || !isFinite(v.duration)) return;
     v.currentTime = Math.max(0, Math.min(v.duration - 0.5, v.currentTime + s2));
+    if (!show) return;
+    setJump({ s: s2, k: Date.now() });
+    clearTimeout(jumpT.current);
+    jumpT.current = setTimeout(() => setJump(null), 650);
   };
+  // The left and right arrow keys go back or forward 15 seconds.
+  const skipRef = useRef(skipBy);
+  skipRef.current = skipBy;
+  useEffect(() => {
+    if (!active || !isVideo) return undefined;
+    const key = (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.target.closest?.('input, textarea, select')) return;
+      if (e.key === 'ArrowLeft') { e.preventDefault(); skipRef.current(-15, true); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); skipRef.current(15, true); }
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, [active, isVideo]);
   const nativeFull = () => {
     const v = vref.current;
     if (!v) return;
@@ -613,14 +663,11 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
     track(item.id, 'open');
   };
   useAmbient(active && !hidden, vref, zoomRef, ambRef, item);
-  // Holding the left or right side of a video plays it faster until you let go: 2x, or 5x for a longer video.
+  // Holding anywhere on a video plays it faster until you let go: 2x, or 5x for a longer video.
   const hold = useRef({ timer: null, x: 0, y: 0, until: 0 });
   const holdStart = (e) => {
     const v = vref.current;
     if (!isVideo || !v || pinch.zoomedNow() || e.target.closest('button, a, iframe, .tk-prog')) return;
-    const b = stageRef.current.getBoundingClientRect();
-    const fx = (e.clientX - b.left) / b.width;
-    if (fx > 0.3 && fx < 0.7) return;
     const h = hold.current;
     h.x = e.clientX; h.y = e.clientY;
     clearTimeout(h.timer);
@@ -786,6 +833,7 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
           <TkMedia item={item} active={active && !hidden} preload={preload} vref={vref} onReady={() => setReady(true)} onStart={() => setStarted(true)} onPlay={() => strong('play')} sandboxed={sandboxed} onNative={setNative} />
           {!started && (isVideo || isEmbed) && coverOf(item.media) ? <TkCover item={item} active={active && !hidden} /> : null}
         </div>
+        {jump ? <span key={jump.k} className="tk-jump" aria-live="polite">{jump.s > 0 ? `+${jump.s}` : `−${-jump.s}`} s</span> : null}
         {fast ? <span className="tk-fast" aria-live="polite">{String(fast).replace('.', ',')}× <Icon name="chevR" /><Icon name="chevR" /></span> : null}
         <PostFx fx={fx} />
         <HeatFx heat={heat} />
@@ -830,7 +878,7 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
         <div className="tk-tags">
           {(item.performers || []).slice(0, 3).map((p) => <button type="button" key={`p${p}`} className="tk-chip perf" onClick={tapOnly(() => { setSheet(`performer:${p}`); strong('performer'); })}><PersonPic name={p} thumb={thumbOf(p)} />{String(p).replace(/^@+/, '')}</button>)}
           {(item.kinks || []).map((k) => <button type="button" key={`k${k.id}`} className="tk-chip kink" style={{ '--c': k.color }} onClick={tapOnly(() => leaveTo(() => setFilters({ kink: k.id })))}>{k.name}</button>)}
-          {tags.slice(0, 12).map((tag) => <button type="button" key={tag} className="tk-chip" onClick={tapOnly(() => leaveTo(() => runSearch(tag).catch(() => setFilters({ tags: [tag] }))))}>#{tag}</button>)}
+          {tags.slice(0, 30).map((tag) => <button type="button" key={tag} className="tk-chip" onClick={tapOnly(() => leaveTo(() => runSearch(tag).catch(() => setFilters({ tags: [tag] }))))}>#{tag}</button>)}
         </div>
         <button type="button" className="tk-tagsbtn" onClick={() => setSheet('tags')} aria-label={t('Show all kinks and tags')}><Icon name="tag" /></button>
       </div>
@@ -887,9 +935,11 @@ export default function Immersive({ items, startId, onClose, onMore, loading, do
     document.documentElement.classList.add('tkopen');
     setTkOpen(true);
     try { window.webkit?.messageHandlers?.uc?.postMessage('pinch-off'); } catch {}
+    enterWindowFull(() => closeRef.current?.());
     return () => {
       document.documentElement.classList.remove('tkopen');
       setTkOpen(false);
+      leaveWindowFull();
       try { window.webkit?.messageHandlers?.uc?.postMessage('pinch-on'); } catch {}
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -911,6 +961,8 @@ export default function Immersive({ items, startId, onClose, onMore, loading, do
     };
   }, [finish]);
   const close = () => { if (window.history.state?.ucTk) window.history.back(); else finish(); };
+  const closeRef = useRef(close);
+  closeRef.current = close;
 
   // The post on screen is the one the scroll position is at.
   const onScroll = () => {
@@ -1050,8 +1102,8 @@ export default function Immersive({ items, startId, onClose, onMore, loading, do
 
 
   const go = (d) => { const el = sc.current; if (el) el.scrollTo({ top: (cur + d) * el.clientHeight, behavior: reduced() ? 'auto' : 'smooth' }); };
-  // A mouse wheel or a trackpad moves exactly one post per swipe, like TikTok on a computer: the first bit of the
-  // swipe goes on, the rest of it (and its momentum) is ignored until the swipe is over.
+  // Scrolling with two fingers or the wheel is the browser's own. Only when a short turn of a mouse wheel was not
+  // enough to leave the post (it springs back), it goes on to the next one once the wheel stops.
   const goRef = useRef(go);
   goRef.current = go;
   const lockRef = useRef(0);
@@ -1059,21 +1111,20 @@ export default function Immersive({ items, startId, onClose, onMore, loading, do
   useEffect(() => {
     const el = sc.current;
     if (!el) return undefined;
-    const w = { acc: 0, busy: false, t: null };
+    const w = { acc: 0, from: null, t: null };
     const onW = (e) => {
-      if (e.ctrlKey || Math.abs(e.deltaY) <= Math.abs(e.deltaX) || e.target.closest?.('.tk-sheetwrap, .tk-text, .tk-chips')) return;
-      e.preventDefault();
-      if (lockRef.current) return;
-      clearTimeout(w.t);
-      w.t = setTimeout(() => { w.busy = false; w.acc = 0; }, 220);
-      if (w.busy) return;
+      if (e.defaultPrevented || e.ctrlKey || Math.abs(e.deltaY) <= Math.abs(e.deltaX) || lockRef.current || e.target.closest?.('.tk-sheetwrap, .tk-text, .tk-chips, .tk-tags')) return;
+      if (w.from == null) w.from = Math.round(el.scrollTop / el.clientHeight);
       w.acc += e.deltaMode === 1 ? e.deltaY * 30 : e.deltaY;
-      if (Math.abs(w.acc) < 40) return;
-      w.busy = true;
-      goRef.current(w.acc > 0 ? 1 : -1);
-      w.acc = 0;
+      clearTimeout(w.t);
+      w.t = setTimeout(() => {
+        const at = Math.round(el.scrollTop / el.clientHeight);
+        if (at === w.from && Math.abs(w.acc) >= 50 && !lockRef.current) goRef.current(w.acc > 0 ? 1 : -1);
+        w.acc = 0;
+        w.from = null;
+      }, 260);
     };
-    el.addEventListener('wheel', onW, { passive: false });
+    el.addEventListener('wheel', onW, { passive: true });
     return () => { el.removeEventListener('wheel', onW); clearTimeout(w.t); };
   }, []);
   useEffect(() => {
