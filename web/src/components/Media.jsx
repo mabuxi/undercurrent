@@ -14,6 +14,33 @@ let pointed = null;
 
 // Where a longer video starts when the intro is skipped: a minute into a video of ten minutes or more, 15 seconds
 // into other long videos, nothing for short ones.
+// How long a video is, also for streams that only say how far you can seek.
+export function lengthOf(v) {
+  if (!v) return 0;
+  if (v.duration && isFinite(v.duration)) return v.duration;
+  try { if (v.seekable?.length) return v.seekable.end(v.seekable.length - 1); } catch {}
+  return 0;
+}
+
+// Go back or forward in a video. Presses in a row add up even while the video is still jumping to the last one.
+export function seekBy(v, s) {
+  const d = lengthOf(v);
+  if (!v || !d) return false;
+  const from = v.seeking && v._ucTo != null ? v._ucTo : v.currentTime;
+  const to = Math.max(0, Math.min(d - 0.5, from + s));
+  v._ucTo = to;
+  try { v.currentTime = to; } catch { return false; }
+  return true;
+}
+export function seekTo(v, f) {
+  const d = lengthOf(v);
+  if (!v || !d) return null;
+  const to = Math.max(0, Math.min(d - 0.3, f * d));
+  v._ucTo = to;
+  try { v.currentTime = to; } catch {}
+  return { at: to, d };
+}
+
 export function introCut(format, d) {
   if (!d || !isFinite(d)) return 0;
   const cut = d >= 600 ? 60 : format === 'long' || d > 180 ? 15 : 0;
@@ -58,6 +85,11 @@ export function VideoPlayer({ item, active, onPlay, onReady, onFull, onFail, inT
   const skipIntro = useRef(true);
   skipIntro.current = settings?.general?.skipIntros !== false;
   const [jump, setJump] = useState(null);
+  // Skipping the intro happens once the video really plays (jumping before that can leave a stream stuck), and
+  // a video that does not move for a while is loaded again (twice), then handed back to the site's player.
+  const skip = useRef({ stage: 0, cut: 0, off: false, t: null });
+  const [retry, setRetry] = useState(0);
+  const stall = useRef({ n: 0, resume: 0 });
   const hlsRef = useRef(null);
   const [src, setSrc] = useState(item.media.kind === 'video' ? item.media.src : item.media.hd || item.media.sd || null);
   const [hlsUrl, setHlsUrl] = useState(item.media.hls || null);
@@ -153,7 +185,7 @@ export function VideoPlayer({ item, active, onPlay, onReady, onFull, onFail, inT
     }
     v.src = hlsUrl || src;
     return undefined;
-  }, [src, hlsUrl, triedProxy, armed]);
+  }, [src, hlsUrl, triedProxy, armed, retry]);
 
   useEffect(() => {
     const v = ref.current;
@@ -167,7 +199,35 @@ export function VideoPlayer({ item, active, onPlay, onReady, onFull, onFail, inT
         }
       });
     } else v.pause();
-  }, [active, hover, armed, src, hlsUrl, zoom.fs, covered]);
+  }, [active, hover, armed, src, hlsUrl, zoom.fs, covered, retry]);
+  const wantPlay = (((active || hover) && !covered) || zoom.fs) && armed && !!(src || hlsUrl) && !error;
+  useEffect(() => {
+    if (!wantPlay) return undefined;
+    let last = -1;
+    let still = 0;
+    const iv = setInterval(() => {
+      const v = ref.current;
+      if (!v || v.ended) return;
+      // Paused by you after it played, or ready but not allowed to start by itself: nothing is loading wrong (the
+      // cover goes away so the first picture and the play sign show).
+      if (v.paused && readyFired.current && !v.seeking) { still = 0; return; }
+      if (v.paused && v.readyState >= 3 && !v.seeking) { still = 0; if (skip.current.stage !== 2) ready(); return; }
+      const moved = v.currentTime !== last;
+      last = v.currentTime;
+      if (moved && !v.paused && !v.seeking) { still = 0; return; }
+      if (++still < (readyFired.current ? 12 : 10)) return;
+      still = 0;
+      const s = stall.current;
+      s.n++;
+      skip.current.off = true;
+      skip.current.stage = 0;
+      if (s.n <= 2) {
+        s.resume = readyFired.current && s.n === 1 && v.currentTime > 2 ? v.currentTime : 0;
+        setRetry((x) => x + 1);
+      } else if (onFail) onFail('stalled');
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [wantPlay, retry]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function onError() {
     if (item.media.kind === 'redgifs' && !refreshed) {
@@ -230,11 +290,30 @@ export function VideoPlayer({ item, active, onPlay, onReady, onFull, onFail, inT
   function onMeta() {
     const v = ref.current;
     if (v?.videoWidth && v?.videoHeight) setAr(v.videoWidth / v.videoHeight);
-    // Skip the intro of a longer video each time it loads from the start (Settings can turn this off).
-    if (v && skipIntro.current && v.currentTime < 1) {
-      const cut = introCut(item.format, v.duration);
-      if (cut) { try { v.currentTime = cut; } catch {} }
+    if (!v) return;
+    // Loaded again after it got stuck: back to where it was.
+    if (stall.current.resume) { const r = stall.current.resume; stall.current.resume = 0; try { v.currentTime = r; } catch {} return; }
+    // Skip the intro of a longer video when it loads from the start (Settings can turn this off).
+    const sk = skip.current;
+    if (skipIntro.current && !sk.off && sk.stage === 0 && v.currentTime < 1) {
+      const cut = introCut(item.format, lengthOf(v));
+      if (cut) { sk.stage = 1; sk.cut = cut; }
     }
+  }
+
+  function ready() {
+    if (!readyFired.current) { readyFired.current = true; onReady?.(); }
+  }
+  function onSeeked() {
+    const sk = skip.current;
+    if (sk.stage === 2) { sk.stage = 3; clearTimeout(sk.t); ready(); }
+  }
+  useEffect(() => () => clearTimeout(skip.current.t), []);
+  // The video has what it needs: it starts, even if it was asked to before it was ready.
+  function canPlay() {
+    setLoading(false);
+    const v = ref.current;
+    if (v && v.paused && wantPlay && !v.ended) v.play().catch(() => {});
   }
 
   // In the feed the left and right arrow keys go back or forward 15 seconds in the video in focus (or the one
@@ -246,10 +325,10 @@ export function VideoPlayer({ item, active, onPlay, onReady, onFull, onFail, inT
       if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
       if (e.metaKey || e.ctrlKey || e.altKey || e.target.closest?.('input, textarea, select, [contenteditable]')) return;
       const v = ref.current;
-      if (!v || (pointed ? pointed !== v : !active) || !v.duration || !isFinite(v.duration)) return;
+      if (!v || (pointed ? pointed !== v : !active) || !lengthOf(v)) return;
       e.preventDefault();
       const s = e.key === 'ArrowLeft' ? -15 : 15;
-      v.currentTime = Math.max(0, Math.min(v.duration - 0.5, v.currentTime + s));
+      seekBy(v, s);
       setJump({ s, k: Date.now() });
       clearTimeout(jt);
       jt = setTimeout(() => setJump(null), 650);
@@ -261,7 +340,18 @@ export function VideoPlayer({ item, active, onPlay, onReady, onFull, onFail, inT
 
   function playing() {
     setLoading(false);
-    if (!readyFired.current) { readyFired.current = true; onReady?.(); }
+    const v = ref.current;
+    const sk = skip.current;
+    if (v && sk.stage === 1) {
+      sk.stage = 2;
+      try { v.currentTime = sk.cut; } catch { sk.stage = 3; }
+      if (sk.stage === 2) {
+        clearTimeout(sk.t);
+        sk.t = setTimeout(() => { if (sk.stage === 2) { sk.stage = 3; ready(); } }, 5000);
+        return;
+      }
+    }
+    ready();
   }
 
   function unmute() {
@@ -292,7 +382,8 @@ export function VideoPlayer({ item, active, onPlay, onReady, onFull, onFail, inT
             onTimeUpdate={onTime}
             onPlaying={playing}
             onWaiting={() => setLoading(true)}
-            onCanPlay={() => setLoading(false)}
+            onCanPlay={canPlay}
+            onSeeked={onSeeked}
             onVolumeChange={(e) => { if (prog.current) { prog.current = false; return; } const m = e.currentTarget.muted; setMuted(m); if (!m && !soundOn()) { setSound(true); track(item.id, 'play'); onPlay?.(); } else if (m && soundOn()) setSound(false); }}
             onEnded={onEnded}
             onLoadedMetadata={onMeta}

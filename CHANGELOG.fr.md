@@ -2,6 +2,20 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.25.0 · 11 octobre 2026
+
+### Kinks
+- Chaque kink a maintenant des communautés Reddit. Ajoutez-en une vous-même (tapez son nom), ou retirez-en une avec le ×. Les publications des communautés d’un kink comptent comme ce kink dans le fil, et les communautés sont récupérées comme tout subreddit que vous suivez.
+- L’app cherche aussi des communautés toute seule, à partir du nom du kink et de chacun de ses tags : d’où viennent vos propres publications avec ces tags, la recherche de subreddits de Reddit, une liste de communautés connues et le modèle local. Elle lit ensuite les publications récentes des plus prometteuses pour vérifier qu’elles parlent vraiment du kink. Celles dont elle est sûre sont ajoutées tout de suite (marquées « ajoutée pour vous ») ; les autres apparaissent sous « Pourrait correspondre », avec la raison, à ajouter ou à refuser. Un kink est recherché quand vous l’ouvrez puis toutes les deux semaines, et le tour horaire en fait un à la fois. Sans clé de flux Reddit cela prend quelques minutes, car Reddit n’autorise alors qu’une requête par minute.
+
+### Plein écran
+- Une vidéo qui n’arrête pas de charger (les miniatures qui défilent sans fin) démarre maintenant toute seule : une fois chargée elle se lance, et si elle ne bouge plus pendant une dizaine de secondes elle est rechargée (deux fois), puis demande un nouveau lien au Mac, puis repasse au lecteur du site. Plus besoin de la quitter et d’y revenir.
+- L’intro est maintenant passée une fois que la vidéo joue vraiment, et plus pendant son chargement, ce qui pouvait bloquer un flux. Après un blocage, l’intro n’est plus passée pour cette vidéo.
+- +15, −15 et le glissement de la ligne du temps remarchent dans ce cas, aussi sur les flux qui ne disent pas leur durée, et plusieurs +15 rapides s’additionnent.
+- Touchez deux fois le côté gauche ou droit d’une vidéo longue pour reculer ou avancer de 15 secondes, comme sur YouTube. Continuez à toucher ce côté pour ajouter 15 de plus à chaque fois (+30, +45…). Deux touchers au milieu aiment toujours le post.
+- Quand plusieurs personnes sont dans un post, la photo à droite les montre toutes, un peu les unes sur les autres : deux côte à côte, trois en triangle, avec +2 et ainsi de suite au-delà. Touchez-la pour choisir qui voir, et suivez chacune d’elles depuis là.
+- Les tags en bas sont centrés (quand il y en a trop pour une ligne, ils défilent comme avant).
+
 ## 0.24.0 · 10 octobre 2026
 
 ### Plein écran sur Mac

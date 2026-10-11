@@ -1,0 +1,25 @@
+// Version 0.25: Reddit communities on kinks, people in a post, double tap to skip.
+export default {
+  "Posted it": "L’a publié",
+  "In the video": "Dans la vidéo",
+  "Tagged": "Identifié",
+  "People in this post": "Les personnes de ce post",
+  "Follow someone in this post": "Suivre quelqu’un de ce post",
+  "{n} person in this post: pick who to see": "{n} personne dans ce post : choisissez qui voir",
+  "{n} people in this post: pick who to see": "{n} personnes dans ce post : choisissez qui voir",
+  "Reddit communities": "Communautés Reddit",
+  "Searching Reddit…": "Recherche sur Reddit…",
+  "Search again": "Chercher à nouveau",
+  "Show only r/{name}": "Afficher seulement r/{name}",
+  "added for you": "ajoutée pour vous",
+  "Removed r/{name}.": "r/{name} retirée.",
+  "Remove r/{name}": "Retirer r/{name}",
+  "Added r/{name}.": "r/{name} ajoutée.",
+  "community": "communauté",
+  "Add a Reddit community to {name}": "Ajouter une communauté Reddit à {name}",
+  "Nothing that fits well yet. Add one yourself, or search again later.": "Rien qui corresponde bien pour l’instant. Ajoutez-en une vous-même, ou cherchez à nouveau plus tard.",
+  "Posts from these communities count as {name} in the feed.": "Les publications de ces communautés comptent comme {name} dans le fil.",
+  "Might fit": "Pourrait correspondre",
+  "Not this one": "Pas celle-ci",
+  "Without a Reddit feed key Reddit allows one request a minute, so this takes a few minutes. You can leave this page.": "Sans clé de flux Reddit, Reddit n’autorise qu’une requête par minute, donc cela prend quelques minutes. Vous pouvez quitter cette page."
+};

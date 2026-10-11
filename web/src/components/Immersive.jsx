@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { api, ago, fmtDur, fmtNum, formatMeta, imgSrc, LABELS, proxied, rgba, track } from '../api.js';
 import { useApp } from '../context.jsx';
 import { Icon } from '../icons.jsx';
-import { VideoPlayer, DIRECT } from './Media.jsx';
+import { VideoPlayer, DIRECT, seekBy, seekTo, lengthOf } from './Media.jsx';
 import { PostFx, HeatFx } from './PostFx.jsx';
 import { AskPanel, Avatar, CommentsPanel, ProfilePanel, PerformerPanel, PersonPanel, WhyPanel } from './Panels.jsx';
 import { DislikeNote, HAS_COMMENTS, identity } from './Post.jsx';
@@ -54,11 +54,18 @@ function TkEmbed({ item, active, preload, onReady, onStart, vref, onPlay, sandbo
     api(`/items/${item.id}/direct`).then((r) => { if (alive) setDirect(r.direct || null); }).catch(() => { if (alive) setDirect(null); });
     return () => { alive = false; clearTimeout(give); };
   }, [active, preload, direct, item.id]);
+  // A phone player that got stuck asks the Mac for a fresh link once before going back to the site's player.
+  const [tries, setTries] = useState(0);
+  const onStuck = () => {
+    if (tries >= 1) { setFailed(true); return; }
+    setTries(1);
+    api(`/items/${item.id}/direct?fresh=1`).then((r) => { if (r.direct) setDirect(r.direct); else setFailed(true); }).catch(() => setFailed(true));
+  };
   const native = !!direct && !failed;
   useEffect(() => { onNative?.(native); }, [native]); // eslint-disable-line react-hooks/exhaustive-deps
   if (native) {
     const vItem = { ...item, media: { kind: 'video', src: direct.kind === 'mp4' ? direct.src : undefined, hls: direct.kind === 'hls' ? direct.src : undefined, poster: poster ? proxied(poster) : undefined, hasAudio: true } };
-    return <VideoPlayer item={vItem} active={active} preload={preload} inTk exposeRef={vref} onReady={() => { onReady?.(); onStart?.(); }} onPlay={onPlay} onFail={() => setFailed(true)} />;
+    return <VideoPlayer key={`${direct.src}|${tries}`} item={vItem} active={active} preload={preload} inTk exposeRef={vref} onReady={() => { onReady?.(); onStart?.(); }} onPlay={onPlay} onFail={(why) => (why === 'stalled' ? onStuck() : setFailed(true))} />;
   }
   return (
     <div className={`tk-embed${short ? ' short' : ''}`}>
@@ -147,10 +154,11 @@ function TkProgress({ vref, active, slideRef, onMeta }) {
     let raf = 0;
     const loop = () => {
       const v = vref.current;
-      if (v && v.duration && isFinite(v.duration)) {
-        if (bar.current) bar.current.style.width = `${(v.currentTime / v.duration) * 100}%`;
-        const key = `${Math.round(v.duration)}|${v.videoWidth}|${v.videoHeight}`;
-        if (key !== sent.current) { sent.current = key; onMeta?.({ d: v.duration, w: v.videoWidth, h: v.videoHeight }); }
+      const d = lengthOf(v);
+      if (v && d) {
+        if (bar.current) bar.current.style.width = `${Math.min(100, ((v.seeking && v._ucTo != null ? v._ucTo : v.currentTime) / d) * 100)}%`;
+        const key = `${Math.round(d)}|${v.videoWidth}|${v.videoHeight}`;
+        if (key !== sent.current) { sent.current = key; onMeta?.({ d, w: v.videoWidth, h: v.videoHeight }); }
       }
       slideRef.current?.classList.toggle('paused', !!v && v.paused && v.readyState >= 2 && !v.ended);
       raf = requestAnimationFrame(loop);
@@ -162,15 +170,16 @@ function TkProgress({ vref, active, slideRef, onMeta }) {
     const v = vref.current;
     const r = e.currentTarget.getBoundingClientRect();
     const f = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
-    if (v && v.duration && isFinite(v.duration)) { v.currentTime = f * v.duration; setScrub({ at: f * v.duration, d: v.duration }); }
+    const to = seekTo(v, f);
+    if (to) setScrub(to);
   };
   // With a mouse, pointing at the line already makes it bigger and shows the time under the pointer.
   const point = (e) => {
     const v = vref.current;
-    if (e.pointerType !== 'mouse' || !v || !v.duration || !isFinite(v.duration)) return;
+    if (e.pointerType !== 'mouse' || !lengthOf(v)) return;
     const r = e.currentTarget.getBoundingClientRect();
     const f = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
-    setHov({ f, at: f * v.duration });
+    setHov({ f, at: f * lengthOf(v) });
   };
   return (
     <div
@@ -631,14 +640,13 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
   const [jump, setJump] = useState(null);
   const jumpT = useRef(null);
   useEffect(() => () => clearTimeout(jumpT.current), []);
-  const skipBy = (s2, show = false) => {
-    const v = vref.current;
-    if (!v || !v.duration || !isFinite(v.duration)) return;
-    v.currentTime = Math.max(0, Math.min(v.duration - 0.5, v.currentTime + s2));
+  // Jumps in a row add up in the sign (+15, +30, +45...), like YouTube.
+  const skipBy = (s2, show = false, side = false) => {
+    if (!seekBy(vref.current, s2)) return;
     if (!show) return;
-    setJump({ s: s2, k: Date.now() });
+    setJump((j) => (j && Math.sign(j.s) === Math.sign(s2) && Date.now() - j.at < 800 ? { ...j, s: j.s + s2, k: j.k + 1, at: Date.now() } : { s: s2, k: Date.now(), at: Date.now(), side }));
     clearTimeout(jumpT.current);
-    jumpT.current = setTimeout(() => setJump(null), 650);
+    jumpT.current = setTimeout(() => setJump(null), 750);
   };
   // The left and right arrow keys go back or forward 15 seconds.
   const skipRef = useRef(skipBy);
@@ -690,6 +698,7 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
   };
   useEffect(() => { if (!active && fast) holdEnd(); }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
   const tap = useRef({ t: 0, timer: null });
+  const seekTap = useRef({ side: 0, until: 0 });
   useEffect(() => () => clearTimeout(tap.current.timer), []);
   function onTap(e) {
     if (e.target.closest('button, a, iframe, input, select, .tk-embednote')) return;
@@ -699,10 +708,23 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
     const r = tap.current;
     const now = Date.now();
     const box = stageRef.current.getBoundingClientRect();
+    // On a longer video a double tap on the left or right side goes back or forward 15 seconds (like YouTube), and
+    // every tap on that side right after adds 15 more; the middle still likes.
+    const fx = (e.clientX - box.left) / box.width;
+    const side = isLong && !pinch.zoomedNow() ? (fx < 0.36 ? -1 : fx > 0.64 ? 1 : 0) : 0;
+    const st = seekTap.current;
+    if (side && side === st.side && now < st.until) {
+      clearTimeout(r.timer);
+      r.t = 0;
+      st.until = now + 700;
+      skipBy(15 * side, true, true);
+      return;
+    }
     if (now - r.t < 300) {
       clearTimeout(r.timer);
       r.t = 0;
       if (pinch.zoomedNow()) { pinch.reset(); return; }
+      if (side) { st.side = side; st.until = now + 700; skipBy(15 * side, true, true); return; }
       // Players from other sites never like on a tap.
       if (!isEmbed || native) { fxAt.current = { y: Math.round(e.clientY - box.top), x: Math.round(e.clientX - box.left) }; acts.like(); }
       return;
@@ -725,7 +747,22 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
   // posted it); a check shows you already do, and tapping it again unfollows.
   const followTarget = who === 'profile' ? (whoData?.author?.canFollow ? { kind: 'author', name: whoData.author.name, on: whoData.author.followed } : null)
     : id.performer ? { kind: 'performer', name: id.performer, on: !!whoData?.performers?.find((p) => p.name === id.performer)?.followed } : null;
-  async function toggleFollow() {
+  // Everyone in the post: who posted it (when the site says), then the people in it. With two or more, the picture
+  // on the right shows them all, a little on top of each other, and tapping it lets you pick who to see.
+  const people = (() => {
+    const out = [];
+    const seen = new Set();
+    const push = (p) => { const k = String(p.name).replace(/^[@u/]+/, '').toLowerCase(); if (!k || seen.has(k)) return; seen.add(k); out.push(p); };
+    if (who === 'profile') push({ key: 'profile', name: id.name, role: t('Posted it'), avatar: item.media?.avatar || null, follow: whoData?.author?.canFollow ? { kind: 'author', name: whoData.author.name, on: whoData.author.followed } : null });
+    for (const pf of item.performers || []) push({ key: `performer:${pf}`, name: pf, role: t('In the video'), thumb: thumbOf(pf), follow: whoData ? { kind: 'performer', name: pf, on: !!whoData.performers?.find((x) => x.name === pf)?.followed } : null });
+    for (const pp of item.people || []) push({ key: `person:${pp.platform || 'any'}|${pp.handle}`, name: pp.handle, role: t('Tagged'), lookup: true, platform: pp.platform || 'any' });
+    return out;
+  })();
+  const picOf = (p) => (p.key === 'profile'
+    ? (p.avatar ? <img className="tk-pic" src={p.avatar} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} /> : <span className="tk-pic none" aria-hidden="true">{String(p.name).replace(/^[@u/]+/, '').slice(0, 1).toUpperCase()}</span>)
+    : <PersonPic name={p.name} thumb={p.thumb} lookup={!!p.lookup} platform={p.platform || 'any'} />);
+  async function toggleFollow(target = followTarget) {
+    const followTarget = target;
     if (!followTarget || !whoData) return;
     const on = !followTarget.on;
     const patch = (d) => (followTarget.kind === 'author' ? { ...d, author: { ...d.author, followed: on } } : { ...d, performers: d.performers.map((p) => (p.name === followTarget.name ? { ...p, followed: on } : p)) });
@@ -761,6 +798,28 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
           <div className="tk-list">
             <button type="button" onClick={() => leaveTo(() => setFilters({ sources: [item.source] }))}><Icon name="globe" />{t('Only posts from {site}', { site })}</button>
             {item.url ? <a href={item.url} target="_blank" rel="noreferrer noopener" onClick={() => track(item.id, 'open')}><Icon name="open" />{t('Open on the original site')}</a> : null}
+          </div>
+        </Sheet>
+      );
+    }
+    if (sheet === 'people') {
+      return (
+        <Sheet title={t('People in this post')} onClose={close}>
+          <div className="tk-people">
+            {people.map((p) => (
+              <div key={p.key} className="tk-person">
+                <button type="button" className="tk-person-main" onClick={() => { setSheet(p.key); if (p.key.startsWith('performer:')) strong('performer'); }}>
+                  <span className="tk-person-pic">{picOf(p)}</span>
+                  <span className="tk-person-name"><b>{String(p.name).replace(/^@+/, '')}</b><em>{p.role}</em></span>
+                  <Icon name="chevR" />
+                </button>
+                {p.follow ? (
+                  <button type="button" className={`tk-pfollow${p.follow.on ? ' on' : ''}`} onClick={() => toggleFollow(p.follow)} aria-pressed={p.follow.on}>
+                    <Icon name={p.follow.on ? 'check' : 'plus'} />{p.follow.on ? t('Following') : t('Follow')}
+                  </button>
+                ) : null}
+              </div>
+            ))}
           </div>
         </Sheet>
       );
@@ -833,7 +892,7 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
           <TkMedia item={item} active={active && !hidden} preload={preload} vref={vref} onReady={() => setReady(true)} onStart={() => setStarted(true)} onPlay={() => strong('play')} sandboxed={sandboxed} onNative={setNative} />
           {!started && (isVideo || isEmbed) && coverOf(item.media) ? <TkCover item={item} active={active && !hidden} /> : null}
         </div>
-        {jump ? <span key={jump.k} className="tk-jump" aria-live="polite">{jump.s > 0 ? `+${jump.s}` : `−${-jump.s}`} s</span> : null}
+        {jump ? <span key={jump.k} className={`tk-jump${jump.side ? (jump.s < 0 ? ' l' : ' r') : ''}`} aria-live="polite">{jump.side ? <Icon name={jump.s < 0 ? 'chevL' : 'chevR'} /> : null}{jump.s > 0 ? `+${jump.s}` : `−${-jump.s}`} s</span> : null}
         {fast ? <span className="tk-fast" aria-live="polite">{String(fast).replace('.', ',')}× <Icon name="chevR" /><Icon name="chevR" /></span> : null}
         <PostFx fx={fx} />
         <HeatFx heat={heat} />
@@ -849,11 +908,22 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
       ) : null}
       <div className="tk-rail">
         <div className="tk-avwrap">
-          <button type="button" className="tk-av" onClick={() => setSheet(who)} aria-label={t('Show profile of {name}', { name: id.name })}>
-            {item.media?.avatar ? <img className="avatar av-m avimg" src={item.media.avatar} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.display = 'none'; }} /> : id.performer && thumbOf(id.performer) ? <img className="avatar av-m avimg" src={imgSrc(thumbOf(id.performer))} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.display = 'none'; }} /> : <Avatar name={id.name} />}
-          </button>
-          {followTarget ? (
-            <button type="button" className={`tk-follow${followTarget.on ? ' on' : ''}`} onClick={toggleFollow} aria-pressed={followTarget.on} aria-label={followTarget.on ? t('You follow {name}. Tap to unfollow.', { name: followTarget.name }) : t('Follow {name}', { name: followTarget.name })}>
+          {people.length >= 2 ? (
+            <button type="button" className={`tk-av tk-avs n${Math.min(3, people.length)}`} onClick={() => setSheet('people')} aria-label={tn(people.length, '{n} person in this post: pick who to see', '{n} people in this post: pick who to see')}>
+              {people.slice(0, 3).map((p, i) => <span key={p.key} className={`tk-avi i${i}`}>{picOf(p)}</span>)}
+              {people.length > 3 ? <span className="tk-avmore">+{people.length - 3}</span> : null}
+            </button>
+          ) : (
+            <button type="button" className="tk-av" onClick={() => setSheet(who)} aria-label={t('Show profile of {name}', { name: id.name })}>
+              {item.media?.avatar ? <img className="avatar av-m avimg" src={item.media.avatar} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.display = 'none'; }} /> : id.performer && thumbOf(id.performer) ? <img className="avatar av-m avimg" src={imgSrc(thumbOf(id.performer))} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.display = 'none'; }} /> : <Avatar name={id.name} />}
+            </button>
+          )}
+          {people.length >= 2 ? (
+            <button type="button" className={`tk-follow${people.some((p) => p.follow?.on) ? ' on' : ''}`} onClick={() => setSheet('people')} aria-label={t('Follow someone in this post')}>
+              <Icon name={people.length && people.every((p) => !p.follow || p.follow.on) && people.some((p) => p.follow) ? 'check' : 'plus'} />
+            </button>
+          ) : followTarget ? (
+            <button type="button" className={`tk-follow${followTarget.on ? ' on' : ''}`} onClick={() => toggleFollow()} aria-pressed={followTarget.on} aria-label={followTarget.on ? t('You follow {name}. Tap to unfollow.', { name: followTarget.name }) : t('Follow {name}', { name: followTarget.name })}>
               <Icon name={followTarget.on ? 'check' : 'plus'} />
             </button>
           ) : null}

@@ -82,7 +82,9 @@ function passes(item, tags, f, kinkSets) {
   // A kink counts when the post has one of its tags, or says it in its title or text (posts the closer look has
   // not reached yet still match what they are about).
   const text = kinkSets.required.length || kinkSets.any.length ? ` ${String(`${item.title || ''} ${String(item.body || '').slice(0, 800)}`).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ')} ` : '';
+  const comm = String(item.community || '').toLowerCase();
   const hits = (set) => {
+    if (comm && set.subs?.has(comm)) return true;
     for (const id of set) if (ids.has(id)) return true;
     for (const n of set.names || []) if (n.length >= 3 && text.includes(` ${n} `)) return true;
     return false;
@@ -259,6 +261,7 @@ export function buildFeed(filters = {}, { exclude = [], limit = 12, mix = 15, ca
     const tags = kinks.find((k) => k.id === Number(id))?.tags || [];
     const set = new Set(tags.map((x) => x.id));
     set.names = [...new Set(tags.map((x) => String(x.name || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()).filter(Boolean))];
+    set.subs = new Set((kinks.find((k) => k.id === Number(id))?.subs || []).map((s) => `r/${s}`.toLowerCase()));
     return set;
   };
   const kinkSets = { required: [], any: [] };
@@ -326,7 +329,7 @@ export function buildFeed(filters = {}, { exclude = [], limit = 12, mix = 15, ca
     // 90% and more only when the AI is sure: many of your top tags, your kinks, a high fit from the AI reading it,
     // and the AI has looked at the picture itself.
     const topHits = tags.filter((x) => x.weight >= 0.45 && topIds.has(x.id)).length;
-    const ksNow = kinksForTags(tags, kidx);
+    const ksNow = kinksForTags(tags, kidx, it.community);
     const sure = 60 + 5 * Math.min(6, topHits) + 4 * Math.min(3, ksNow.length) + ((it.aiFit ?? 0) >= 75 ? 6 : 0) + (it.gSrc === 'vision' ? 4 : 0);
     if (topHits >= 3) s.match = Math.max(s.match, Math.min(it.gSrc === 'vision' ? 99 : 89, sure));
     if (f.following && !s.followed) continue;
@@ -619,6 +622,6 @@ export function presentOne(item) {
   const kl = listKinks();
   const kt = new Set(kl.filter((k) => !k.isGroup && (k.status === 'active' || k.origin === 'user')).flatMap((k) => k.tags.map((x) => x.id)));
   const s = scoreItem(item, tags, affinityMap(), followed(), now(), tagSpecificity().map, kt);
-  const ks = kinksForTags(tags, kinkIndex(kl));
+  const ks = kinksForTags(tags, kinkIndex(kl), item.community);
   return present({ it: item, tags, s, ks, label: s.followed ? 'following' : s.familiarity < 0.35 ? 'discovery' : 'foryou' });
 }

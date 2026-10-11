@@ -12,6 +12,7 @@ import { genderPrefs, setGenderPrefs, autoMale } from './gender.js';
 import { queueLook } from './ai/looker.js';
 import { listSuggestions, setSuggestion, suggestCombos, suggestFantasies, refreshFantasyIdeas } from './suggest.js';
 import { touchSession } from './sessions.js';
+import { kinkSubs, addKinkSub, removeKinkSub, dismissKinkSub, searchKinkSubs, maybeSearch } from './kinksubs.js';
 import { listKinks, createKink, updateKink, deleteKink, mergeKinks, unlockKink, listFantasies, saveFantasy, deleteFantasy, setLink, removeLink, kinkIdsForTagNames } from './kinks.js';
 import { writeFantasy, tagsForText, conceptsFor } from './fantasywrite.js';
 import { deeperStep, fantasyTags } from './deeper.js';
@@ -220,7 +221,7 @@ api.get('/items/:id/direct', wrap(async (req, res) => {
   if (!it) return res.status(404).json({ error: tr('Not found') });
   // Test mode: Pornhub posts play a test file in the phone's player, the others keep the site's player.
   if (config.mock) return res.json({ direct: it.source === 'pornhub' ? { kind: 'mp4', src: '/api/mock/video/landscape.webm', height: 360 } : null });
-  res.json({ direct: await directMedia(it) });
+  res.json({ direct: await directMedia(it, { fresh: req.query.fresh === '1' }) });
 }));
 
 api.get('/items/:id/similar', wrap((req, res) => {
@@ -745,7 +746,7 @@ api.get('/session/summary', wrap(async (req, res) => res.json(await summarizeSes
 api.get('/session/stats', wrap((req, res) => res.json(sessionStats(req.query.session || null))));
 
 api.get('/kinks', wrap((req, res) => res.json({ kinks: listKinks({ includeHidden: true }).map((k) => ({ ...k, name: k.label || k.name, baseName: k.name })) })));
-api.post('/kinks', wrap((req, res) => res.json({ id: createKink({ ...req.body, origin: 'user' }) })));
+api.post('/kinks', wrap((req, res) => { const id = createKink({ ...req.body, origin: 'user' }); if (!req.body?.isGroup) searchKinkSubs(id); res.json({ id }); }));
 api.patch('/kinks/:id', wrap((req, res) => res.json({ ok: updateKink(Number(req.params.id), req.body || {}) })));
 api.delete('/kinks/:id', wrap((req, res) => { deleteKink(Number(req.params.id)); res.json({ ok: true }); }));
 api.post('/kinks/refresh', wrap(async (req, res) => res.json(await refreshKinks())));
@@ -757,6 +758,11 @@ api.post('/kinks/groups', wrap((req, res) => {
   for (const k of req.body?.kinks || []) updateKink(Number(k), { parentId: id });
   res.json({ id });
 }));
+api.get('/kinks/:id/subs', wrap((req, res) => { if (req.query.auto !== '0') maybeSearch(Number(req.params.id)); res.json(kinkSubs(Number(req.params.id))); }));
+api.post('/kinks/:id/subs', wrap((req, res) => { const name = addKinkSub(Number(req.params.id), String(req.body?.name || ''), { origin: 'user', why: req.body?.why || null }); invalidatePool(); res.json({ name, ...kinkSubs(Number(req.params.id)) }); }));
+api.delete('/kinks/:id/subs/:name', wrap((req, res) => { removeKinkSub(Number(req.params.id), req.params.name); invalidatePool(); res.json(kinkSubs(Number(req.params.id))); }));
+api.post('/kinks/:id/subs/:name/dismiss', wrap((req, res) => { dismissKinkSub(Number(req.params.id), req.params.name); res.json(kinkSubs(Number(req.params.id))); }));
+api.post('/kinks/:id/subs-search', wrap((req, res) => { searchKinkSubs(Number(req.params.id)); res.json(kinkSubs(Number(req.params.id))); }));
 api.post('/kinks/:id/merge', wrap((req, res) => res.json({ id: mergeKinks(Number(req.params.id), Number(req.body?.into)) })));
 api.post('/kinks/:id/unlock', wrap(async (req, res) => { unlockKink(Number(req.params.id)); res.json(await refreshKinks()); }));
 api.get('/kinks/removed', wrap((req, res) => res.json({ removed: [...removedConcepts()].map((c) => ({ concept: c, name: conceptLabel(c, lang(), conceptName(c)) })) })));

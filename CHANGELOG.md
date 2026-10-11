@@ -3,6 +3,20 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.25.0 · 11 October 2026
+
+### Kinks
+- Every kink has Reddit communities now. Add one yourself (type its name), or remove one with the ×. Posts from a kink's communities count as that kink in the feed, and the communities are fetched like any subreddit you follow.
+- The app also looks for communities by itself, from the kink's name and every tag in it: where your own posts with those tags come from, Reddit's subreddit search, a list of well-known ones and the local model. It then reads the newest posts of the promising ones to check they are really about the kink. The ones it is sure about are added right away (marked "added for you"); the others are shown under "Might fit", with why, to add or turn down. A kink is searched when you open it and again every two weeks, and the hourly round does one kink at a time. Without a Reddit feed key this takes a few minutes, because Reddit then allows one request a minute.
+
+### Full screen viewer
+- A video that keeps loading (the cover pictures going on and on) now starts by itself: when it has loaded it plays, and when it does not move for about ten seconds it is loaded again (twice), then asks the Mac for a fresh link, then falls back to the site's player. You no longer need to scroll away and back.
+- The intro is now skipped once the video really plays, instead of while it was still loading, which could leave a stream stuck. After a video got stuck, the intro is not skipped again for it.
+- +15, −15 and dragging the time line work again when that happened, also on streams that do not say how long they are, and pressing +15 several times quickly adds up.
+- Double tap the left or right side of a longer video to go back or forward 15 seconds, like YouTube. Keep tapping on that side to add 15 more each time (+30, +45...). A double tap in the middle still likes the post.
+- When several people are in a post, the picture on the right shows them all, a little on top of each other: two side by side, three in a triangle, with +2 and so on for more. Tap it to pick who to see, and follow each of them from there.
+- The tags at the bottom are centered (when they are too many for one line, you scroll them as before).
+
 ## 0.24.0 · 10 October 2026
 
 ### Full screen viewer on the Mac

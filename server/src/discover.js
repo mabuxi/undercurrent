@@ -183,7 +183,7 @@ export function reviveAndRest() {
   return { woke, rested };
 }
 
-function subsFor(terms) {
+export function subsFor(terms) {
   const wanted = [];
   for (const t of terms) {
     const tw = ` ${t} `;
@@ -425,6 +425,8 @@ export async function autoDiscover({ force = false } = {}) {
       if (room > 0 && (force || Date.now() - aiAt > 5 * 3600000)) {
         try { out.aiChecked = await validateSubs(await aiSubreddits(terms), room); setSetting('aiSubsAt', Date.now()); } catch (e) { if (!e.yielded) log('warn', `AI subreddit picks failed: ${e.message}`); }
       }
+      // Reddit communities for one of your kinks (runs in the background, one kink per round).
+      try { const { kinkSubsRound } = await import('./kinksubs.js'); out.kinkSubs = kinkSubsRound(); } catch (e) { log('warn', `Kink communities failed: ${e.message}`); }
     }
     if (st.redgifs?.enabled) out.redgifs = await discoverNiches(terms);
     try { out.revive = reviveAndRest(); } catch (e) { log('warn', `Source revival failed: ${e.message}`); }

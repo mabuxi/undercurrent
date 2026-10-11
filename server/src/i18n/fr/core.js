@@ -65,5 +65,14 @@ export default {
   "What are they wearing?": "Que portent-ils ?",
   "Add a twist?": "Un rebondissement ?",
   "How does it end?": "Comment ça finit ?",
-  "resting: you skipped its last {n} posts": "au repos : vous avez passé ses {n} dernières publications"
+  "resting: you skipped its last {n} posts": "au repos : vous avez passé ses {n} dernières publications",
+  "That is not a subreddit name.": "Ce n’est pas un nom de subreddit.",
+  "That community is blocked by your limits or the safety filter.": "Cette communauté est bloquée par vos limites ou le filtre de sécurité.",
+  "Pick a kink first.": "Choisissez d’abord un kink.",
+  "{hit} of the {n} posts you got from it are about this": "{hit} des {n} publications reçues d’elle en parlent",
+  "known for {what}": "connue pour {what}",
+  "Reddit finds it for “{q}”": "Reddit la trouve pour « {q} »",
+  "the model knows it for this": "le modèle la connaît pour ça",
+  "its name says it": "son nom le dit",
+  "{p}% of its newest posts say it": "{p} % de ses publications récentes le disent"
 };

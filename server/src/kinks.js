@@ -27,10 +27,14 @@ export function listKinks({ includeHidden = false } = {}) {
   const tagRows = db.prepare('SELECT kt.kink_id, kt.tag_id, kt.weight, t.name FROM kink_tags kt JOIN tags t ON t.id = kt.tag_id').all();
   const byKink = new Map();
   for (const r of tagRows) { if (!byKink.has(r.kink_id)) byKink.set(r.kink_id, []); byKink.get(r.kink_id).push(r); }
+  const subsOf = new Map();
+  for (const r of db.prepare("SELECT kink_id, name FROM kink_subs WHERE status = 'added'").all()) { if (!subsOf.has(r.kink_id)) subsOf.set(r.kink_id, []); subsOf.get(r.kink_id).push(r.name); }
   // A group matches posts through the kinks inside it.
   for (const g of kinks.filter((k) => k.is_group)) {
     const kids = kinks.filter((k) => k.parent_id === g.id && !k.is_group && k.status !== 'hidden').flatMap((k) => byKink.get(k.id) || []);
     if (kids.length) byKink.set(g.id, [...new Map(kids.map((r) => [r.tag_id, { ...r, kink_id: g.id }])).values()]);
+    const kidSubs = kinks.filter((k) => k.parent_id === g.id && !k.is_group && k.status !== 'hidden').flatMap((k) => subsOf.get(k.id) || []);
+    if (kidSubs.length) subsOf.set(g.id, [...new Set(kidSubs)]);
   }
   return kinks.map((k) => {
     const tags = byKink.get(k.id) || [];
@@ -41,6 +45,7 @@ export function listKinks({ includeHidden = false } = {}) {
       id: k.id, name: k.name, label: kinkLabel({ name: k.name, locks: locksOf(k), isGroup: !!k.is_group, concepts: conceptsOfRow(k) }), color: k.color, description: k.description, origin: k.origin, status: k.status, parentId: k.parent_id || null, isGroup: !!k.is_group,
       concepts: conceptsOfRow(k), locks: locksOf(k), evidence: k.evidence ? JSON.parse(k.evidence) : null, created: k.created, fadedAt: k.faded_at || null,
       tags: tags.map((t) => ({ id: t.tag_id, name: t.name, weight: t.weight })),
+      subs: subsOf.get(k.id) || [],
       allTime: Math.round(50 + 50 * all), lately: Math.round(50 + 50 * lately), now: Math.round(50 + 50 * nowv)
     };
   }).sort((a, b) => b.allTime + b.lately - a.allTime - a.lately);
@@ -49,8 +54,15 @@ export function listKinks({ includeHidden = false } = {}) {
 // Groups never match a post themselves: a post shows the kinks it has, in their family's colour.
 export function kinkIndex(kinks = listKinks()) {
   const byTag = new Map();
+  // A post from one of a kink's Reddit communities has that kink too.
+  byTag.subs = new Map();
   for (const k of kinks) {
     if (k.isGroup || k.status === 'hidden') continue;
+    for (const s of k.subs || []) {
+      const key = `r/${s}`.toLowerCase();
+      if (!byTag.subs.has(key)) byTag.subs.set(key, []);
+      byTag.subs.get(key).push(k);
+    }
     for (const t of k.tags) {
       if (!byTag.has(t.id)) byTag.set(t.id, []);
       byTag.get(t.id).push({ kink: k, weight: t.weight });
@@ -61,8 +73,9 @@ export function kinkIndex(kinks = listKinks()) {
 
 // A post has a kink when one of its tags for it is solid (a title word, the site's own tag, something the AI saw),
 // not when a weak guess brushes past it.
-export function kinksForTags(itemTags, index) {
+export function kinksForTags(itemTags, index, community = null) {
   const sums = new Map();
+  for (const kink of (community && index.subs?.get(String(community).toLowerCase())) || []) sums.set(kink.id, { kink, s: 1, top: 1 });
   for (const t of itemTags) for (const { kink, weight } of index.get(t.id) || []) {
     const cur = sums.get(kink.id) || { kink, s: 0, top: 0 };
     cur.s += t.weight * weight;

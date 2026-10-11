@@ -85,12 +85,12 @@ const SITES = {
 };
 export const DIRECT_SOURCES = Object.keys(SITES);
 
-export async function directMedia(item) {
+export async function directMedia(item, { fresh = false } = {}) {
   const fn = SITES[item?.source];
   const embed = item?.media?.embed;
   if (!fn || !embed) return null;
   const hit = CACHE.get(item.id);
-  if (hit && Date.now() - hit.at < TTL) return hit.v;
+  if (hit && !fresh && Date.now() - hit.at < TTL) return hit.v;
   let v = null;
   try { v = await fn(embed); } catch (e) { log('info', `Direct video for ${item.source} ${item.id} failed: ${e.message}`); }
   if (v) {

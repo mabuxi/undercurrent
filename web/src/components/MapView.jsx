@@ -43,6 +43,64 @@ function AiWidget({ nodeKey }) {
   );
 }
 
+// The Reddit communities of a kink: the ones it has (yours, and the ones the app was sure about), a field to add one,
+// and what the app found but was not sure enough about to add by itself.
+function KinkSubs({ kinkId, name }) {
+  const { setFilters, toast } = useApp();
+  const [d, setD] = useState(null);
+  const [val, setVal] = useState('');
+  const [busy, setBusy] = useState(false);
+  const load = (auto = true) => api(`/kinks/${kinkId}/subs${auto ? '' : '?auto=0'}`).then(setD).catch(() => {});
+  useEffect(() => { setD(null); load(); }, [kinkId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!d?.searching) return undefined;
+    const tm = setInterval(() => load(false), 4000);
+    return () => clearInterval(tm);
+  }, [d?.searching, kinkId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const act = async (fn, msg) => { try { const r = await fn(); setD(r); if (msg) toast(msg); } catch (e) { toast(e.message); } };
+  const add = async (n, msg) => act(() => api(`/kinks/${kinkId}/subs`, { method: 'POST', body: { name: n } }), msg);
+  const open = (n) => setFilters({ community: `r/${n}` });
+  const members = (m) => (m ? tn(m, '{n} member', '{n} members', { n: m >= 10000 ? `${Math.round(m / 1000)}k` : m }) : null);
+  return (
+    <div className="bw wide ksubs">
+      <div className="bw-h">
+        <span>{t('Reddit communities')}</span>
+        {d?.searching ? <span className="ksubs-busy"><span className="spin" />{t('Searching Reddit…')}</span> : (
+          <button type="button" className="linkbtn" disabled={!d} onClick={() => act(() => api(`/kinks/${kinkId}/subs-search`, { method: 'POST', body: {} }))}>{t('Search again')}</button>
+        )}
+      </div>
+      <div className="ksubs-list">
+        {(d?.added || []).map((s) => (
+          <span key={s.name} className={`ksub${s.origin === 'auto' ? ' auto' : ''}`} title={s.why || ''}>
+            <button type="button" className="ksub-name" onClick={() => open(s.name)} title={t('Show only r/{name}', { name: s.name })}>r/{s.name}</button>
+            {s.origin === 'auto' ? <span className="ksub-tag"><Icon name="spark" />{t('added for you')}</span> : null}
+            <button type="button" className="chipx" onClick={() => act(() => api(`/kinks/${kinkId}/subs/${encodeURIComponent(s.name)}`, { method: 'DELETE' }), t('Removed r/{name}.', { name: s.name }))} aria-label={t('Remove r/{name}', { name: s.name })}>×</button>
+          </span>
+        ))}
+        <form className="ksub-add" onSubmit={(e) => { e.preventDefault(); const v = val.trim(); if (!v || busy) return; setBusy(true); add(v, t('Added r/{name}.', { name: v.replace(/^\/?r\//i, '') })).finally(() => { setBusy(false); setVal(''); }); }}>
+          <span>r/</span><input value={val} onChange={(e) => setVal(e.target.value.replace(/\s+/g, ''))} placeholder={t('community')} aria-label={t('Add a Reddit community to {name}', { name })} autoCapitalize="off" autoCorrect="off" spellCheck={false} />
+          <button type="submit" className="ghost-btn small" disabled={!val.trim() || busy}><Icon name="plus" />{t('Add')}</button>
+        </form>
+      </div>
+      {d && !d.added.length && !d.suggested.length && !d.searching ? <p className="wnote">{d.searchedAt ? t('Nothing that fits well yet. Add one yourself, or search again later.') : t('Posts from these communities count as {name} in the feed.', { name })}</p> : null}
+      {d?.suggested?.length ? (
+        <div className="ksubs-sugg">
+          <div className="kimprove-h"><Icon name="search" /><b>{t('Might fit')}</b></div>
+          {d.suggested.map((s) => (
+            <div key={s.name} className="ksugg">
+              <button type="button" className="ksub-name" onClick={() => open(s.name)} title={t('Show only r/{name}', { name: s.name })}>r/{s.name}</button>
+              <span className="ksugg-why">{[s.why, members(s.members)].filter(Boolean).join(' · ')}</span>
+              <button type="button" className="ghost-btn small accent" onClick={() => add(s.name, t('Added r/{name}.', { name: s.name }))}><Icon name="plus" />{t('Add')}</button>
+              <button type="button" className="icon-btn" onClick={() => act(() => api(`/kinks/${kinkId}/subs/${encodeURIComponent(s.name)}/dismiss`, { method: 'POST', body: {} }))} aria-label={t('Not this one')} title={t('Not this one')}><Icon name="x" /></button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {d?.searching && d.slow ? <p className="wnote">{t('Without a Reddit feed key Reddit allows one request a minute, so this takes a few minutes. You can leave this page.')}</p> : null}
+    </div>
+  );
+}
+
 function Detail({ nodeKey, brain, reload, onSelect, startEdit = false }) {
   const { setFilters, openMode, toast, refreshMeta, kinks: allKinks } = useApp();
   const node = brain.nodes.find((n) => n.key === nodeKey);
@@ -170,6 +228,7 @@ function Detail({ nodeKey, brain, reload, onSelect, startEdit = false }) {
             ) : <p className="wnote">{t('It updates by itself: tags join as you like them, and it fades if you stop.')}</p>}
           </div>
         ) : null}
+        {kinkObj && !full?.isGroup ? <KinkSubs kinkId={node.id} name={node.name} /> : null}
         <AiWidget nodeKey={nodeKey} />
         <div className="bw half">
           <div className="bw-h"><span>{t('This week vs before')}</span></div>

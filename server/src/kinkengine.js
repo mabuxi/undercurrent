@@ -29,6 +29,18 @@ export function ensureKinkSchema() {
   if (!cols.includes('faded_at')) db.exec('ALTER TABLE kinks ADD COLUMN faded_at INTEGER');
   if (!cols.includes('parent_id')) db.exec('ALTER TABLE kinks ADD COLUMN parent_id INTEGER');
   if (!cols.includes('is_group')) db.exec('ALTER TABLE kinks ADD COLUMN is_group INTEGER DEFAULT 0');
+  // Reddit communities that belong to a kink: added (by you or because the app was sure), suggested, or turned down.
+  db.exec(`CREATE TABLE IF NOT EXISTS kink_subs (
+    kink_id INTEGER NOT NULL REFERENCES kinks(id) ON DELETE CASCADE,
+    name TEXT NOT NULL COLLATE NOCASE,
+    status TEXT NOT NULL DEFAULT 'suggested',
+    origin TEXT NOT NULL DEFAULT 'auto',
+    score REAL,
+    why TEXT,
+    members INTEGER,
+    created INTEGER,
+    PRIMARY KEY (kink_id, name)
+  )`);
 }
 
 const parse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
@@ -230,6 +242,14 @@ export function moveReferences(fromId, toId) {
     db.prepare('INSERT OR IGNORE INTO kink_links(a, b, why, origin) VALUES(?, ?, ?, ?)').run(x, y, l.why, l.origin);
   }
   db.prepare('UPDATE kinks SET parent_id = NULL WHERE parent_id = ?').run(fromId);
+  if (toId) {
+    for (const s of db.prepare('SELECT * FROM kink_subs WHERE kink_id = ?').all(fromId)) {
+      const have = db.prepare('SELECT status FROM kink_subs WHERE kink_id = ? AND name = ?').get(toId, s.name);
+      if (!have) db.prepare('INSERT INTO kink_subs(kink_id, name, status, origin, score, why, members, created) VALUES(?, ?, ?, ?, ?, ?, ?, ?)').run(toId, s.name, s.status, s.origin, s.score, s.why, s.members, s.created);
+      else if (s.status === 'added' && have.status !== 'added') db.prepare("UPDATE kink_subs SET status = 'added', origin = ? WHERE kink_id = ? AND name = ?").run(s.origin, toId, s.name);
+    }
+  }
+  db.prepare('DELETE FROM kink_subs WHERE kink_id = ?').run(fromId);
 }
 
 export function dropKink(id) {
