@@ -3,6 +3,14 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.27.1 · 11 October 2026
+
+### Kinks
+- Suggested tags now also build on the tags a kink already has, not only on its name: written forms of those tags in your posts ("big balls" brings "big-balls" and "big balls gay"; the words have to be there as they are, so "balls" never brings "ball gag").
+- The model's ideas and those written forms take turns in the list, so the model's synonyms and close variants show up on the first page too.
+- The suggestions now come from your main model instead of the small fast one, which repeated itself and wandered off the kink (it gave "pecs" and "biceps" for Abs; the main model gives "abdominals", "washboard abs", "ripped abs"). It takes up to half a minute the first time, and the list says so while it waits.
+- When the model was busy and gave nothing, it is asked once more, and the list without its ideas is only kept a minute (before, only the tags with the name in them could stay for half an hour).
+
 ## 0.27.0 · 11 October 2026
 
 ### Kinks

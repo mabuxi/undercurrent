@@ -76,7 +76,7 @@ function KinkTagIdeas({ kinkId, name, tagCount, onAdd }) {
             + {x.name}{x.posts ? <em className="dim"> {x.posts}</em> : null}
           </button>
         ))}</div>
-      ) : <p className="wnote"><span className="spin" /> {t('Thinking of tags…')}</p>}
+      ) : <p className="wnote"><span className="spin" /> {t('Thinking of tags… (the model can take up to half a minute)')}</p>}
     </div>
   );
 }

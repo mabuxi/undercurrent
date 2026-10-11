@@ -2,7 +2,7 @@ import { config } from './config.js';
 import { getDb, normalizeTag } from './db.js';
 import { ensureKinkSchema, locksOf, modeOf, addTags } from './kinkengine.js';
 import { isBlocked } from './safety.js';
-import { chat, fastModel } from './ai/ollama.js';
+import { chat, activeModel } from './ai/ollama.js';
 import { log } from './log.js';
 
 // Tags that make a kink find more of its posts: the same thing written another way ("gay bondage", "gay-bondage",
@@ -35,21 +35,33 @@ function postsWith(names) {
 }
 
 // Tags in your posts with the kink's name (or a form of it) in them as a word.
-function nameTags(k, minPosts = 2) {
-  const stems = [...new Set(words(k.name).filter((w) => w.length >= 4).map(stem))];
+function variantsOf(base, minPosts, limit = 60, strict = false) {
+  // From a tag, the words have to be there as they are ("balls" brings "big balls gay", not "ball gag").
+  const stems = [...new Set(words(base).filter((w) => w.length >= 4).map((w) => (strict ? w : stem(w))))];
   if (!stems.length) return [];
   const db = getDb();
-  const cands = new Map();
-  for (const s of stems) {
-    for (const r of db.prepare("SELECT t.name, COUNT(DISTINCT it.item_id) c FROM tags t JOIN item_tags it ON it.tag_id = t.id WHERE t.name LIKE ? AND t.kind != 'performer' AND it.weight >= 0.3 GROUP BY t.id HAVING c >= ? ORDER BY c DESC LIMIT 60").all(`%${s}%`, minPosts)) {
-      // Every word of the name has to be in the tag, each starting a word ("male bondage" for Bondage), so a long
-      // name never brings in tags that only share one of its words.
-      if (!stems.every((x) => words(r.name).some((w) => w.startsWith(x)))) continue;
-      if (words(r.name).length > 4) continue;
-      cands.set(r.name, Math.max(cands.get(r.name) || 0, r.c));
-    }
+  const out = [];
+  // The rarest word of the base finds the candidates; every word has to be in the tag, each starting a word
+  // ("male bondage" for Bondage), so a long base never brings in tags that only share one of its words.
+  const s = stems.slice().sort((a, b) => b.length - a.length)[0];
+  for (const r of db.prepare("SELECT t.name, COUNT(DISTINCT it.item_id) c FROM tags t JOIN item_tags it ON it.tag_id = t.id WHERE t.name LIKE ? AND t.kind != 'performer' AND it.weight >= 0.3 GROUP BY t.id HAVING c >= ? ORDER BY c DESC LIMIT ?").all(`%${s}%`, minPosts, limit)) {
+    if (!stems.every((x) => words(r.name).some((w) => w.startsWith(x)))) continue;
+    if (words(r.name).length > 4) continue;
+    out.push({ name: r.name, posts: r.c });
   }
-  return [...cands.entries()].map(([name, posts]) => ({ name, posts }));
+  return out;
+}
+
+// Tags in your posts that are written forms of the kink's name, and of the tags it already has (so "big balls"
+// brings "big balls gay" and "big-balls" even when the kink is called something else).
+function nameTags(k, minPosts = 2) {
+  const cands = new Map();
+  for (const x of variantsOf(k.name, minPosts)) cands.set(x.name, { ...x, why: 'name' });
+  for (const tg of k.tags.slice(0, 25)) {
+    if (words(tg.name).length > 3) continue;
+    for (const x of variantsOf(tg.name, Math.max(minPosts, 3), 20, true)) if (!cands.has(x.name)) cands.set(x.name, { ...x, why: 'tag' });
+  }
+  return [...cands.values()];
 }
 
 const SCHEMA = {
@@ -63,8 +75,9 @@ Give tags that mean the SAME thing as the kink, written the way people tag posts
 - other spellings and forms: plural and singular, with a space, with a hyphen, joined, common abbreviations
 - the kink with a common qualifier people add ("gay bondage", "male bondage" for Bondage)
 - close synonyms, and parts or kinds that are clearly inside it ("biceps", "pecs" for Muscle)
+- forms of the tags the kink already has, and tags that mean the same as those
 
-Never things that only come along with it (a place, an act or a body type that is a different kink). Never anything about minors, age, family, non-consent or animals.
+Stay inside the kink: for Abs give "six pack", "abdominals", "washboard abs", "ab muscles", never "pecs" or "biceps" (other body parts). Never things that only come along with it (a place, an act or a body type that is a different kink). Never anything about minors, age, family, non-consent or animals.
 Lowercase, one to three words each. sure: 0 to 100, how sure you are it means this kink.`;
 
 async function fromModel(k, exclude, n, interactive) {
@@ -76,8 +89,11 @@ async function fromModel(k, exclude, n, interactive) {
     `Give up to ${n} tags.`
   ].filter(Boolean).join('\n');
   try {
-    const out = await chat({ kind: interactive ? 'kink-tags' : 'discover-ai', system: RULES, user, schema: SCHEMA, temperature: 0.2, model: fastModel(), numPredict: 500 });
-    return (out?.tags || []).map((x) => ({ name: normalizeTag(x.tag), sure: Math.max(0, Math.min(100, Number(x.sure) || 0)) })).filter((x) => x.name && x.name.length >= 3 && x.name.split(' ').length <= 3);
+    // The main model: the small fast one repeats itself and wanders off the kink here.
+    const out = await chat({ kind: interactive ? 'kink-tags' : 'discover-ai', system: RULES, user, schema: SCHEMA, temperature: 0.2, model: activeModel(), numPredict: 600 });
+    const seen = new Set();
+    return (out?.tags || []).map((x) => ({ name: normalizeTag(x.tag), sure: Math.max(0, Math.min(100, Number(x.sure) || 0)) }))
+      .filter((x) => x.name && x.name.length >= 3 && x.name.split(' ').length <= 3 && !seen.has(x.name) && seen.add(x.name));
   } catch (e) {
     if (!e.yielded) log('warn', `Tag ideas for ${k.name} failed: ${e.message}`);
     return [];
@@ -95,17 +111,23 @@ export async function tagIdeas(id, { skip = [], count = 10 } = {}) {
   const ok = (x) => x.name && !have.has(x.name) && !isBlocked({ title: x.name, tags: [x.name] }).blocked;
   let pool = POOL.get(k.id);
   if (!pool || Date.now() - pool.at > 30 * 60000 || pool.sig !== k.tags.length) {
-    const byName = nameTags(k).map((x) => ({ ...x, why: 'name', sure: 90 }));
-    const ai = await fromModel(k, [...have], 24, true);
+    const byName = nameTags(k).map((x) => ({ ...x, sure: x.why === 'name' ? 90 : 80 }));
+    let ai = await fromModel(k, [...have], 24, true);
+    // The model can be busy with something else for a moment: one more try.
+    if (!ai.length && !config.mock) { await new Promise((r) => setTimeout(r, 1500)); ai = await fromModel(k, [...have], 24, true); }
     const counts = postsWith(ai.map((x) => x.name));
     const list = new Map();
     for (const x of byName) list.set(x.name, x);
     for (const x of ai) if (!list.has(x.name)) list.set(x.name, { name: x.name, posts: counts.get(x.name) || 0, why: 'ai', sure: x.sure });
-    pool = { at: Date.now(), sig: k.tags.length, items: [...list.values()].filter((x) => x.sure >= 40) };
+    // Without the model's ideas the list is kept only a minute, so they are asked for again soon.
+    pool = { at: Date.now() - (ai.length || config.mock ? 0 : 29 * 60000), sig: k.tags.length, items: [...list.values()].filter((x) => x.sure >= 40) };
     POOL.set(k.id, pool);
   }
-  // Surest and most used first.
-  const ranked = pool.items.filter(ok).sort((a, b) => (b.sure >= 80) - (a.sure >= 80) || b.posts - a.posts || b.sure - a.sure);
+  // The model's ideas and the written forms take turns, the surest and most used first in each.
+  const fromAi = pool.items.filter((x) => x.why === 'ai').filter(ok).sort((a, b) => (b.sure >= 80) - (a.sure >= 80) || b.posts - a.posts || b.sure - a.sure);
+  const fromTags = pool.items.filter((x) => x.why !== 'ai').filter(ok).sort((a, b) => (a.why === 'name' ? 0 : 1) - (b.why === 'name' ? 0 : 1) || b.posts - a.posts);
+  const ranked = [];
+  for (let i = 0; i < Math.max(fromAi.length, fromTags.length); i++) { if (fromAi[i]) ranked.push(fromAi[i]); if (fromTags[i]) ranked.push(fromTags[i]); }
   let next = ranked.filter((x) => !shown.has(x.name));
   if (!next.length && ranked.length) {
     // Everything was shown: ask for more, then start over.

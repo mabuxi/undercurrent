@@ -2,6 +2,14 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.27.1 · 11 octobre 2026
+
+### Kinks
+- Les tags suggérés s’appuient aussi sur les tags que le kink a déjà, pas seulement sur son nom : les formes écrites de ces tags dans vos publications (« big balls » amène « big-balls » et « big balls gay » ; les mots doivent y être tels quels, donc « balls » n’amène jamais « ball gag »).
+- Les idées du modèle et ces formes écrites alternent dans la liste, donc les synonymes et variantes proches du modèle apparaissent aussi dès la première page.
+- Les suggestions viennent maintenant de votre modèle principal au lieu du petit modèle rapide, qui se répétait et s’éloignait du kink (il donnait « pecs » et « biceps » pour Abs ; le modèle principal donne « abdominals », « washboard abs », « ripped abs »). Cela prend jusqu’à une demi-minute la première fois, et la liste l’indique pendant l’attente.
+- Quand le modèle était occupé et ne donnait rien, on le lui redemande une fois, et la liste sans ses idées n’est gardée qu’une minute (avant, seuls les tags contenant le nom pouvaient rester une demi-heure).
+
 ## 0.27.0 · 11 octobre 2026
 
 ### Kinks

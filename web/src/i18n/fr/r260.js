@@ -13,7 +13,7 @@ export default {
   "Other ways people tag {name}: spellings, plurals and parts of it. Tap one to add it, so the feed finds more of it.": "D’autres façons de taguer {name} : orthographes, pluriels et parties. Touchez-en un pour l’ajouter, et le fil en trouvera davantage.",
   "In {n} of your posts": "Dans {n} de vos publications",
   "Not in your posts yet": "Pas encore dans vos publications",
-  "Thinking of tags…": "Recherche de tags…",
+  "Thinking of tags… (the model can take up to half a minute)": "Recherche de tags… (le modèle peut prendre jusqu’à une demi-minute)",
   "Other suggestions": "Autres suggestions",
   "Locked": "Verrouillé",
   "Only you change it. The app never renames it, never touches its tags or communities and never fades it. It can still suggest things for you to add.": "Vous seul le modifiez. L’app ne le renomme jamais, ne touche jamais à ses tags ni à ses communautés et ne l’estompe jamais. Elle peut toujours vous suggérer des choses à ajouter.",
