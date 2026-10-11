@@ -2,6 +2,27 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.26.0 · 11 octobre 2026
+
+### Kinks
+- Chaque kink indique à quel point il vous correspond, en %. 50 % est exactement le seuil où quelque chose devient un kink : en dessous, le chemin parcouru ; au-dessus, de combien il le dépasse.
+- « Presque un kink » affiche le même % (tous sous 50 %) au lieu d’un nombre, avec un + pour en faire un kink vous-même. Il est alors gardé.
+- Depuis toujours, récemment et en ce moment se comptent maintenant en points : chaque publication qui a le kink ajoute les points que vous lui avez donnés (visionnage, chaleur, j’aime, enregistrements), depuis toujours, sur les 7 derniers jours et sur les dernières 24 heures. Le % est la part de tous vos points qui lui est allée pendant cette période, et les barres sont comparées entre elles, donc un kink qui vous attire récemment ressort vraiment. La page du kink affiche aussi les points.
+- Qui peut modifier un kink, en trois choix avec une icône, un nom et une phrase qui l’explique :
+  - Verrouillé (un cadenas) : vous seul le modifiez. L’app ne le renomme jamais, ne touche jamais à ses tags ni à ses communautés et ne l’estompe jamais. Elle peut toujours suggérer des choses.
+  - Grandit (un cadenas ouvert) : l’app peut ajouter des tags et des communautés qui correspondent, mais ne retire jamais rien, ne le renomme jamais et ne l’estompe jamais. Sa correspondance peut passer sous 50 % sans qu’il s’estompe. Un kink que vous créez commence ici, et l’app ajoute tout de suite les tags qu’elle connaît pour lui, à côté des vôtres.
+  - Géré par l’app (des étincelles) : l’app le gère comme ses propres kinks, ajoute et retire des tags, le renomme et l’estompe quand sa correspondance reste sous 50 %.
+- Les tags montrent où ils en sont : un cadenas sur ceux que l’app ne peut jamais toucher, des étincelles sur ceux que l’app a ajoutés. Un tag que vous retirez le reste ; l’app ne le rajoute pas.
+- « Masquer » devient « Estomper » : un kink estompé quitte vos kinks et revient de lui-même dès que vous aimez clairement quelques nouvelles publications avec lui. « Faire revenir » le ramène tout de suite. « À vous » sur les cartes est remplacé par le cadenas, le cadenas ouvert ou les étincelles.
+- Modifier le nom ou les tags d’un kink géré par l’app le fait passer à « Grandit », pour que votre modification reste.
+- « Ajoutez des tags au kink pour l’améliorer » a un bouton pour actualiser qui montre les suggestions suivantes (et recommence après les dernières).
+
+### Plein écran
+- Les petites photos de plusieurs personnes ont le même contour doux et transparent que la grande (plus de bord sombre).
+
+### iPhone
+- Toucher un champ de texte ne zoome plus la page.
+
 ## 0.25.1 · 11 octobre 2026
 
 ### Plein écran

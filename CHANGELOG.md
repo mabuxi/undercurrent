@@ -3,6 +3,27 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.26.0 · 11 October 2026
+
+### Kinks
+- Every kink shows how much of a match it is to you, in %. 50% is exactly where something becomes a kink: below it, how far it has come; above it, how far past it.
+- "Almost a kink" shows the same % (all under 50%) instead of a number, with a + to make one a kink yourself. It is then kept.
+- All time, lately and right now are now counted in points: every post with the kink adds the points you gave it (watching, heat, likes, saves), all time, the last 7 days and the last 24 hours. The % is the part of all your points that went to it in that time, and the bars are scaled against each other, so a kink you are getting into lately really stands out. The kink page shows the points too.
+- Who may change a kink, in three steps with an icon, a name and a sentence explaining it:
+  - Locked (a lock): only you change it. The app never renames it, never touches its tags or communities and never fades it. It can still suggest things.
+  - Grows (an open lock): the app can add tags and communities that fit, but never removes anything, never renames it and never fades it. Its match can drop under 50% without it fading. A kink you make starts here, and the app adds the tags it knows for it right away, next to yours.
+  - Managed by the app (sparkles): the app manages it like its own kinks, adding and removing tags, renaming it and fading it when its match stays under 50%.
+- Tags show where they stand: a lock on tags the app can never touch, sparkles on the ones the app added. A tag you take off stays off; the app does not add it back.
+- "Hide" is now "Fade": a faded kink leaves your kinks and comes back by itself once you clearly like a few new posts with it. "Bring back" returns it right away. "Yours" on the cards is replaced by the lock, open lock or sparkles.
+- Editing the name or tags of a kink the app manages switches it to "Grows", so your change stays.
+- "Update tags to kink to improve" has a refresh button that shows the next suggestions (and starts over after the last ones).
+
+### Full screen viewer
+- The small pictures of several people have the same soft, see-through ring as the big one (no dark border any more).
+
+### iPhone
+- Tapping into a text field no longer zooms the page in.
+
 ## 0.25.1 · 11 October 2026
 
 ### Full screen viewer

@@ -18,7 +18,7 @@ import { writeFantasy, tagsForText, conceptsFor } from './fantasywrite.js';
 import { deeperStep, fantasyTags } from './deeper.js';
 import { directMedia } from './direct.js';
 import { planDiscovery, journeyOutcome } from './discovery.js';
-import { removedConcepts, forgetRemoved, risingConcepts, RULES } from './kinkengine.js';
+import { removedConcepts, forgetRemoved, risingConcepts, RULES, keepConcept } from './kinkengine.js';
 import { conceptName } from './concepts.js';
 import { grouped, addMemory, updateMemory, deleteMemory, CATEGORIES, listPrompts, deletePrompt } from './memory.js';
 import { hardBlockList, userLimits } from './safety.js';
@@ -767,13 +767,14 @@ api.post('/kinks/:id/merge', wrap((req, res) => res.json({ id: mergeKinks(Number
 api.post('/kinks/:id/unlock', wrap(async (req, res) => { unlockKink(Number(req.params.id)); res.json(await refreshKinks()); }));
 api.get('/kinks/removed', wrap((req, res) => res.json({ removed: [...removedConcepts()].map((c) => ({ concept: c, name: conceptLabel(c, lang(), conceptName(c)) })) })));
 api.delete('/kinks/removed/:concept', wrap(async (req, res) => { forgetRemoved(String(req.params.concept)); res.json(await refreshKinks()); }));
+api.post('/kinks/rising/:concept', wrap((req, res) => res.json({ id: keepConcept(String(req.params.concept)) })));
 api.get('/kinks/rising', wrap((req, res) => res.json({ rising: risingConcepts(12), rules: RULES })));
 api.post('/kinks/links', wrap((req, res) => { setLink(req.body?.a, req.body?.b, req.body?.why || '', 'user'); res.json({ ok: true }); }));
 api.delete('/kinks/links/:a/:b', wrap((req, res) => { removeLink(req.params.a, req.params.b); res.json({ ok: true }); }));
 
 api.get('/brain', wrap((req, res) => res.json(brain())));
 api.get('/brain/node/:key', wrap((req, res) => {
-  const d = nodeDetail(String(req.params.key));
+  const d = nodeDetail(String(req.params.key), { skip: String(req.query.skip || '').split('|').filter(Boolean).slice(0, 200) });
   if (!d) return res.status(404).json({ error: tr('Not found') });
   res.json(d);
 }));

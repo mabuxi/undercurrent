@@ -3,7 +3,8 @@ import { getDb, now, tagId, normalizeTag, getSetting, setSetting } from './db.js
 import { affinityMap, engagement } from './profile.js';
 import { tagsForItems } from './store.js';
 import { conceptsOf, isKinkConcept } from './concepts.js';
-import { ensureKinkSchema, locksOf, conceptsOfRow, rememberRemoved, removedConcepts, dropKink, moveReferences, recolor } from './kinkengine.js';
+import { ensureKinkSchema, locksOf, conceptsOfRow, rememberRemoved, removedConcepts, dropKink, moveReferences, recolor, modeOf, kinkMatch, fillKink, conceptEvidence, MODES } from './kinkengine.js';
+import { kinkPoints } from './kinkstats.js';
 import { tr } from './i18n.js';
 
 export const PALETTE = ['#D98A99', '#A58FE0', '#66B5A6', '#D2A15E', '#7FA7D9', '#C98BC4', '#E3A58F', '#93C47D', '#E07A7A', '#7FD0C2', '#B7A4E8', '#E8C66B'];
@@ -24,7 +25,7 @@ export function listKinks({ includeHidden = false } = {}) {
   const db = getDb();
   const aff = affinityMap();
   const kinks = db.prepare(`SELECT * FROM kinks ${includeHidden ? '' : "WHERE status != 'hidden'"} ORDER BY id`).all();
-  const tagRows = db.prepare('SELECT kt.kink_id, kt.tag_id, kt.weight, t.name FROM kink_tags kt JOIN tags t ON t.id = kt.tag_id').all();
+  const tagRows = db.prepare("SELECT kt.kink_id, kt.tag_id, kt.weight, COALESCE(kt.origin, 'ai') origin, t.name FROM kink_tags kt JOIN tags t ON t.id = kt.tag_id").all();
   const byKink = new Map();
   for (const r of tagRows) { if (!byKink.has(r.kink_id)) byKink.set(r.kink_id, []); byKink.get(r.kink_id).push(r); }
   const subsOf = new Map();
@@ -36,7 +37,9 @@ export function listKinks({ includeHidden = false } = {}) {
     const kidSubs = kinks.filter((k) => k.parent_id === g.id && !k.is_group && k.status !== 'hidden').flatMap((k) => subsOf.get(k.id) || []);
     if (kidSubs.length) subsOf.set(g.id, [...new Set(kidSubs)]);
   }
-  return kinks.map((k) => {
+  let stats = null;
+  try { stats = conceptEvidence().stats; } catch { stats = new Map(); }
+  const out = kinks.map((k) => {
     const tags = byKink.get(k.id) || [];
     const all = score01(aff, tags, 'long');
     const lately = score01(aff, tags, 'lately');
@@ -44,11 +47,18 @@ export function listKinks({ includeHidden = false } = {}) {
     return {
       id: k.id, name: k.name, label: kinkLabel({ name: k.name, locks: locksOf(k), isGroup: !!k.is_group, concepts: conceptsOfRow(k) }), color: k.color, description: k.description, origin: k.origin, status: k.status, parentId: k.parent_id || null, isGroup: !!k.is_group,
       concepts: conceptsOfRow(k), locks: locksOf(k), evidence: k.evidence ? JSON.parse(k.evidence) : null, created: k.created, fadedAt: k.faded_at || null,
-      tags: tags.map((t) => ({ id: t.tag_id, name: t.name, weight: t.weight })),
+      tags: tags.map((t) => ({ id: t.tag_id, name: t.name, weight: t.weight, origin: t.origin })),
       subs: subsOf.get(k.id) || [],
+      mode: k.is_group ? null : modeOf(k), match: k.is_group ? null : kinkMatch(k, stats),
       allTime: Math.round(50 + 50 * all), lately: Math.round(50 + 50 * lately), now: Math.round(50 + 50 * nowv)
     };
   }).sort((a, b) => b.allTime + b.lately - a.allTime - a.lately);
+  // Points: everything you did with posts of each kink, all time, the last 7 days and the last day.
+  try {
+    const pts = kinkPoints(out);
+    for (const k of out) k.points = pts.get(k.id) || { all: 0, lately: 0, now: 0, shareAll: 0, shareLately: 0, shareNow: 0 };
+  } catch { for (const k of out) k.points = { all: 0, lately: 0, now: 0, shareAll: 0, shareLately: 0, shareNow: 0 }; }
+  return out;
 }
 
 // Groups never match a post themselves: a post shows the kinks it has, in their family's colour.
@@ -101,11 +111,12 @@ export function createKink({ name, tags = [], description = '', color, origin = 
   const taken = db.prepare('SELECT * FROM kinks WHERE name = ? COLLATE NOCASE').get(clean);
   if (taken && taken.status === 'hidden' && !taken.is_group && !isGroup) {
     // Bringing back a kink that faded: it is yours now.
-    db.prepare("UPDATE kinks SET status = ?, origin = ?, locks = ?, parent_id = ?, updated = ? WHERE id = ?").run(status, origin, JSON.stringify(origin === 'user' ? { name: 1, status: 1 } : {}), parentId || null, now(), taken.id);
+    db.prepare("UPDATE kinks SET status = ?, origin = ?, locks = ?, parent_id = ?, updated = ? WHERE id = ?").run(status, origin, JSON.stringify(origin === 'user' ? { mode: 'grow', name: 1 } : {}), parentId || null, now(), taken.id);
     if (tags.length) setKinkTags(taken.id, tags);
+    if (origin === 'user') fillKink(taken.id);
     return taken.id;
   }
-  const locks = origin === 'user' ? { name: 1, tags: tags.length ? 1 : 0, color: color ? 1 : 0, parent: parentId ? 1 : 0 } : {};
+  const locks = origin === 'user' ? { mode: 'grow', name: 1, color: color ? 1 : 0, parent: parentId ? 1 : 0 } : {};
   const info = db.prepare('INSERT INTO kinks(name, color, description, origin, status, created, updated, parent_id, is_group, concepts, locks) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
     .run(taken ? `${clean} ${count}` : clean, color || PALETTE[count % PALETTE.length], description, origin, status, now(), now(), parentId || null, isGroup ? 1 : 0,
       JSON.stringify(isGroup ? [] : conceptsForUser(clean, tags)), JSON.stringify(Object.fromEntries(Object.entries(locks).filter(([, v]) => v))));
@@ -115,6 +126,8 @@ export function createKink({ name, tags = [], description = '', color, origin = 
     setKinkTags(id, list);
   }
   if (!isGroup) forgetRemovedAll(conceptsForUser(clean, tags));
+  // A kink you make starts in "grows": the app adds the tags it knows for it, your own stay.
+  if (!isGroup && origin === 'user') fillKink(id);
   return id;
 }
 
@@ -125,14 +138,16 @@ function forgetRemovedAll(cs) {
   if (changed) setSetting('kinkRemoved', [...s]);
 }
 
+// Tags you set: the ones it already had keep where they came from, new ones are yours.
 export function setKinkTags(id, tags) {
   const db = getDb();
+  const had = new Map(db.prepare("SELECT tag_id, COALESCE(origin, 'ai') origin FROM kink_tags WHERE kink_id = ?").all(id).map((r) => [r.tag_id, r.origin]));
   db.prepare('DELETE FROM kink_tags WHERE kink_id = ?').run(id);
-  const ins = db.prepare('INSERT OR REPLACE INTO kink_tags(kink_id, tag_id, weight) VALUES(?, ?, ?)');
+  const ins = db.prepare('INSERT OR REPLACE INTO kink_tags(kink_id, tag_id, weight, origin) VALUES(?, ?, ?, ?)');
   for (const t of tags) {
     const name = typeof t === 'string' ? t : t.name;
     const tid = tagId(normalizeTag(name));
-    if (tid) ins.run(id, tid, typeof t === 'string' ? 1 : t.weight ?? 1);
+    if (tid) ins.run(id, tid, typeof t === 'string' ? 1 : t.weight ?? 1, had.get(tid) || 'user');
   }
 }
 
@@ -143,9 +158,26 @@ export function updateKink(id, patch, { byUser = true } = {}) {
   const cur = db.prepare('SELECT * FROM kinks WHERE id = ?').get(id);
   if (!cur) return false;
   const locks = locksOf(cur);
-  if (byUser) {
+  if (byUser && !cur.is_group) {
+    const mode = modeOf(cur);
+    if (patch.mode && MODES.includes(patch.mode)) locks.mode = patch.mode;
+    else if (mode === 'ai' && ((patch.name != null && patch.name !== cur.name) || patch.tags)) locks.mode = 'grow';
+    else if (!locks.mode) locks.mode = mode;
     if (patch.name != null && patch.name !== cur.name) locks.name = 1;
-    if (patch.tags) locks.tags = 1;
+    if ('parentId' in patch) locks.parent = 1;
+    if (patch.color) locks.color = 1;
+    // Fading is not hiding for good: it comes back by itself once you are into it again.
+    if (patch.status === 'hidden') { locks.faded = 1; delete locks.status; }
+    if (patch.status === 'active') { delete locks.faded; delete locks.status; }
+    // Tags you take off stay off (the app may not add them back).
+    if (patch.tags) {
+      const now2 = new Set(patch.tags.map((x) => normalizeTag(typeof x === 'string' ? x : x.name)));
+      const gone = db.prepare('SELECT t.name FROM kink_tags kt JOIN tags t ON t.id = kt.tag_id WHERE kt.kink_id = ?').all(id).map((r) => r.name).filter((n) => !now2.has(n));
+      locks.noTags = [...new Set([...(locks.noTags || []).filter((n) => !now2.has(n)), ...gone])].slice(-80);
+      delete locks.tags;
+    }
+  } else if (byUser) {
+    if (patch.name != null && patch.name !== cur.name) locks.name = 1;
     if ('parentId' in patch) locks.parent = 1;
     if (patch.color) locks.color = 1;
     if (patch.status && patch.status !== cur.status) locks.status = 1;
@@ -153,8 +185,8 @@ export function updateKink(id, patch, { byUser = true } = {}) {
   const parent = 'parentId' in patch ? (patch.parentId && Number(patch.parentId) !== id ? Number(patch.parentId) : null) : cur.parent_id;
   let name = patch.name != null ? String(patch.name).trim().slice(0, 60) || cur.name : cur.name;
   if (name !== cur.name && db.prepare('SELECT id FROM kinks WHERE name = ? COLLATE NOCASE AND id != ?').get(name, id)) throw Object.assign(new Error(tr('There is already a kink or group called {name}.', { name })), { status: 400 });
-  db.prepare('UPDATE kinks SET name = ?, color = ?, description = ?, status = ?, parent_id = ?, is_group = ?, locks = ?, updated = ? WHERE id = ?')
-    .run(name, patch.color ?? cur.color, patch.description ?? cur.description, patch.status ?? cur.status, parent, 'isGroup' in patch ? (patch.isGroup ? 1 : 0) : cur.is_group, JSON.stringify(locks), now(), id);
+  db.prepare('UPDATE kinks SET name = ?, color = ?, description = ?, status = ?, parent_id = ?, is_group = ?, locks = ?, faded_at = ?, updated = ? WHERE id = ?')
+    .run(name, patch.color ?? cur.color, patch.description ?? cur.description, patch.status ?? cur.status, parent, 'isGroup' in patch ? (patch.isGroup ? 1 : 0) : cur.is_group, JSON.stringify(locks), patch.status === 'hidden' && cur.status !== 'hidden' ? now() : cur.faded_at, now(), id);
   if (patch.tags) {
     setKinkTags(id, patch.tags);
     if (!cur.is_group) {
@@ -164,12 +196,15 @@ export function updateKink(id, patch, { byUser = true } = {}) {
     }
   }
   if (patch.color || 'parentId' in patch) recolor();
+  if (byUser && !cur.is_group && patch.mode && patch.mode !== 'lock') fillKink(id);
   return true;
 }
 
 // Lets the automatic updates take over again after you edited a kink.
 export function unlockKink(id) {
-  getDb().prepare("UPDATE kinks SET locks = '{}', origin = CASE WHEN origin = 'user' THEN 'ai' ELSE origin END WHERE id = ?").run(id);
+  const row = getDb().prepare('SELECT locks FROM kinks WHERE id = ?').get(id);
+  const lk = locksOf(row);
+  getDb().prepare('UPDATE kinks SET locks = ? WHERE id = ?').run(JSON.stringify({ mode: 'ai', ...(lk.color ? { color: 1 } : {}), ...(lk.parent ? { parent: 1 } : {}) }), id);
 }
 
 // Deleting a kink also means "don't bring it back": its concepts are remembered. Deleting a group puts its kinks

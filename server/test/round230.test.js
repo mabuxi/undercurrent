@@ -17,12 +17,13 @@ test('combining two kinks keeps every tag of both, and the map shows them all', 
   assert.equal(into, b);
   const k = listKinks({ includeHidden: true }).find((x) => x.id === b);
   const names = k.tags.map((x) => x.name).sort();
-  assert.equal(names.length, 11);
+  // A kink you make also gets the tags the app knows for it (0.26), so there can be more than the 11 given.
+  assert.ok(names.length >= 11);
   for (const n of ['velvet', 'satin sheets', 'silk robe', 'candle light', 'slow build', 'soft touch', 'back rub']) assert.ok(names.includes(n), n);
   assert.ok(!listKinks({ includeHidden: true }).some((x) => x.id === a));
   const node = brain().nodes.find((n) => n.key === `k${b}`);
-  assert.equal(node.tags.length, 11, 'the map is not cut at 8 tags any more');
-  assert.equal(nodeDetail(`k${b}`).kinkTags.length, 11);
+  assert.equal(node.tags.length, names.length, 'the map is not cut at 8 tags any more');
+  assert.equal(nodeDetail(`k${b}`).kinkTags.length, names.length);
 });
 
 function autoSearch(value, topic) {

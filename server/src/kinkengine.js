@@ -29,6 +29,8 @@ export function ensureKinkSchema() {
   if (!cols.includes('faded_at')) db.exec('ALTER TABLE kinks ADD COLUMN faded_at INTEGER');
   if (!cols.includes('parent_id')) db.exec('ALTER TABLE kinks ADD COLUMN parent_id INTEGER');
   if (!cols.includes('is_group')) db.exec('ALTER TABLE kinks ADD COLUMN is_group INTEGER DEFAULT 0');
+  const tcols = db.prepare('PRAGMA table_info(kink_tags)').all().map((c) => c.name);
+  if (!tcols.includes('origin')) db.exec("ALTER TABLE kink_tags ADD COLUMN origin TEXT DEFAULT 'ai'");
   // Reddit communities that belong to a kink: added (by you or because the app was sure), suggested, or turned down.
   db.exec(`CREATE TABLE IF NOT EXISTS kink_subs (
     kink_id INTEGER NOT NULL REFERENCES kinks(id) ON DELETE CASCADE,
@@ -45,6 +47,43 @@ export function ensureKinkSchema() {
 
 const parse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
 export const locksOf = (row) => parse(row?.locks, {});
+
+// Who may change a kink:
+// - lock: only you. The app never renames it, never touches its tags or communities and never fades it (it can
+//   still suggest things for you to add).
+// - grow: the app may add tags and communities that fit, but never removes anything, never renames it and never
+//   fades it; its match can drop under 50% without it fading. New kinks you make start here.
+// - ai: the app manages it like the kinks it finds itself.
+// A kink you faded yourself comes back by itself once you are into it again, whatever its mode.
+export const MODES = ['lock', 'grow', 'ai'];
+export function modeOf(row) {
+  const lk = locksOf(row);
+  if (MODES.includes(lk.mode)) return lk.mode;
+  return row?.origin === 'user' || lk.name || lk.tags || lk.status ? 'grow' : 'ai';
+}
+
+// How close something is to being a kink, 0 to 99: 50 is exactly where it becomes one (or, for a kink, where it
+// stops being one). Below that it is how far the weakest part has come; above, how far past it everything is.
+export function matchPct(x, rule = RULES.create) {
+  if (!x) return 0;
+  const f = [x.n / rule.n, x.s / rule.s, rule.days ? (x.dayCount || 0) / rule.days : 1, x.lift / rule.lift, x.prevalence > 0 ? Math.min(4, rule.prevalence / x.prevalence) : 4];
+  if (!knownConcept(x.concept) && rule.text) f.push(x.textShare / rule.text);
+  const low = Math.max(0, Math.min(...f));
+  let q = low;
+  if (low >= 1) {
+    const geo = Math.exp(f.reduce((a, v) => a + Math.log(Math.min(4, Math.max(1, v))), 0) / f.length);
+    q = Math.sqrt(low * geo);
+  }
+  return Math.max(0, Math.min(99, Math.round((100 * q) / (q + 1))));
+}
+
+// A kink's match: its strongest concept against the rule it has to meet (staying a kink is a little easier than
+// becoming one).
+export function kinkMatch(row, stats = conceptEvidence().stats) {
+  const cs = conceptsOfRow(row);
+  const rule = row.status === 'active' ? RULES.keep : RULES.create;
+  return cs.reduce((m, c) => Math.max(m, matchPct(stats.get(c), rule)), 0);
+}
 export const conceptsOfRow = (row) => parse(row?.concepts, []);
 
 // Every post you clearly liked, with how strongly, fading slowly over months so old phases give way to new ones.
@@ -130,6 +169,7 @@ function computeEvidence() {
       if (it.kinds.includes('save')) x.save++;
       if (m.said?.has(c)) x.said = (x.said || 0) + 1;
       x.items.push(it.id);
+      (x.lasts || (x.lasts = [])).push(it.last);
       for (const nm of names) x.variants.set(nm, (x.variants.get(nm) || 0) + it.w);
     }
   }
@@ -181,8 +221,34 @@ function tagsFor(concepts, x) {
 function setTags(id, tags) {
   const db = getDb();
   db.prepare('DELETE FROM kink_tags WHERE kink_id = ?').run(id);
-  const ins = db.prepare('INSERT OR REPLACE INTO kink_tags(kink_id, tag_id, weight) VALUES(?, ?, ?)');
+  const ins = db.prepare("INSERT OR REPLACE INTO kink_tags(kink_id, tag_id, weight, origin) VALUES(?, ?, ?, 'ai')");
   for (const t of tags) { const tid = tagId(t.name); if (tid) ins.run(id, tid, t.weight ?? 1); }
+}
+
+// Right after you make a kink (or let it grow): the tags the app knows for what it is about join it.
+export function fillKink(id) {
+  const db = getDb();
+  const r = db.prepare('SELECT * FROM kinks WHERE id = ?').get(id);
+  if (!r || r.is_group || modeOf(r) === 'lock') return 0;
+  const cs = conceptsOfRow(r);
+  if (!cs.length) return 0;
+  const { stats } = conceptEvidence();
+  const x = cs.map((c) => stats.get(c)).filter(Boolean).sort((a, b) => b.s - a.s)[0];
+  return addTags(id, tagsFor(cs, x), locksOf(r).noTags || []);
+}
+
+// A kink that may only grow: new tags that fit join it, nothing it has goes, and tags you took off stay off.
+export function addTags(id, tags, skip = []) {
+  const db = getDb();
+  const no = new Set(skip.map((s) => String(s).toLowerCase()));
+  const ins = db.prepare("INSERT OR IGNORE INTO kink_tags(kink_id, tag_id, weight, origin) VALUES(?, ?, ?, 'ai')");
+  let n = 0;
+  for (const t of tags) {
+    if (no.has(String(t.name).toLowerCase())) continue;
+    const tid = tagId(t.name);
+    if (tid && ins.run(id, tid, t.weight ?? 0.9).changes) n++;
+  }
+  return n;
 }
 
 function uniqueName(name, selfId) {
@@ -290,14 +356,13 @@ export function syncKinks({ ai = null } = {}) {
     }
     // 2. Two kinks about the same concept become one: yours wins, then the one that is shown, then the oldest.
     const owner = new Map();
-    const order = rows().filter((r) => !r.is_group).sort((a, b) => (a.origin === 'user' || Object.keys(locksOf(a)).length ? 0 : 1) - (b.origin === 'user' || Object.keys(locksOf(b)).length ? 0 : 1)
+    const order = rows().filter((r) => !r.is_group).sort((a, b) => (modeOf(a) !== 'ai' ? 0 : 1) - (modeOf(b) !== 'ai' ? 0 : 1)
       || (a.status === 'active' ? 0 : 1) - (b.status === 'active' ? 0 : 1) || a.id - b.id);
     for (const r of order) {
       const cs = conceptsOfRow(r);
       const keep = cs.map((c) => owner.get(c)).find(Boolean);
       if (keep && keep.id !== r.id) {
-        const userMade = r.origin === 'user' || Object.keys(locksOf(r)).length;
-        if (!userMade) {
+        if (modeOf(r) === 'ai') {
           const into = conceptsOfRow(keep);
           db.prepare('UPDATE kinks SET concepts = ? WHERE id = ?').run(JSON.stringify([...new Set([...into, ...cs])]), keep.id);
           moveReferences(r.id, keep.id);
@@ -309,27 +374,41 @@ export function syncKinks({ ai = null } = {}) {
       }
       for (const c of cs) if (!owner.has(c)) owner.set(c, r);
     }
-    // 3. Update every kink from its evidence. What you changed by hand stays as you set it.
+    // 3. Update every kink from its evidence, as far as its mode allows.
     for (const r of rows()) {
       if (r.is_group) continue;
       const cs = conceptsOfRow(r);
       const lk = locksOf(r);
-      const userMade = r.origin === 'user';
+      const mode = modeOf(r);
       const x = cs.map((c) => stats.get(c)).filter(Boolean).sort((a, b) => b.s - a.s)[0];
       const evidence = x ? { n: x.n, s: Math.round(x.s * 10) / 10, lift: Math.round(x.lift * 10) / 10, prevalence: Math.round(x.prevalence * 1000) / 10, days: x.dayCount, heat: x.heat, up: x.up, save: x.save, last: x.last } : null;
       const alive = cs.some((c) => qualifies(stats.get(c), r.status === 'active' ? RULES.keep : RULES.create));
+      const notRemoved = !cs.every((c) => removed.has(c));
       let status = r.status;
-      if (userMade || lk.status) status = r.status === 'proposed' ? 'active' : r.status;
-      else if (alive && !cs.every((c) => removed.has(c))) { if (r.status !== 'active') summary.back.push(r.name); status = 'active'; }
-      else { if (r.status === 'active') summary.faded.push(r.name); status = 'hidden'; }
+      let locks = lk;
+      // A kink you faded yourself comes back once you clearly liked a few new posts with it since.
+      const since = r.faded_at || 0;
+      const fresh = cs.reduce((m, c) => Math.max(m, (stats.get(c)?.lasts || []).filter((v) => v > since).length), 0);
+      if (r.status === 'hidden' && lk.faded) {
+        if (alive && notRemoved && fresh >= 3) {
+          status = 'active';
+          summary.back.push(r.name);
+          locks = { ...lk };
+          delete locks.faded;
+        }
+      } else if (mode === 'ai') {
+        if (alive && notRemoved) { if (r.status !== 'active') summary.back.push(r.name); status = 'active'; }
+        else { if (r.status === 'active') summary.faded.push(r.name); status = 'hidden'; }
+      } else if (r.status === 'proposed') status = 'active';
       let name = r.name;
-      if (!lk.name && !userMade && x) {
+      if (mode === 'ai' && !lk.name && x) {
         const want = nameFor(x);
         if (want !== r.name) { name = uniqueName(want, r.id); if (status === 'active') summary.renamed.push(`${r.name} → ${name}`); }
       }
-      if (!lk.tags && x) setTags(r.id, tagsFor(cs, x));
-      db.prepare('UPDATE kinks SET name = ?, status = ?, evidence = ?, faded_at = ?, updated = ? WHERE id = ?')
-        .run(name, status, evidence ? JSON.stringify(evidence) : r.evidence, status === 'hidden' && r.status === 'active' ? t : r.faded_at, t, r.id);
+      if (mode === 'ai' && !lk.tags && x) setTags(r.id, tagsFor(cs, x));
+      else if (mode === 'grow') addTags(r.id, tagsFor(cs, x), lk.noTags || []);
+      db.prepare('UPDATE kinks SET name = ?, status = ?, evidence = ?, faded_at = ?, locks = ?, updated = ? WHERE id = ?')
+        .run(name, status, evidence ? JSON.stringify(evidence) : r.evidence, status === 'hidden' && r.status === 'active' ? t : r.faded_at, JSON.stringify(locks), t, r.id);
     }
     // 4. New kinks for concepts that now clearly qualify.
     const covered = new Set(rows().flatMap((r) => conceptsOfRow(r)));
@@ -433,7 +512,25 @@ export function risingConcepts(limit = 12) {
   const covered = new Set(getDb().prepare("SELECT concepts FROM kinks WHERE status != 'hidden'").all().flatMap((r) => conceptsOfRow(r)));
   return [...stats.values()].filter((x) => !covered.has(x.concept) && x.n >= 2 && x.lift >= 1.4 && x.prevalence <= RULES.create.prevalence && !qualifies(x))
     .sort((a, b) => (knownConcept(b.concept) ? 1 : 0) - (knownConcept(a.concept) ? 1 : 0) || b.s * Math.min(3, b.lift) - a.s * Math.min(3, a.lift)).slice(0, limit)
-    .map((x) => ({ concept: x.concept, name: conceptLabel(x.concept, lang(), conceptName(x.concept)), n: x.n, s: Math.round(x.s * 10) / 10, lift: Math.round(x.lift * 10) / 10, need: Math.max(0, RULES.create.n - x.n) }));
+    .map((x) => ({ concept: x.concept, name: conceptLabel(x.concept, lang(), conceptName(x.concept)), n: x.n, s: Math.round(x.s * 10) / 10, lift: Math.round(x.lift * 10) / 10, need: Math.max(0, RULES.create.n - x.n), match: Math.min(49, matchPct(x)) }));
+}
+
+// You say something that is almost a kink already is one: it is kept (it grows, but never fades by itself).
+export function keepConcept(concept) {
+  ensureKinkSchema();
+  const db = getDb();
+  const { stats } = conceptEvidence();
+  const x = stats.get(concept) || null;
+  const name = uniqueName(x ? nameFor(x) : conceptName(concept), null);
+  const t = now();
+  const ev = x ? JSON.stringify({ n: x.n, s: Math.round(x.s * 10) / 10, lift: Math.round(x.lift * 10) / 10, prevalence: Math.round(x.prevalence * 1000) / 10, days: x.dayCount, heat: x.heat, up: x.up, save: x.save, last: x.last }) : null;
+  const info = db.prepare("INSERT INTO kinks(name, color, description, origin, status, created, updated, concepts, evidence, locks) VALUES(?, ?, '', 'user', 'active', ?, ?, ?, ?, ?)")
+    .run(name, LOOSE[0], t, t, JSON.stringify([concept]), ev, JSON.stringify({ mode: 'grow' }));
+  const id = Number(info.lastInsertRowid);
+  setTags(id, tagsFor([concept], x));
+  forgetRemoved(concept);
+  recolor();
+  return id;
 }
 
 // Which family unknown concepts belong to, asked once to the local model and remembered.

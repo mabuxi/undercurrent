@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, rgba, FORMATS, ago } from '../api.js';
 import { useApp } from '../context.jsx';
 import BrainCanvas from './BrainCanvas.jsx';
-import KinkBoard, { evidenceLine, ColorDot } from './KinkBoard.jsx';
+import KinkBoard, { evidenceLine, ColorDot, KINK_MODES, modeInfo, shareBars } from './KinkBoard.jsx';
 import { deeperSpec } from './Windows.jsx';
 import { Icon } from '../icons.jsx';
 import { t, tn } from '../i18n.js';
@@ -18,7 +18,8 @@ function HoverCard({ hover, brain }) {
   return (
     <div className="hovercard" style={{ left: Math.min(hover.x + 16, 9999), top: hover.y + 12 }}>
       <div className="hc-head"><span className="win-dot" style={{ '--c': n.color }} /><b>{n.name}</b><em>{TYPE_LABEL[n.type]}{n.origin === 'tag' ? ` · ${t('grew from a tag')}` : n.status === 'proposed' ? ` · ${t('suggested')}` : ''}</em></div>
-      {n.type !== 'fantasy' ? <div className="hc-row"><span>{t('All time {n}%', { n: n.allTime })}</span><span>{t('Lately {n}%', { n: n.lately })}</span><span className={d >= 0 ? 'up' : 'down'}>{d >= 0 ? '▲' : '▼'} {Math.abs(d)}</span></div> : null}
+      {n.type === 'kink' && n.points ? (() => { const dd = Math.round((n.points.shareLately - n.points.shareAll) * 10) / 10; return <div className="hc-row">{n.match != null ? <span>{t('{n}% match', { n: n.match })}</span> : null}<span>{t('All time {n}%', { n: String(n.points.shareAll).replace('.', ',') })}</span><span>{t('Lately {n}%', { n: String(n.points.shareLately).replace('.', ',') })}</span><span className={dd >= 0 ? 'up' : 'down'}>{dd >= 0 ? '▲' : '▼'} {String(Math.abs(dd)).replace('.', ',')}</span></div>; })()
+        : n.type !== 'fantasy' ? <div className="hc-row"><span>{t('All time {n}%', { n: n.allTime })}</span><span>{t('Lately {n}%', { n: n.lately })}</span><span className={d >= 0 ? 'up' : 'down'}>{d >= 0 ? '▲' : '▼'} {Math.abs(d)}</span></div> : null}
       <div className="hc-row"><span>{t('Strength {n}', { n: Math.round(n.activity || 0) })}</span><span>{n.last ? t('last {when}', { when: ago(Math.round(n.last / 1000)) }) : t('no interaction yet')}</span></div>
       {n.tags?.length ? <div className="hc-tags">{n.tags.slice(0, 6).join(' · ')}</div> : null}
       {links.length ? <div className="hc-links">{links.map((l) => <span key={l.name}><i style={{ opacity: 0.25 + l.w * 0.75 }} />{l.name} {Math.round(l.w * 100)}%</span>)}</div> : null}
@@ -119,7 +120,6 @@ function Detail({ nodeKey, brain, reload, onSelect, startEdit = false }) {
   if (!node) return null;
   const kinkObj = node.type === 'kink' ? node : null;
   const full = kinkObj ? allKinks.find((k) => k.id === node.id) : null;
-  const edited = full && (Object.keys(full.locks || {}).length > 0 || full.origin === 'user');
   // Always every tag of the kink, with its weight, so changing one never loses the others.
   const allTags = d?.kinkTags || full?.tags?.map((x) => ({ name: x.name, weight: x.weight ?? 1 })) || (node.tags || []).map((x) => ({ name: x, weight: 1 }));
   async function patch(body, msg) {
@@ -177,7 +177,8 @@ function Detail({ nodeKey, brain, reload, onSelect, startEdit = false }) {
             {kinkObj?.status === 'proposed' ? <button type="button" className="ghost-btn small accent" onClick={() => patch({ status: 'active' }, t('Kept.'))}><Icon name="check" />{t('Keep')}</button> : null}
             {kinkObj ? <button type="button" className={`ghost-btn small${editing ? ' accent' : ''}`} onClick={() => setEditing((x) => !x)}><Icon name="edit" />{t('Edit')}</button> : null}
             {kinkObj ? <button type="button" className={`ghost-btn small${combine ? ' accent' : ''}`} onClick={() => setCombine((x) => !x)} aria-expanded={combine}><Icon name="grid" />{t('Combine')}</button> : null}
-            {kinkObj ? <button type="button" className="ghost-btn small" onClick={() => patch({ status: 'hidden' }, t('Hidden. It stays hidden until you bring it back.'))}><Icon name="less" />{t('Hide')}</button> : null}
+            {kinkObj && node.status !== 'hidden' && full?.status !== 'hidden' ? <button type="button" className="ghost-btn small" onClick={() => patch({ status: 'hidden' }, t('Faded. It comes back by itself once you are into it again.'))} title={t('It leaves your kinks and comes back by itself once you are into it again')}><Icon name="less" />{t('Fade')}</button> : null}
+            {kinkObj && (node.status === 'hidden' || full?.status === 'hidden') ? <button type="button" className="ghost-btn small accent" onClick={() => patch({ status: 'active' }, t('It is back.'))}><Icon name="eye" />{t('Bring back')}</button> : null}
             {kinkObj ? <button type="button" className="ghost-btn small danger" onClick={async () => { await api(`/kinks/${node.id}`, { method: 'DELETE' }); toast(t("Removed. It won't come back by itself.")); onSelect(null); reload(); refreshMeta(); }}><Icon name="trash" />{t('Remove')}</button> : null}
             {node.type === 'fantasy' ? <button type="button" className="ghost-btn small danger" onClick={async () => { await api(`/fantasies/${node.id}`, { method: 'DELETE' }); onSelect(null); reload(); }}><Icon name="trash" />{t('Delete')}</button> : null}
           </div>
@@ -189,11 +190,29 @@ function Detail({ nodeKey, brain, reload, onSelect, startEdit = false }) {
           ) : null}
         </div>
 
+        {kinkObj && full && !full.isGroup ? (
+          <div className="kmodebox">
+            <div className="kmodes" role="radiogroup" aria-label={t('Who may change it')}>
+              {KINK_MODES.map((m) => (
+                <button type="button" key={m.id} role="radio" aria-checked={full.mode === m.id} className={`kmode${full.mode === m.id ? ' on' : ''}`} onClick={() => { if (full.mode !== m.id) patch({ mode: m.id }, t('{mode}: {text}', { mode: m.name, text: m.text })); }}>
+                  <Icon name={m.icon} /><span>{m.name}</span>
+                </button>
+              ))}
+            </div>
+            <p className="kmode-text"><Icon name={modeInfo(full.mode).icon} /><span><b>{modeInfo(full.mode).name}.</b> {modeInfo(full.mode).text}</span></p>
+          </div>
+        ) : null}
+
         {node.type === 'kink' ? (
           <div className="ktags">
             <div className="bw-h"><span>{t('Tags')}</span><span className="count">{allTags.length}</span></div>
             <div className="chiprow">
-              {allTags.map((x) => <span key={x.name} className="chip ghost">{x.name}<button type="button" className="chipx" aria-label={t('Remove {tag}', { tag: x.name })} onClick={() => setTags(allTags.filter((y) => y.name !== x.name))}>×</button></span>)}
+              {allTags.map((x) => {
+                const origin = full?.tags?.find((y) => y.name === x.name)?.origin;
+                const icon = full?.mode === 'lock' ? 'lock' : full?.mode === 'grow' ? (origin === 'user' ? 'lock' : 'why') : null;
+                const tip = full?.mode === 'lock' ? t('Locked: the app never changes it') : full?.mode === 'grow' ? (origin === 'user' ? t('You added it: the app never removes it') : t('The app added it: it stays unless you remove it')) : '';
+                return <span key={x.name} className="chip ghost ktag" title={tip}>{icon ? <Icon name={icon} /> : null}{x.name}<button type="button" className="chipx" aria-label={t('Remove {tag}', { tag: x.name })} onClick={() => setTags(allTags.filter((y) => y.name !== x.name))}>×</button></span>;
+              })}
               <form onSubmit={(e) => { e.preventDefault(); if (tagIn.trim()) { addTag(tagIn, t('Tag added.')); setTagIn(''); } }}><input className="tagadd" value={tagIn} onChange={(e) => setTagIn(e.target.value)} placeholder={t('+ tag')} aria-label={t('Add tag')} /></form>
             </div>
             <div className="rowline wrapline kgroup"><span className="fb-label">{t('Group')}</span>
@@ -204,7 +223,12 @@ function Detail({ nodeKey, brain, reload, onSelect, startEdit = false }) {
             </div>
             {d?.relatedTags?.length ? (
               <div className="kimprove">
-                <div className="kimprove-h"><Icon name="spark" /><b>{t('Update tags to kink to improve')}</b></div>
+                <div className="kimprove-h"><Icon name="spark" /><b>{t('Update tags to kink to improve')}</b>
+                  <button type="button" className="icon-btn kimprove-refresh" onClick={async () => {
+                    const seen = [...new Set([...(d.seenRel || []), ...d.relatedTags])];
+                    try { const r = await api(`/brain/node/${nodeKey}?skip=${encodeURIComponent(seen.join('|'))}`); setD((cur) => ({ ...cur, relatedTags: r.relatedTags, seenRel: r.relatedTags.some((x) => seen.includes(x)) ? [] : seen })); } catch (e) { toast(e.message); }
+                  }} aria-label={t('Other suggestions')} title={t('Other suggestions')}><Icon name="refresh" /></button>
+                </div>
                 <p className="wnote">{t('These often come with it in your posts. Tap one to add it to {name}, so the feed finds more of it.', { name: node.name })}</p>
                 <div className="chiprow">{d.relatedTags.map((tag) => <button type="button" key={tag} className="chip btn" onClick={() => addTag(tag, t('Added {tag}.', { tag }))} title={t('Add to this kink')}>+ {tag}</button>)}</div>
               </div>
@@ -218,25 +242,34 @@ function Detail({ nodeKey, brain, reload, onSelect, startEdit = false }) {
       <div className="bwgrid kgridw">
         {kinkObj ? (
           <div className="bw wide">
-            <div className="bw-h"><span>{t('Why this is a kink')}</span></div>
+            <div className="bw-h"><span>{t('Why this is a kink')}</span>{full?.match != null ? <span className={`kc-match big${full.match >= 50 ? ' ok' : ''}`}>{t('{n}% match', { n: full.match })}</span> : null}</div>
             <p className="aitext small">{full?.evidence ? evidenceLine(full.evidence) : full?.origin === 'user' ? t('You made this one yourself.') : t('Not enough clear likes behind it yet.')}</p>
-            {edited ? (
-              <div className="rowline wrapline">
-                <span className="wnote">{t('You changed {what} by hand, so that stays as you set it.', { what: Object.keys(full.locks || {}).filter((x) => full.locks[x]).map((x) => ({ name: t('the name'), tags: t('the tags'), parent: t('the group'), color: t('the colour'), status: t('whether it shows') }[x])).filter(Boolean).join(', ') || t('this') })}</span>
-                <button type="button" className="linkbtn" onClick={async () => { try { await api(`/kinks/${node.id}/unlock`, { method: 'POST', body: {} }); toast(t('It updates by itself again.')); await reload(); refreshMeta(); loadDetail(); } catch (e) { toast(e.message); } }}>{t('Let it update by itself again')}</button>
-              </div>
-            ) : <p className="wnote">{t('It updates by itself: tags join as you like them, and it fades if you stop.')}</p>}
+            <p className="wnote">{full?.match >= 50 ? t('From 50% something is a kink; this one is past it.') : full?.mode === 'ai' ? t('Under 50%: the app fades it if it stays there.') : t('Under 50%, but it is kept: only the app\'s own kinks fade by themselves.')}</p>
           </div>
         ) : null}
         {kinkObj && !full?.isGroup ? <KinkSubs kinkId={node.id} name={node.name} /> : null}
         <AiWidget nodeKey={nodeKey} />
         <div className="bw half">
           <div className="bw-h"><span>{t('This week vs before')}</span></div>
-          <div className="bars">
-            <div className="barrow"><div className="bt"><span>{t('All time')}</span><em>{node.allTime}%</em></div><div className="track2"><i style={{ width: `${node.allTime}%`, background: rgba(node.color, 0.5) }} /></div></div>
-            <div className="barrow"><div className="bt"><span>{t('Lately')}</span><em className={d7 >= 0 ? 'up' : 'down'}>{node.lately}% ({d7 >= 0 ? '+' : ''}{d7})</em></div><div className="track2"><i style={{ width: `${node.lately}%`, background: node.color }} /></div></div>
-            {node.now !== undefined ? <div className="barrow"><div className="bt"><span>{t('Right now')}</span><em>{node.now}%</em></div><div className="track2"><i style={{ width: `${node.now}%`, background: 'var(--flame)' }} /></div></div> : null}
-          </div>
+          {full?.points ? (
+            <div className="bars">
+              {shareBars(full.points, true).map((b) => {
+                const diff = b.key === 'lately' ? Math.round((b.share - full.points.shareAll) * 10) / 10 : null;
+                return (
+                  <div key={b.key} className="barrow">
+                    <div className="bt"><span>{b.label}</span><em className={diff == null ? '' : diff >= 0 ? 'up' : 'down'}>{tn(b.pts, '{n} pt', '{n} pts')} · {t('{p}% of yours', { p: String(b.share).replace('.', ',') })}{diff != null && diff !== 0 ? ` (${diff > 0 ? '+' : ''}${String(diff).replace('.', ',')})` : ''}</em></div>
+                    <div className="track2"><i style={{ width: `${b.w}%`, background: b.key === 'now' ? 'var(--flame)' : b.key === 'all' ? rgba(node.color, 0.5) : node.color }} /></div>
+                  </div>
+                );
+              })}
+              <p className="wnote">{t('Points from every post with it: watching, heat, likes and saves. Lately is the last 7 days, right now the last 24 hours. The % is how much of all your points went to it in that time.')}</p>
+            </div>
+          ) : (
+            <div className="bars">
+              <div className="barrow"><div className="bt"><span>{t('All time')}</span><em>{node.allTime}%</em></div><div className="track2"><i style={{ width: `${node.allTime}%`, background: rgba(node.color, 0.5) }} /></div></div>
+              <div className="barrow"><div className="bt"><span>{t('Lately')}</span><em className={d7 >= 0 ? 'up' : 'down'}>{node.lately}% ({d7 >= 0 ? '+' : ''}{d7})</em></div><div className="track2"><i style={{ width: `${node.lately}%`, background: node.color }} /></div></div>
+            </div>
+          )}
           {d ? <p className="wnote">{tn(d.week, '{n} post this week, {before} a week before that.', '{n} posts this week, {before} a week before that.', { before: d.perWeekBefore })} {Object.entries(d.counts || {}).filter(([ev]) => ev !== 'impression').map(([ev, c]) => `${c} ${EVENT_LABEL[ev] || ev}`).slice(0, 5).join(', ')}</p> : null}
         </div>
         <div className="bw half">
@@ -396,12 +429,17 @@ export default function MapView() {
         <div className="card2">
           <h3>{t('Lately vs all time')}</h3>
           <div className="bars">
-            {kinks.length ? kinks.slice(0, 10).map((k) => { const d = k.lately - k.allTime; return (
-              <div className="barrow" key={k.id} onClick={() => select(`k${k.id}`)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') select(`k${k.id}`); }}>
-                <div className="bt"><span>{k.name}{k.status === 'proposed' ? ` (${t('suggested')})` : ''}</span><em className={d >= 0 ? 'up' : 'down'}>{d >= 0 ? '+' : ''}{d}</em></div>
-                <div className="duo"><div className="track2"><i style={{ width: `${k.allTime}%`, background: rgba(k.color, 0.45) }} /></div><div className="track2"><i style={{ width: `${k.lately}%`, background: k.color }} /></div></div>
-              </div>
-            ); }) : <p className="wnote">{t("No kinks yet. They appear once you've given heat to, liked or saved a few posts, or add your own below.")}</p>}
+            {kinks.length ? kinks.slice(0, 10).map((k) => {
+              const p = k.points;
+              const d = p ? Math.round((p.shareLately - p.shareAll) * 10) / 10 : k.lately - k.allTime;
+              const top = p ? Math.max(1, p.shareAll, p.shareLately) : 100;
+              return (
+                <div className="barrow" key={k.id} onClick={() => select(`k${k.id}`)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') select(`k${k.id}`); }}>
+                  <div className="bt"><span>{k.name}{k.status === 'proposed' ? ` (${t('suggested')})` : ''}</span><em className={d >= 0 ? 'up' : 'down'}>{d >= 0 ? '+' : ''}{String(d).replace('.', ',')}</em></div>
+                  <div className="duo"><div className="track2"><i style={{ width: `${p ? (p.shareAll / top) * 100 : k.allTime}%`, background: rgba(k.color, 0.45) }} /></div><div className="track2"><i style={{ width: `${p ? (p.shareLately / top) * 100 : k.lately}%`, background: k.color }} /></div></div>
+                </div>
+              );
+            }) : <p className="wnote">{t("No kinks yet. They appear once you've given heat to, liked or saved a few posts, or add your own below.")}</p>}
           </div>
         </div>
         <div className="card2">

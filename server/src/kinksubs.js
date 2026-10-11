@@ -272,7 +272,8 @@ async function findFor(id) {
       }
     }
     const proven = (c.own && c.own.hit >= 5) || (check && check.ratio >= 0.2) || (c.list && check);
-    const status = c.s >= ADD_AT && proven && added < AUTO_MAX ? 'added' : c.s >= SUGGEST_AT && suggested < SUGGEST_MAX ? 'suggested' : null;
+    // A locked kink only gets suggestions: the app adds nothing to it by itself.
+    const status = c.s >= ADD_AT && proven && added < AUTO_MAX && k.mode !== 'lock' ? 'added' : c.s >= SUGGEST_AT && suggested < SUGGEST_MAX ? 'suggested' : null;
     if (!status) continue;
     const why = [...new Set(c.why)].slice(0, 2).join(' · ');
     if (status === 'added') {

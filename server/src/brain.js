@@ -81,7 +81,7 @@ export function brain({ maxTags = 18 } = {}) {
     nodes.push({
       key: `k${k.id}`, id: k.id, type: 'kink', name: k.label || k.name, baseName: k.name, status: k.status, origin: k.origin, description: k.description || '',
       color: tg ? groupColor.get(tg.id) || k.color : k.color, ownColor: k.color, group: k.parentId || null, topGroup: tg?.id || null,
-      allTime: k.allTime, lately: k.lately, now: k.now, activity: Math.round((act.get(`k${k.id}`) || 0) * 10) / 10, last: last.get(`k${k.id}`) || null,
+      allTime: k.allTime, lately: k.lately, now: k.now, points: k.points, match: k.match, mode: k.mode, activity: Math.round((act.get(`k${k.id}`) || 0) * 10) / 10, last: last.get(`k${k.id}`) || null,
       tags: k.tags.map((t) => t.name)
     });
   }
@@ -141,7 +141,7 @@ export function brain({ maxTags = 18 } = {}) {
   };
 }
 
-export function nodeDetail(key) {
+export function nodeDetail(key, { skip = [] } = {}) {
   const db = getDb();
   const type = key[0];
   const id = Number(key.slice(1));
@@ -190,10 +190,14 @@ export function nodeDetail(key) {
     return it ? { ...x, title: it.title, media: it.media, source: it.source, format: it.format, author: it.author } : null;
   }).filter(Boolean);
   const related = db.prepare(`SELECT t2.name, COUNT(*) c FROM item_tags a JOIN tags t1 ON t1.id = a.tag_id JOIN item_tags b ON b.item_id = a.item_id JOIN tags t2 ON t2.id = b.tag_id
-    WHERE t1.name IN (${ph}) AND t2.name NOT IN (${ph}) AND t2.kind != 'performer' AND b.weight >= 0.45 GROUP BY t2.id ORDER BY c DESC LIMIT 40`).all(...tagNames, ...tagNames);
+    WHERE t1.name IN (${ph}) AND t2.name NOT IN (${ph}) AND t2.kind != 'performer' AND b.weight >= 0.45 GROUP BY t2.id ORDER BY c DESC LIMIT 120`).all(...tagNames, ...tagNames);
   const spec = tagSpecificity();
   const idOf = new Map(db.prepare(`SELECT id, name FROM tags WHERE name IN (${related.map(() => '?').join(',') || "''"})`).all(...related.map((r) => r.name)).map((r) => [r.name, r.id]));
-  const relTags = related.filter((r) => conceptsOf(r.name).some(isKinkConcept)).map((r) => ({ name: r.name, score: r.c * (spec.map.get(idOf.get(r.name)) ?? 1) })).sort((a, b) => b.score - a.score).slice(0, 10).map((r) => r.name);
+  const ranked = related.filter((r) => conceptsOf(r.name).some(isKinkConcept)).map((r) => ({ name: r.name, score: r.c * (spec.map.get(idOf.get(r.name)) ?? 1) })).sort((a, b) => b.score - a.score).map((r) => r.name);
+  // Refreshing the suggestions shows the next ones; after the last ones it starts over.
+  const shown = new Set(skip.map((s) => String(s).toLowerCase()));
+  const next = ranked.filter((n) => !shown.has(n.toLowerCase()));
+  const relTags = (next.length ? next : ranked).slice(0, 10);
   return {
     filter, counts, week, perWeekBefore: Math.round((before / 4) * 10) / 10, relatedTags: relTags, kinkTags,
     recent: posts

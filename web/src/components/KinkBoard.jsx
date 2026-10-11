@@ -29,27 +29,48 @@ export function ColorDot({ color, onChange, label, big = false }) {
   );
 }
 
+// Who may change a kink, with an icon, a name and what it means.
+export const KINK_MODES = [
+  { id: 'lock', icon: 'lock', name: t('Locked'), text: t('Only you change it. The app never renames it, never touches its tags or communities and never fades it. It can still suggest things for you to add.') },
+  { id: 'grow', icon: 'unlock', name: t('Grows'), text: t('The app can add tags and communities that fit, but never removes anything, never renames it and never fades it. Its match can drop under 50% without it fading.') },
+  { id: 'ai', icon: 'why', name: t('Managed by the app'), text: t('The app manages it like the kinks it finds itself: it adds and removes tags, renames it, and fades it when its match stays under 50%.') }
+];
+export const modeInfo = (id) => KINK_MODES.find((m) => m.id === id) || KINK_MODES[2];
+
+// Points over time as two or three bars, each scaled against the biggest, so a change really shows.
+export function shareBars(p, withNow = false) {
+  const rows = [
+    { key: 'all', label: t('All time'), share: p?.shareAll || 0, pts: p?.all || 0 },
+    { key: 'lately', label: t('Lately'), share: p?.shareLately || 0, pts: p?.lately || 0 },
+    ...(withNow ? [{ key: 'now', label: t('Right now'), share: p?.shareNow || 0, pts: p?.now || 0 }] : [])
+  ];
+  const top = Math.max(1, ...rows.map((r) => r.share));
+  return rows.map((r) => ({ ...r, w: Math.round((r.share / top) * 100) }));
+}
+const pct = (v) => `${String(Math.round(v * 10) / 10).replace('.', getLang() === 'fr' ? ',' : '.')}%`;
+
 function KinkCard({ k, onOpen }) {
   const fresh = k.created && Date.now() - k.created < 3 * DAY;
-  const edited = Object.keys(k.locks || {}).length > 0 || k.origin === 'user';
+  const mode = modeInfo(k.mode);
   const open = () => onOpen(k);
+  const bars = shareBars(k.points);
   return (
     <div role="button" tabIndex={0} className={`kcard clickable${k.status !== 'active' ? ' dim' : ''}`} style={{ '--c': k.color }} onClick={open} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } }}>
       <div className="kc-head">
         <span className="kc-dot" />
         <strong>{k.name}</strong>
+        <span className={`kc-mode m-${k.mode}`} title={`${mode.name}: ${mode.text}`}><Icon name={mode.icon} /></span>
+        {k.match != null ? <span className={`kc-match${k.match >= 50 ? ' ok' : ''}`} title={t('How much of a match it is to you. From 50% it is a kink.')}>{k.match}%</span> : null}
         <button type="button" className="kc-edit" onClick={(e) => { e.stopPropagation(); onOpen(k); }} aria-label={t('Edit {name}', { name: k.name })} title={t('Edit')}><Icon name="edit" /></button>
       </div>
-      {(fresh && k.status === 'active') || edited || k.status === 'hidden' ? (
+      {(fresh && k.status === 'active') || k.status === 'hidden' ? (
         <div className="kc-badges">
           {fresh && k.status === 'active' ? <span className="sugg">{t('New')}</span> : null}
-          {edited ? <span className="sugg pin" title={t('You changed this by hand, so it stays the way you set it')}>{t('Yours')}</span> : null}
-          {k.status === 'hidden' ? <span className="sugg">{k.fadedAt ? t('Faded {when}', { when: ago(Math.round(k.fadedAt / 1000)) }) : t('Hidden')}</span> : null}
+          {k.status === 'hidden' ? <span className="sugg">{k.fadedAt ? t('Faded {when}', { when: ago(Math.round(k.fadedAt / 1000)) }) : t('Faded')}</span> : null}
         </div>
       ) : null}
-      <div className="kc-bars">
-        <div><span>{t('All time')}</span><div className="track2"><i style={{ width: `${k.allTime}%`, background: k.color }} /></div><em>{k.allTime}%</em></div>
-        <div><span>{t('Lately')}</span><div className="track2"><i style={{ width: `${k.lately}%`, background: k.color }} /></div><em>{k.lately}%</em></div>
+      <div className="kc-bars" title={t('The part of all your points that went to posts with it')}>
+        {bars.map((b) => <div key={b.key}><span>{b.label}</span><div className="track2"><i style={{ width: `${b.w}%`, background: k.color, opacity: b.key === 'all' ? 0.55 : 1 }} /></div><em title={tn(b.pts, '{n} point', '{n} points')}>{pct(b.share)}</em></div>)}
       </div>
       {k.evidence ? <p className="kc-why">{evidenceLine(k.evidence)}</p> : null}
       <div className="kc-tags">{k.tags.slice(0, 4).map((x) => <span key={x.name} className="chip ghost">{x.name}</span>)}{k.tags.length > 4 ? <span className="chip ghost more">+{k.tags.length - 4}</span> : null}</div>
@@ -94,7 +115,7 @@ export default function KinkBoard({ onOpen, onChange }) {
   const plain = kinks.filter((k) => !k.isGroup);
   const active = plain.filter((k) => k.status !== 'hidden');
   const faded = plain.filter((k) => k.status === 'hidden');
-  const sort = (list) => list.slice().sort((a, b) => (b.allTime + b.lately) - (a.allTime + a.lately));
+  const sort = (list) => list.slice().sort((a, b) => (b.match ?? 0) - (a.match ?? 0) || (b.points?.all || 0) - (a.points?.all || 0));
   const sections = groups.map((g) => ({ g, members: sort(active.filter((k) => k.parentId === g.id)) })).filter((s) => s.members.length).sort((a, b) => b.members.length - a.members.length);
   const loose = sort(active.filter((k) => !k.parentId || !groups.some((g) => g.id === k.parentId)));
   const changed = () => { onChange(); loadExtra(); };
@@ -106,7 +127,7 @@ export default function KinkBoard({ onOpen, onChange }) {
       await api('/kinks', { method: 'POST', body: { name: nk.name.trim(), tags: nk.tags.split(',').map((t) => t.trim()).filter(Boolean), parentId: nk.parent ? Number(nk.parent) : null } });
       setNk({ name: '', tags: '', parent: '' });
       setForm(null);
-      toast(t('Kink added. It stays exactly as you made it.'));
+      toast(t('Kink added. The app adds tags that fit, and never removes yours.'));
       changed();
     } catch (err) { toast(err.message); }
   }
@@ -127,7 +148,7 @@ export default function KinkBoard({ onOpen, onChange }) {
       <div className="kb-head">
         <div>
           <h3>{t('Your kinks')} <span className="count">{active.length}</span></h3>
-          <p className="wnote">{t('A kink is one specific thing you keep coming back to, proven by heat, likes and saves, not by watching. It has to be in clearly more of what you loved than in everything you see, so tags that are on almost every video never count. Kinks update by themselves as your taste moves; anything you change by hand stays as you set it.')}</p>
+          <p className="wnote">{t('A kink is one specific thing you keep coming back to, proven by heat, likes and saves, not by watching. It has to be in clearly more of what you loved than in everything you see, so tags that are on almost every video never count. The % is how much of a match it is to you: from 50% it is a kink. Each kink has a lock, an open lock or sparkles: only you change it, the app may only add to it, or the app manages it.')}</p>
         </div>
         <div className="wbtns">
           <button type="button" className={`ghost-btn small${form === 'kink' ? ' accent' : ''}`} onClick={() => setForm(form === 'kink' ? null : 'kink')}><Icon name="plus" />{t('New kink')}</button>
@@ -166,12 +187,18 @@ export default function KinkBoard({ onOpen, onChange }) {
       {extra.rising?.length ? (
         <div className="ksection">
           <div className="ks-head" style={{ '--c': '#B6A8B0' }}><span className="kc-dot hollow" />{t('Almost a kink')}</div>
-          <div className="chiprow">{extra.rising.map((r) => <span key={r.concept} className="chip ghost" title={`${tn(r.n, '{n} post you clearly liked, {lift}× more than usual', '{n} posts you clearly liked, {lift}× more than usual', { lift: dec(r.lift) })}${r.need ? `. ${t('{n} more and it becomes a kink.', { n: r.need })}` : `. ${t('Needs a bit more, or another day.')}`}`}>{r.name}<em className="dim"> {r.n}</em></span>)}</div>
+          <p className="wnote">{t('At 50% they become kinks by themselves. Think one already is? Tap + and it is kept.')}</p>
+          <div className="chiprow">{extra.rising.map((r) => (
+            <span key={r.concept} className="chip ghost rising" title={`${tn(r.n, '{n} post you clearly liked, {lift}× more than usual', '{n} posts you clearly liked, {lift}× more than usual', { lift: dec(r.lift) })}${r.need ? `. ${t('{n} more and it becomes a kink.', { n: r.need })}` : `. ${t('Needs a bit more, or another day.')}`}`}>
+              {r.name}<em className="dim"> {r.match}%</em>
+              <button type="button" className="chipx keep" onClick={async () => { try { await api(`/kinks/rising/${encodeURIComponent(r.concept)}`, { method: 'POST', body: {} }); toast(t('{name} is a kink now, and it is kept.', { name: r.name })); changed(); } catch (e) { toast(e.message); } }} aria-label={t('Make {name} a kink', { name: r.name })} title={t('Make it a kink')}><Icon name="plus" /></button>
+            </span>
+          ))}</div>
         </div>
       ) : null}
       {faded.length ? (
         <div className="ksection">
-          <button type="button" className="linkbtn" onClick={() => setShowFaded((x) => !x)}>{showFaded ? tn(faded.length, 'Hide {n} faded or hidden kink', 'Hide {n} faded or hidden kinks') : tn(faded.length, 'Show {n} faded or hidden kink', 'Show {n} faded or hidden kinks')}</button>
+          <button type="button" className="linkbtn" onClick={() => setShowFaded((x) => !x)}>{showFaded ? tn(faded.length, 'Hide {n} faded kink', 'Hide {n} faded kinks') : tn(faded.length, 'Show {n} faded kink', 'Show {n} faded kinks')}</button>
           {showFaded ? <div className="kgrid">{sort(faded).map((k) => <KinkCard key={k.id} k={k} onOpen={onOpen} />)}</div> : null}
         </div>
       ) : null}
