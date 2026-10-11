@@ -3,6 +3,15 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.25.1 · 11 October 2026
+
+### Full screen viewer
+- The search and filter chips at the top are centered now. The tags at the bottom are back on the left, as before 0.25.0.
+- Jumping back or forward (double tap on a side, the arrow keys) no longer shows a +15 or −15 sign: a very light half circle fades in on that side, with small arrows running through it and the seconds added up while you keep tapping. It fades away by itself. The feed's videos show the same with the arrow keys.
+- The like animation of a double tap now shows above everything, also above the full screen and 15 second buttons.
+- Zoomed in on a video, a double tap on the left or right side still jumps 15 seconds and holding still plays it faster. A double tap in the middle still goes back to normal size.
+- The small pictures of several people now look like the big one: the same soft colours and two letters when there is no picture, and every person has a colour of their own (also in the list of people).
+
 ## 0.25.0 · 11 October 2026
 
 ### Kinks

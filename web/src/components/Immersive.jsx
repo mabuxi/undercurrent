@@ -3,9 +3,9 @@ import { createPortal } from 'react-dom';
 import { api, ago, fmtDur, fmtNum, formatMeta, imgSrc, LABELS, proxied, rgba, track } from '../api.js';
 import { useApp } from '../context.jsx';
 import { Icon } from '../icons.jsx';
-import { VideoPlayer, DIRECT, seekBy, seekTo, lengthOf } from './Media.jsx';
+import { VideoPlayer, DIRECT, seekBy, seekTo, lengthOf, SeekRipple, nextJump } from './Media.jsx';
 import { PostFx, HeatFx } from './PostFx.jsx';
-import { AskPanel, Avatar, CommentsPanel, ProfilePanel, PerformerPanel, PersonPanel, WhyPanel } from './Panels.jsx';
+import { AskPanel, Avatar, avatarColor, initialsOf, CommentsPanel, ProfilePanel, PerformerPanel, PersonPanel, WhyPanel } from './Panels.jsx';
 import { DislikeNote, HAS_COMMENTS, identity } from './Post.jsx';
 import { usePostActions } from '../postactions.js';
 import { setTkOpen, withChanges } from '../tk.js';
@@ -524,7 +524,7 @@ function useAmbient(active, vref, zoomRef, ambRef, item) {
 // A small round picture for someone in a post: the performer's picture when known, the person's profile picture
 // from the sites that have it, otherwise their initials.
 const PEOPLE_PICS = new Map();
-function PersonPic({ name, thumb, lookup = false, platform = 'any' }) {
+function PersonPic({ name, thumb, lookup = false, platform = 'any', color }) {
   const [src, setSrc] = useState(thumb || PEOPLE_PICS.get(name) || null);
   const [bad, setBad] = useState(false);
   useEffect(() => {
@@ -538,7 +538,7 @@ function PersonPic({ name, thumb, lookup = false, platform = 'any' }) {
     }).catch(() => {});
     return () => { alive = false; };
   }, [name, thumb, lookup, platform]);
-  if (!src || bad) return <span className="tk-pic none" aria-hidden="true">{String(name).replace(/^@+/, '').slice(0, 1).toUpperCase()}</span>;
+  if (!src || bad) return <span className="tk-pic none" style={{ background: color || avatarColor(name) }} aria-hidden="true">{initialsOf(name)}</span>;
   return <img className="tk-pic" src={imgSrc(src)} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBad(true)} />;
 }
 
@@ -644,9 +644,9 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
   const skipBy = (s2, show = false, side = false) => {
     if (!seekBy(vref.current, s2)) return;
     if (!show) return;
-    setJump((j) => (j && Math.sign(j.s) === Math.sign(s2) && Date.now() - j.at < 800 ? { ...j, s: j.s + s2, k: j.k + 1, at: Date.now() } : { s: s2, k: Date.now(), at: Date.now(), side }));
+    setJump((j) => nextJump(j, s2));
     clearTimeout(jumpT.current);
-    jumpT.current = setTimeout(() => setJump(null), 750);
+    jumpT.current = setTimeout(() => { setJump((j) => j && { ...j, out: true }); jumpT.current = setTimeout(() => setJump(null), 320); }, 620);
   };
   // The left and right arrow keys go back or forward 15 seconds.
   const skipRef = useRef(skipBy);
@@ -675,7 +675,7 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
   const hold = useRef({ timer: null, x: 0, y: 0, until: 0 });
   const holdStart = (e) => {
     const v = vref.current;
-    if (!isVideo || !v || pinch.zoomedNow() || e.target.closest('button, a, iframe, .tk-prog')) return;
+    if (!isVideo || !v || e.target.closest('button, a, iframe, .tk-prog')) return;
     const h = hold.current;
     h.x = e.clientX; h.y = e.clientY;
     clearTimeout(h.timer);
@@ -711,7 +711,7 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
     // On a longer video a double tap on the left or right side goes back or forward 15 seconds (like YouTube), and
     // every tap on that side right after adds 15 more; the middle still likes.
     const fx = (e.clientX - box.left) / box.width;
-    const side = isLong && !pinch.zoomedNow() ? (fx < 0.36 ? -1 : fx > 0.64 ? 1 : 0) : 0;
+    const side = isLong ? (fx < 0.36 ? -1 : fx > 0.64 ? 1 : 0) : 0;
     const st = seekTap.current;
     if (side && side === st.side && now < st.until) {
       clearTimeout(r.timer);
@@ -723,8 +723,9 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
     if (now - r.t < 300) {
       clearTimeout(r.timer);
       r.t = 0;
-      if (pinch.zoomedNow()) { pinch.reset(); return; }
+      // Zoomed in, the sides still jump; the middle goes back to normal size.
       if (side) { st.side = side; st.until = now + 700; skipBy(15 * side, true, true); return; }
+      if (pinch.zoomedNow()) { pinch.reset(); return; }
       // Players from other sites never like on a tap.
       if (!isEmbed || native) { fxAt.current = { y: Math.round(e.clientY - box.top), x: Math.round(e.clientX - box.left) }; acts.like(); }
       return;
@@ -756,11 +757,20 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
     if (who === 'profile') push({ key: 'profile', name: id.name, role: t('Posted it'), avatar: item.media?.avatar || null, follow: whoData?.author?.canFollow ? { kind: 'author', name: whoData.author.name, on: whoData.author.followed } : null });
     for (const pf of item.performers || []) push({ key: `performer:${pf}`, name: pf, role: t('In the video'), thumb: thumbOf(pf), follow: whoData ? { kind: 'performer', name: pf, on: !!whoData.performers?.find((x) => x.name === pf)?.followed } : null });
     for (const pp of item.people || []) push({ key: `person:${pp.platform || 'any'}|${pp.handle}`, name: pp.handle, role: t('Tagged'), lookup: true, platform: pp.platform || 'any' });
+    // Each person their own colour; two people whose colours happen to be the same get the next one.
+    const used = new Set();
+    for (const p of out) {
+      let off = 0;
+      let col = avatarColor(p.name);
+      while (used.has(col) && off < 8) col = avatarColor(p.name, ++off);
+      used.add(col);
+      p.color = col;
+    }
     return out;
   })();
   const picOf = (p) => (p.key === 'profile'
-    ? (p.avatar ? <img className="tk-pic" src={p.avatar} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} /> : <span className="tk-pic none" aria-hidden="true">{String(p.name).replace(/^[@u/]+/, '').slice(0, 1).toUpperCase()}</span>)
-    : <PersonPic name={p.name} thumb={p.thumb} lookup={!!p.lookup} platform={p.platform || 'any'} />);
+    ? (p.avatar ? <img className="tk-pic" src={p.avatar} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} /> : <span className="tk-pic none" style={{ background: p.color }} aria-hidden="true">{initialsOf(p.name)}</span>)
+    : <PersonPic name={p.name} thumb={p.thumb} lookup={!!p.lookup} platform={p.platform || 'any'} color={p.color} />);
   async function toggleFollow(target = followTarget) {
     const followTarget = target;
     if (!followTarget || !whoData) return;
@@ -809,7 +819,7 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
             {people.map((p) => (
               <div key={p.key} className="tk-person">
                 <button type="button" className="tk-person-main" onClick={() => { setSheet(p.key); if (p.key.startsWith('performer:')) strong('performer'); }}>
-                  <span className="tk-person-pic">{picOf(p)}</span>
+                  <span className="tk-person-pic" style={{ '--pc': p.color }}>{picOf(p)}</span>
                   <span className="tk-person-name"><b>{String(p.name).replace(/^@+/, '')}</b><em>{p.role}</em></span>
                   <Icon name="chevR" />
                 </button>
@@ -892,7 +902,7 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
           <TkMedia item={item} active={active && !hidden} preload={preload} vref={vref} onReady={() => setReady(true)} onStart={() => setStarted(true)} onPlay={() => strong('play')} sandboxed={sandboxed} onNative={setNative} />
           {!started && (isVideo || isEmbed) && coverOf(item.media) ? <TkCover item={item} active={active && !hidden} /> : null}
         </div>
-        {jump ? <span key={jump.k} className={`tk-jump${jump.side ? (jump.s < 0 ? ' l' : ' r') : ''}`} aria-live="polite">{jump.side ? <Icon name={jump.s < 0 ? 'chevL' : 'chevR'} /> : null}{jump.s > 0 ? `+${jump.s}` : `−${-jump.s}`} s</span> : null}
+        <SeekRipple jump={jump} />
         {fast ? <span className="tk-fast" aria-live="polite">{String(fast).replace('.', ',')}× <Icon name="chevR" /><Icon name="chevR" /></span> : null}
         <PostFx fx={fx} />
         <HeatFx heat={heat} />
@@ -910,7 +920,7 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
         <div className="tk-avwrap">
           {people.length >= 2 ? (
             <button type="button" className={`tk-av tk-avs n${Math.min(3, people.length)}`} onClick={() => setSheet('people')} aria-label={tn(people.length, '{n} person in this post: pick who to see', '{n} people in this post: pick who to see')}>
-              {people.slice(0, 3).map((p, i) => <span key={p.key} className={`tk-avi i${i}`}>{picOf(p)}</span>)}
+              {people.slice(0, 3).map((p, i) => <span key={p.key} className={`tk-avi i${i}`} style={{ '--pc': p.color }}>{picOf(p)}</span>)}
               {people.length > 3 ? <span className="tk-avmore">+{people.length - 3}</span> : null}
             </button>
           ) : (

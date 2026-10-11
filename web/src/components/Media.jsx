@@ -41,6 +41,26 @@ export function seekTo(v, f) {
   return { at: to, d };
 }
 
+// A jump back or forward shows as a light half circle on that side of the video, like YouTube: arrows run through
+// it and the seconds add up while you keep going. It fades by itself.
+export function nextJump(j, s) {
+  const now = Date.now();
+  if (j && Math.sign(j.s) === Math.sign(s) && now - j.at < 900) return { ...j, s: j.s + s, n: j.n + 1, at: now };
+  return { s, k: now, n: 0, at: now };
+}
+export function SeekRipple({ jump }) {
+  if (!jump) return null;
+  const back = jump.s < 0;
+  return (
+    <span key={jump.k} className={`seekrip ${back ? 'l' : 'r'}${jump.out ? ' out' : ''}`} aria-live="polite">
+      <span key={jump.n} className="seekrip-in">
+        <span className="seekrip-arrows" aria-hidden="true"><i /><i /><i /></span>
+        <em>{t('{n} s', { n: Math.abs(jump.s) })}</em>
+      </span>
+    </span>
+  );
+}
+
 export function introCut(format, d) {
   if (!d || !isFinite(d)) return 0;
   const cut = d >= 600 ? 60 : format === 'long' || d > 180 ? 15 : 0;
@@ -329,9 +349,9 @@ export function VideoPlayer({ item, active, onPlay, onReady, onFull, onFail, inT
       e.preventDefault();
       const s = e.key === 'ArrowLeft' ? -15 : 15;
       seekBy(v, s);
-      setJump({ s, k: Date.now() });
+      setJump((j) => nextJump(j, s));
       clearTimeout(jt);
-      jt = setTimeout(() => setJump(null), 650);
+      jt = setTimeout(() => { setJump((j) => j && { ...j, out: true }); jt = setTimeout(() => setJump(null), 320); }, 620);
     };
     window.addEventListener('keydown', key);
     return () => { window.removeEventListener('keydown', key); clearTimeout(jt); };
@@ -392,7 +412,7 @@ export function VideoPlayer({ item, active, onPlay, onReady, onFull, onFail, inT
         {!inTk && !armed ? <Badge format={item.format} /> : null}
         {item.duration && !inTk && !armed ? <span className="dur">{fmtDur(item.duration)}</span> : null}
         {loading && !error ? <span className="spinner" aria-label={t('Loading video')} /> : null}
-        {jump && !inTk ? <span key={jump.k} className="vjump" aria-live="polite">{jump.s > 0 ? `+${jump.s}` : `\u2212${-jump.s}`} s</span> : null}
+        {!inTk ? <SeekRipple jump={jump} /> : null}
         {!inTk && item.media.hasAudio !== false && (src || hlsUrl) && armed ? (
           <button type="button" className={`mutebtn${muted ? '' : ' on'}`} onClick={(e) => { e.stopPropagation(); if (muted) unmute(); else { setSound(false); } }} aria-label={muted ? t('Turn sound on') : t('Turn sound off')} title={muted ? t('Sound on for every video') : t('Sound off for every video')}>
             <Icon name={muted ? 'mute' : 'volume'} />

@@ -2,6 +2,15 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.25.1 · 11 octobre 2026
+
+### Plein écran
+- Les puces de recherche et de filtres en haut sont maintenant centrées. Les tags en bas reviennent à gauche, comme avant la 0.25.0.
+- Reculer ou avancer (deux touchers sur un côté, les flèches) n’affiche plus de +15 ou −15 : un demi-cercle très léger apparaît de ce côté, avec de petites flèches qui le traversent et les secondes qui s’additionnent tant que vous continuez. Il s’efface tout seul. Les vidéos du fil font de même avec les flèches.
+- L’animation du j’aime par deux touchers s’affiche maintenant au-dessus de tout, aussi au-dessus des boutons plein écran et 15 secondes.
+- En zoom sur une vidéo, deux touchers à gauche ou à droite sautent toujours de 15 secondes et maintenir l’accélère toujours. Deux touchers au milieu remettent toujours la taille normale.
+- Les petites photos de plusieurs personnes ressemblent maintenant à la grande : les mêmes couleurs douces et deux lettres quand il n’y a pas de photo, et chaque personne a sa propre couleur (aussi dans la liste des personnes).
+
 ## 0.25.0 · 11 octobre 2026
 
 ### Kinks

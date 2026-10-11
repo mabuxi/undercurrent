@@ -1,5 +1,6 @@
 // Version 0.25: Reddit communities on kinks, people in a post, double tap to skip.
 export default {
+  "{n} s": "{n} s",
   "Posted it": "L’a publié",
   "In the video": "Dans la vidéo",
   "Tagged": "Identifié",

@@ -8,14 +8,21 @@ export const plain = (s) => String(s).replace(/ \[[^\]]*\]$/, '');
 
 export const RATE_TEXT = [t('Not rated'), t('Not for me'), t('Okay'), t('Good'), t('Great'), t('Perfect')];
 
-export function Avatar({ name, size = 'm' }) {
-  const n = String(name || '?').replace(/^u\//, '');
+// Everyone has their own colour (the same one everywhere), and two letters when there is no picture.
+const AV_COLORS = ['#E3A58F', '#B5A2E8', '#86C7B8', '#E0C07A', '#93B4DF', '#D6A0CF', '#E8B4A6', '#A9C98D'];
+export function avatarColor(name, offset = 0) {
+  const n = String(name || '?').replace(/^u\//, '').replace(/^@+/, '');
   let h = 0;
   for (const c of n) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  const colors = ['#E3A58F', '#B5A2E8', '#86C7B8', '#E0C07A', '#93B4DF', '#D6A0CF', '#E8B4A6', '#A9C98D'];
+  return AV_COLORS[(h + offset) % AV_COLORS.length];
+}
+export function initialsOf(name) {
+  const n = String(name || '?').replace(/^u\//, '').replace(/^@+/, '');
   const parts = n.split(/[_\-\s.]+/).filter(Boolean);
-  const ini = ((parts[0]?.[0] || '?') + (parts[1]?.[0] || parts[0]?.[1] || '')).toUpperCase();
-  return <span className={`avatar av-${size}`} style={{ background: colors[h % colors.length] }}>{ini}</span>;
+  return ((parts[0]?.[0] || '?') + (parts[1]?.[0] || parts[0]?.[1] || '')).toUpperCase();
+}
+export function Avatar({ name, size = 'm', color }) {
+  return <span className={`avatar av-${size}`} style={{ background: color || avatarColor(name) }}>{initialsOf(name)}</span>;
 }
 
 export function Flames({ value, onChange, id }) {
