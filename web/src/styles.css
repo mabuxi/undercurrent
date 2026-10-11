@@ -800,7 +800,7 @@ article.post,.filterbar,.win{scroll-margin-top:calc(var(--toph,92px) + 8px)}
 .kc-head strong{font-size:14px}
 .kc-desc{margin:0;font-size:12px;color:var(--text-2);line-height:1.4}
 .kc-bars{display:flex;flex-direction:column;gap:4px}
-.kc-bars>div{display:grid;grid-template-columns:52px 1fr 34px;align-items:center;gap:6px;font-size:11px;color:var(--text-3)}
+.kc-bars>div{display:grid;grid-template-columns:52px 1fr 46px;align-items:center;gap:6px;font-size:11px;color:var(--text-3)}
 .kc-bars em{font-style:normal;text-align:right;color:var(--text-2)}
 .kc-tags{display:flex;flex-wrap:wrap;gap:4px}
 .kc-tags .chip{font-size:11px;padding:2px 7px}
@@ -2421,3 +2421,13 @@ html.narrow .pmenu .grp.end .blockerbtn{display:flex}
 @media (max-width:640px){.kmode{flex-direction:column;gap:3px;font-size:11.5px;padding:8px 4px}}
 .kc-head .kc-match{margin-left:auto}
 .kimprove-refresh{margin-left:auto}
+.kimprove-refresh.busy svg{animation:spin 1s linear infinite}
+.kc-bars em svg,.barrow .bt em svg{width:11px;height:11px;stroke-width:2.4;margin-right:2px;vertical-align:-1px}
+.kc-bars em svg{color:var(--text-2)}
+.kb-search{display:flex;align-items:center;gap:8px;margin:4px 0 14px;padding:0 6px 0 12px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line-2)}
+.kb-search>svg{width:16px;height:16px;color:var(--text-3);flex:none}
+.kb-search input{all:unset;flex:1;min-width:0;padding:10px 0;font-size:14px;color:var(--text)}
+.kb-search input::-webkit-search-cancel-button{display:none}
+.kfound{display:flex;flex-direction:column;gap:4px}
+.kfound-hits{margin:0 4px;font-size:11.5px;color:var(--text-3)}
+.kinkboard .kb-search input[type=search]{all:unset;box-sizing:border-box;flex:1;min-width:0;padding:10px 0;font-size:14px;color:var(--text);background:transparent;border:0;border-radius:0}

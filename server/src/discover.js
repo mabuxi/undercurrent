@@ -427,6 +427,7 @@ export async function autoDiscover({ force = false } = {}) {
       }
       // Reddit communities for one of your kinks (runs in the background, one kink per round).
       try { const { kinkSubsRound } = await import('./kinksubs.js'); out.kinkSubs = kinkSubsRound(); } catch (e) { log('warn', `Kink communities failed: ${e.message}`); }
+      try { const { growRound } = await import('./kinktags.js'); out.kinkTags = await growRound(); } catch (e) { log('warn', `Kink tags failed: ${e.message}`); }
     }
     if (st.redgifs?.enabled) out.redgifs = await discoverNiches(terms);
     try { out.revive = reviveAndRest(); } catch (e) { log('warn', `Source revival failed: ${e.message}`); }

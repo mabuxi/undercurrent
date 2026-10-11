@@ -37,15 +37,17 @@ export const KINK_MODES = [
 ];
 export const modeInfo = (id) => KINK_MODES.find((m) => m.id === id) || KINK_MODES[2];
 
-// Points over time as two or three bars, each scaled against the biggest, so a change really shows.
+// Points over time as bars on a scale of 100%: lately first, with an arrow saying whether it went up or down
+// against all time.
 export function shareBars(p, withNow = false) {
-  const rows = [
-    { key: 'all', label: t('All time'), share: p?.shareAll || 0, pts: p?.all || 0 },
-    { key: 'lately', label: t('Lately'), share: p?.shareLately || 0, pts: p?.lately || 0 },
+  const all = p?.shareAll || 0;
+  const late = p?.shareLately || 0;
+  const trend = late - all >= 0.5 ? 'up' : all - late >= 0.5 ? 'down' : null;
+  return [
+    { key: 'lately', label: t('Lately'), share: late, pts: p?.lately || 0, trend },
+    { key: 'all', label: t('All time'), share: all, pts: p?.all || 0 },
     ...(withNow ? [{ key: 'now', label: t('Right now'), share: p?.shareNow || 0, pts: p?.now || 0 }] : [])
-  ];
-  const top = Math.max(1, ...rows.map((r) => r.share));
-  return rows.map((r) => ({ ...r, w: Math.round((r.share / top) * 100) }));
+  ].map((r) => ({ ...r, w: Math.max(0, Math.min(100, r.share)) }));
 }
 const pct = (v) => `${String(Math.round(v * 10) / 10).replace('.', getLang() === 'fr' ? ',' : '.')}%`;
 
@@ -70,7 +72,7 @@ function KinkCard({ k, onOpen }) {
         </div>
       ) : null}
       <div className="kc-bars" title={t('The part of all your points that went to posts with it')}>
-        {bars.map((b) => <div key={b.key}><span>{b.label}</span><div className="track2"><i style={{ width: `${b.w}%`, background: k.color, opacity: b.key === 'all' ? 0.55 : 1 }} /></div><em title={tn(b.pts, '{n} point', '{n} points')}>{pct(b.share)}</em></div>)}
+        {bars.map((b) => <div key={b.key}><span>{b.label}</span><div className="track2"><i style={{ width: `${b.w}%`, background: k.color, opacity: b.key === 'all' ? 0.55 : 1 }} /></div><em title={tn(b.pts, '{n} point', '{n} points')}>{b.trend ? <Icon name={b.trend} /> : null}{pct(b.share)}</em></div>)}
       </div>
       {k.evidence ? <p className="kc-why">{evidenceLine(k.evidence)}</p> : null}
       <div className="kc-tags">{k.tags.slice(0, 4).map((x) => <span key={x.name} className="chip ghost">{x.name}</span>)}{k.tags.length > 4 ? <span className="chip ghost more">+{k.tags.length - 4}</span> : null}</div>
@@ -106,6 +108,7 @@ export default function KinkBoard({ onOpen, onChange }) {
   const { kinks, toast } = useApp();
   const [extra, setExtra] = useState({ rising: [], removed: [] });
   const [showFaded, setShowFaded] = useState(false);
+  const [q, setQ] = useState('');
   const [form, setForm] = useState(null);
   const [nk, setNk] = useState({ name: '', tags: '', parent: '' });
   const [ng, setNg] = useState({ name: '', kinks: [] });
@@ -119,6 +122,14 @@ export default function KinkBoard({ onOpen, onChange }) {
   const sections = groups.map((g) => ({ g, members: sort(active.filter((k) => k.parentId === g.id)) })).filter((s) => s.members.length).sort((a, b) => b.members.length - a.members.length);
   const loose = sort(active.filter((k) => !k.parentId || !groups.some((g) => g.id === k.parentId)));
   const changed = () => { onChange(); loadExtra(); };
+  // Searching your kinks: the name, every tag and every Reddit community count, faded kinks too.
+  const needle = q.trim().toLowerCase().replace(/^r\//, '');
+  const found = needle ? sort(plain).map((k) => {
+    const inName = k.name.toLowerCase().includes(needle);
+    const tags = (k.tags || []).filter((x) => x.name.toLowerCase().includes(needle)).map((x) => x.name);
+    const subs = (k.subs || []).filter((s) => s.toLowerCase().includes(needle)).map((s) => `r/${s}`);
+    return inName || tags.length || subs.length ? { k, hits: [...subs, ...tags].slice(0, 4), inName } : null;
+  }).filter(Boolean).sort((a, b) => Number(b.inName) - Number(a.inName)) : null;
 
   async function addKink(e) {
     e.preventDefault();
@@ -170,6 +181,23 @@ export default function KinkBoard({ onOpen, onChange }) {
         </form>
       ) : null}
 
+      <div className="kb-search">
+        <Icon name="search" />
+        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('Search your kinks, tags and communities')} aria-label={t('Search your kinks')} />
+        {q ? <button type="button" className="icon-btn" onClick={() => setQ('')} aria-label={t('Clear the search')}><Icon name="x" /></button> : null}
+      </div>
+      {found ? (
+        <div className="ksection">
+          <div className="ks-head" style={{ '--c': '#B6A8B0' }}><span className="kc-dot" />{tn(found.length, '{n} kink found', '{n} kinks found')}</div>
+          {found.length ? <div className="kgrid">{found.map(({ k, hits }) => (
+            <div key={k.id} className="kfound">
+              <KinkCard k={k} onOpen={onOpen} />
+              {hits.length ? <p className="kfound-hits">{t('Matches: {what}', { what: hits.join(', ') })}</p> : null}
+            </div>
+          ))}</div> : <p className="wnote">{t('No kink has that in its name, tags or communities.')}</p>}
+        </div>
+      ) : null}
+      {found ? null : <>
       {sections.map(({ g, members }) => (
         <div key={g.id} className="ksection">
           <GroupHead g={g} count={members.length} onChange={changed} />
@@ -182,6 +210,7 @@ export default function KinkBoard({ onOpen, onChange }) {
           <div className="kgrid">{loose.map((k) => <KinkCard key={k.id} k={k} onOpen={onOpen} />)}</div>
         </div>
       ) : null}
+      </>}
       {!active.length ? <p className="wnote">{t("No kinks yet. They show up once you've given heat to, liked or saved a few posts that share something specific, on more than one day.")}</p> : null}
 
       {extra.rising?.length ? (

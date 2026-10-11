@@ -4,9 +4,9 @@ import { tagsForItems } from './store.js';
 import { kinkIndex, kinksForTags } from './kinks.js';
 
 // How much you did with each kink, in points: every post that has the kink (by its tags or its communities) adds
-// the points you gave it (watching, heat, likes, saves), all time, over the last 7 days and over the
-// last day. The share is the part of all your points in that time that went to the kink, so a kink you are getting
-// into lately stands out clearly against all time.
+// the points you gave it (watching, heat, likes, saves; skipping and disliking take points away), all time, over the
+// last 7 days and over the last day. The share is the kink's points against all the points you gave in that time
+// (never under 0%), so a kink you are getting into lately stands out against all time, and one you are going off drops.
 
 const DAY = 86400000;
 let cache = { at: 0, items: null };
@@ -22,9 +22,9 @@ function engagedItems() {
   const comm = new Map();
   const q = getDb().prepare('SELECT community FROM items WHERE id = ?');
   for (const id of ids) comm.set(id, q.get(id)?.community || null);
-  // Only what you got out of a post counts: a post you skipped adds nothing (it does not take points away).
-  const pos = (v) => Math.max(0, v || 0);
-  cache = { at: t, items: all.filter((x) => x.p > 0 || week.get(x.item_id) > 0).map((x) => ({ id: x.item_id, all: pos(x.p), lately: pos(week.get(x.item_id)), now: pos(day.get(x.item_id)), tags: tagMap.get(x.item_id) || [], community: comm.get(x.item_id) })) };
+  // Points both ways: a post you skipped or disliked takes points away from its kinks, so a kink you are going off
+  // lately goes down.
+  cache = { at: t, items: all.filter((x) => x.p || week.get(x.item_id) || day.get(x.item_id)).map((x) => ({ id: x.item_id, all: x.p || 0, lately: week.get(x.item_id) || 0, now: day.get(x.item_id) || 0, tags: tagMap.get(x.item_id) || [], community: comm.get(x.item_id) })) };
   return cache.items;
 }
 

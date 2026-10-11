@@ -2,6 +2,16 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.27.0 · 11 octobre 2026
+
+### Kinks
+- Une barre de recherche au-dessus de vos kinks : elle trouve les kinks par leur nom, n’importe lequel de leurs tags et leurs communautés Reddit (les kinks estompés aussi), et indique ce qui correspond.
+- Les points comptent dans les deux sens : passer ou ne pas aimer des publications avec un kink lui retire des points, donc un kink qui vous lasse baisse récemment.
+- Les barres utilisent toujours une échelle de 100 %. Récemment est au-dessus de depuis toujours, avec une petite flèche quand il a monté ou baissé.
+- « Ajoutez des tags au kink pour l’améliorer » devient « Tags suggérés pour améliorer ce kink », avec des étincelles. Les suggestions sont uniquement des façons d’écrire le kink lui-même : autres orthographes (gay bondage, gay-bondage, male bondage pour Bondage), pluriels et formes (muscles, muscular pour Muscle) et parties clairement incluses (biceps, pecs). Elles viennent du modèle local, à partir du nom du kink et des tags qu’il a déjà, et des tags de vos publications qui contiennent chaque mot du nom du kink. Plus rien qui ne fait que l’accompagner. Le bouton pour actualiser montre les suivantes et en demande d’autres au modèle quand il n’y en a plus ; chacune indique dans combien de vos publications elle se trouve.
+- Un kink qui grandit ajoute aussi tout seul les tags dont l’app est sûre : ceux qui contiennent son nom et se trouvent dans quelques-unes de vos publications, et ceux dont le modèle est très sûr et qui sont dans vos publications. Juste après la création d’un kink, puis un kink par tour horaire.
+- Ouvrir un kink estompé le ramène en mode « Grandit » (avant, il revenait encore géré par l’app et pouvait de nouveau s’estomper). Pareil pour « Faire revenir ».
+
 ## 0.26.0 · 11 octobre 2026
 
 ### Kinks

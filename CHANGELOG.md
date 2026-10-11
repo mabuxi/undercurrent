@@ -3,6 +3,16 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.27.0 · 11 October 2026
+
+### Kinks
+- A search bar above your kinks: it finds kinks by their name, any of their tags and their Reddit communities (faded kinks too), and says what matched.
+- Points count both ways now: skipping or disliking posts with a kink takes points away, so a kink you are going off goes down lately.
+- The bars always use a scale of 100%. Lately is on top of all time, with a small arrow when it went up or down.
+- "Update tags to kink to improve" is now "Suggested tags to improve this kink", with sparkles. The suggestions are only ways of writing the kink itself: other spellings (gay bondage, gay-bondage, male bondage for Bondage), plurals and word forms (muscles, muscular for Muscle) and parts clearly inside it (biceps, pecs). They come from the local model, given the kink's name and the tags it already has, and from tags in your posts that have every word of the kink's name in them. Nothing that only comes along with it any more. The refresh button shows the next ones and asks the model for more when they run out; each one shows in how many of your posts it is.
+- A kink that grows also adds the tags the app is sure about by itself: tags with its name in them that are in a few of your posts, and the model's very sure ones that are in your posts. Right after you make a kink, and then one kink per hourly round.
+- Opening a faded kink brings it back set to "Grows" (it used to come back still managed by the app, so it could fade again). The same for "Bring back".
+
 ## 0.26.0 · 11 October 2026
 
 ### Kinks

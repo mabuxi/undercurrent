@@ -5,6 +5,7 @@ import { tagsForItems } from './store.js';
 import { conceptsOf, isKinkConcept } from './concepts.js';
 import { ensureKinkSchema, locksOf, conceptsOfRow, rememberRemoved, removedConcepts, dropKink, moveReferences, recolor, modeOf, kinkMatch, fillKink, conceptEvidence, MODES } from './kinkengine.js';
 import { kinkPoints } from './kinkstats.js';
+import { growSoon } from './kinktags.js';
 import { tr } from './i18n.js';
 
 export const PALETTE = ['#D98A99', '#A58FE0', '#66B5A6', '#D2A15E', '#7FA7D9', '#C98BC4', '#E3A58F', '#93C47D', '#E07A7A', '#7FD0C2', '#B7A4E8', '#E8C66B'];
@@ -127,7 +128,7 @@ export function createKink({ name, tags = [], description = '', color, origin = 
   }
   if (!isGroup) forgetRemovedAll(conceptsForUser(clean, tags));
   // A kink you make starts in "grows": the app adds the tags it knows for it, your own stay.
-  if (!isGroup && origin === 'user') fillKink(id);
+  if (!isGroup && origin === 'user') { fillKink(id); growSoon(id); }
   return id;
 }
 
@@ -161,7 +162,9 @@ export function updateKink(id, patch, { byUser = true } = {}) {
   if (byUser && !cur.is_group) {
     const mode = modeOf(cur);
     if (patch.mode && MODES.includes(patch.mode)) locks.mode = patch.mode;
-    else if (mode === 'ai' && ((patch.name != null && patch.name !== cur.name) || patch.tags)) locks.mode = 'grow';
+    // Bringing back a faded kink, or changing the name or tags of one the app manages, makes it yours: it grows
+    // from now on, and never fades by itself again.
+    else if (mode === 'ai' && ((patch.name != null && patch.name !== cur.name) || patch.tags || (patch.status === 'active' && cur.status === 'hidden'))) locks.mode = 'grow';
     else if (!locks.mode) locks.mode = mode;
     if (patch.name != null && patch.name !== cur.name) locks.name = 1;
     if ('parentId' in patch) locks.parent = 1;
@@ -196,7 +199,7 @@ export function updateKink(id, patch, { byUser = true } = {}) {
     }
   }
   if (patch.color || 'parentId' in patch) recolor();
-  if (byUser && !cur.is_group && patch.mode && patch.mode !== 'lock') fillKink(id);
+  if (byUser && !cur.is_group && patch.mode && patch.mode !== 'lock') { fillKink(id); if (patch.mode === 'grow') growSoon(id); }
   return true;
 }
 

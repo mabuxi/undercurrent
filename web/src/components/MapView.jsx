@@ -44,6 +44,43 @@ function AiWidget({ nodeKey }) {
   );
 }
 
+// Tags that would help the kink find more of its posts: other ways of writing it, plurals and word forms,
+// and parts or kinds clearly inside it. They come from the local model and from tags in your posts that have the
+// kink's name in them; the refresh button shows the next ones.
+function KinkTagIdeas({ kinkId, name, tagCount, onAdd }) {
+  const { toast } = useApp();
+  const [ideas, setIdeas] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const seen = useRef([]);
+  const load = async (more = false) => {
+    setBusy(true);
+    try {
+      if (more) seen.current = [...new Set([...seen.current, ...(ideas || []).map((x) => x.name)])];
+      const r = await api(`/kinks/${kinkId}/tag-ideas${more && seen.current.length ? `?skip=${encodeURIComponent(seen.current.join('|'))}` : ''}`);
+      if (more && r.ideas.some((x) => seen.current.includes(x.name))) seen.current = [];
+      setIdeas(r.ideas);
+    } catch (e) { toast(e.message); }
+    setBusy(false);
+  };
+  useEffect(() => { seen.current = []; load(); }, [kinkId, tagCount]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (ideas && !ideas.length && !busy) return null;
+  return (
+    <div className="kimprove">
+      <div className="kimprove-h"><Icon name="why" /><b>{t('Suggested tags to improve this kink')}</b>
+        <button type="button" className={`icon-btn kimprove-refresh${busy ? ' busy' : ''}`} disabled={busy} onClick={() => load(true)} aria-label={t('Other suggestions')} title={t('Other suggestions')}><Icon name="refresh" /></button>
+      </div>
+      <p className="wnote">{t('Other ways people tag {name}: spellings, plurals and parts of it. Tap one to add it, so the feed finds more of it.', { name })}</p>
+      {ideas ? (
+        <div className="chiprow">{ideas.map((x) => (
+          <button type="button" key={x.name} className="chip btn kidea" onClick={() => { onAdd(x.name); setIdeas((cur) => cur.filter((y) => y.name !== x.name)); }} title={x.posts ? tn(x.posts, 'In {n} of your posts', 'In {n} of your posts') : t('Not in your posts yet')}>
+            + {x.name}{x.posts ? <em className="dim"> {x.posts}</em> : null}
+          </button>
+        ))}</div>
+      ) : <p className="wnote"><span className="spin" /> {t('Thinking of tags…')}</p>}
+    </div>
+  );
+}
+
 // The Reddit communities of a kink: the ones it has (yours, and the ones the app was sure about), a field to add one,
 // and what the app found but was not sure enough about to add by itself.
 function KinkSubs({ kinkId, name }) {
@@ -178,7 +215,7 @@ function Detail({ nodeKey, brain, reload, onSelect, startEdit = false }) {
             {kinkObj ? <button type="button" className={`ghost-btn small${editing ? ' accent' : ''}`} onClick={() => setEditing((x) => !x)}><Icon name="edit" />{t('Edit')}</button> : null}
             {kinkObj ? <button type="button" className={`ghost-btn small${combine ? ' accent' : ''}`} onClick={() => setCombine((x) => !x)} aria-expanded={combine}><Icon name="grid" />{t('Combine')}</button> : null}
             {kinkObj && node.status !== 'hidden' && full?.status !== 'hidden' ? <button type="button" className="ghost-btn small" onClick={() => patch({ status: 'hidden' }, t('Faded. It comes back by itself once you are into it again.'))} title={t('It leaves your kinks and comes back by itself once you are into it again')}><Icon name="less" />{t('Fade')}</button> : null}
-            {kinkObj && (node.status === 'hidden' || full?.status === 'hidden') ? <button type="button" className="ghost-btn small accent" onClick={() => patch({ status: 'active' }, t('It is back.'))}><Icon name="eye" />{t('Bring back')}</button> : null}
+            {kinkObj && (node.status === 'hidden' || full?.status === 'hidden') ? <button type="button" className="ghost-btn small accent" onClick={() => patch({ status: 'active' }, full?.mode === 'ai' ? t('It is back, and it grows now: the app can add to it but never fades it.') : t('It is back.'))}><Icon name="eye" />{t('Bring back')}</button> : null}
             {kinkObj ? <button type="button" className="ghost-btn small danger" onClick={async () => { await api(`/kinks/${node.id}`, { method: 'DELETE' }); toast(t("Removed. It won't come back by itself.")); onSelect(null); reload(); refreshMeta(); }}><Icon name="trash" />{t('Remove')}</button> : null}
             {node.type === 'fantasy' ? <button type="button" className="ghost-btn small danger" onClick={async () => { await api(`/fantasies/${node.id}`, { method: 'DELETE' }); onSelect(null); reload(); }}><Icon name="trash" />{t('Delete')}</button> : null}
           </div>
@@ -221,18 +258,7 @@ function Detail({ nodeKey, brain, reload, onSelect, startEdit = false }) {
                 {groups.map((g) => <option key={g.id} value={g.id}>{g.parentId ? `  ${groups.find((x) => x.id === g.parentId)?.name || ''} › ${g.name}` : g.name}</option>)}
               </select>
             </div>
-            {d?.relatedTags?.length ? (
-              <div className="kimprove">
-                <div className="kimprove-h"><Icon name="spark" /><b>{t('Update tags to kink to improve')}</b>
-                  <button type="button" className="icon-btn kimprove-refresh" onClick={async () => {
-                    const seen = [...new Set([...(d.seenRel || []), ...d.relatedTags])];
-                    try { const r = await api(`/brain/node/${nodeKey}?skip=${encodeURIComponent(seen.join('|'))}`); setD((cur) => ({ ...cur, relatedTags: r.relatedTags, seenRel: r.relatedTags.some((x) => seen.includes(x)) ? [] : seen })); } catch (e) { toast(e.message); }
-                  }} aria-label={t('Other suggestions')} title={t('Other suggestions')}><Icon name="refresh" /></button>
-                </div>
-                <p className="wnote">{t('These often come with it in your posts. Tap one to add it to {name}, so the feed finds more of it.', { name: node.name })}</p>
-                <div className="chiprow">{d.relatedTags.map((tag) => <button type="button" key={tag} className="chip btn" onClick={() => addTag(tag, t('Added {tag}.', { tag }))} title={t('Add to this kink')}>+ {tag}</button>)}</div>
-              </div>
-            ) : null}
+            {kinkObj ? <KinkTagIdeas kinkId={node.id} name={node.name} tagCount={allTags.length} onAdd={(tag) => addTag(tag, t('Added {tag}.', { tag }))} /> : null}
           </div>
         ) : node.type === 'tag' && d?.relatedTags?.length ? (
           <div className="ktags"><div className="bw-h"><span>{t('Often comes with')}</span></div><div className="chiprow">{d.relatedTags.map((x) => <button type="button" key={x} className="chip btn" onClick={() => setFilters({ tags: [node.name, x] })}>{x}</button>)}</div></div>
@@ -257,7 +283,7 @@ function Detail({ nodeKey, brain, reload, onSelect, startEdit = false }) {
                 const diff = b.key === 'lately' ? Math.round((b.share - full.points.shareAll) * 10) / 10 : null;
                 return (
                   <div key={b.key} className="barrow">
-                    <div className="bt"><span>{b.label}</span><em className={diff == null ? '' : diff >= 0 ? 'up' : 'down'}>{tn(b.pts, '{n} pt', '{n} pts')} · {t('{p}% of yours', { p: String(b.share).replace('.', ',') })}{diff != null && diff !== 0 ? ` (${diff > 0 ? '+' : ''}${String(diff).replace('.', ',')})` : ''}</em></div>
+                    <div className="bt"><span>{b.label}</span><em className={diff == null ? '' : diff >= 0 ? 'up' : 'down'}>{b.trend ? <Icon name={b.trend} /> : null}{tn(b.pts, '{n} pt', '{n} pts')} · {t('{p}% of yours', { p: String(b.share).replace('.', ',') })}{diff != null && diff !== 0 ? ` (${diff > 0 ? '+' : ''}${String(diff).replace('.', ',')})` : ''}</em></div>
                     <div className="track2"><i style={{ width: `${b.w}%`, background: b.key === 'now' ? 'var(--flame)' : b.key === 'all' ? rgba(node.color, 0.5) : node.color }} /></div>
                   </div>
                 );
@@ -374,7 +400,7 @@ export default function MapView() {
   // A kink that faded is brought back when you open it: opening it says you still care.
   async function openKink(k, how = {}) {
     if (k.status === 'hidden') {
-      try { await api(`/kinks/${k.id}`, { method: 'PATCH', body: { status: 'active' } }); toast(t('{name} is back and stays.', { name: k.name })); await load(); refreshMeta(); } catch (e) { toast(e.message); return; }
+      try { await api(`/kinks/${k.id}`, { method: 'PATCH', body: { status: 'active' } }); toast(k.mode === 'ai' ? t('{name} is back, and it grows now: the app can add to it but never fades it.', { name: k.name }) : t('{name} is back and stays.', { name: k.name })); await load(); refreshMeta(); } catch (e) { toast(e.message); return; }
     }
     select(`k${k.id}`, how);
   }
@@ -432,11 +458,10 @@ export default function MapView() {
             {kinks.length ? kinks.slice(0, 10).map((k) => {
               const p = k.points;
               const d = p ? Math.round((p.shareLately - p.shareAll) * 10) / 10 : k.lately - k.allTime;
-              const top = p ? Math.max(1, p.shareAll, p.shareLately) : 100;
               return (
                 <div className="barrow" key={k.id} onClick={() => select(`k${k.id}`)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') select(`k${k.id}`); }}>
                   <div className="bt"><span>{k.name}{k.status === 'proposed' ? ` (${t('suggested')})` : ''}</span><em className={d >= 0 ? 'up' : 'down'}>{d >= 0 ? '+' : ''}{String(d).replace('.', ',')}</em></div>
-                  <div className="duo"><div className="track2"><i style={{ width: `${p ? (p.shareAll / top) * 100 : k.allTime}%`, background: rgba(k.color, 0.45) }} /></div><div className="track2"><i style={{ width: `${p ? (p.shareLately / top) * 100 : k.lately}%`, background: k.color }} /></div></div>
+                  <div className="duo"><div className="track2"><i style={{ width: `${p ? Math.min(100, p.shareLately) : k.lately}%`, background: k.color }} /></div><div className="track2"><i style={{ width: `${p ? Math.min(100, p.shareAll) : k.allTime}%`, background: rgba(k.color, 0.45) }} /></div></div>
                 </div>
               );
             }) : <p className="wnote">{t("No kinks yet. They appear once you've given heat to, liked or saved a few posts, or add your own below.")}</p>}

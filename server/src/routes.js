@@ -12,6 +12,7 @@ import { genderPrefs, setGenderPrefs, autoMale } from './gender.js';
 import { queueLook } from './ai/looker.js';
 import { listSuggestions, setSuggestion, suggestCombos, suggestFantasies, refreshFantasyIdeas } from './suggest.js';
 import { touchSession } from './sessions.js';
+import { tagIdeas } from './kinktags.js';
 import { kinkSubs, addKinkSub, removeKinkSub, dismissKinkSub, searchKinkSubs, maybeSearch } from './kinksubs.js';
 import { listKinks, createKink, updateKink, deleteKink, mergeKinks, unlockKink, listFantasies, saveFantasy, deleteFantasy, setLink, removeLink, kinkIdsForTagNames } from './kinks.js';
 import { writeFantasy, tagsForText, conceptsFor } from './fantasywrite.js';
@@ -758,6 +759,7 @@ api.post('/kinks/groups', wrap((req, res) => {
   for (const k of req.body?.kinks || []) updateKink(Number(k), { parentId: id });
   res.json({ id });
 }));
+api.get('/kinks/:id/tag-ideas', wrap(async (req, res) => res.json({ ideas: await tagIdeas(Number(req.params.id), { skip: String(req.query.skip || '').split('|').filter(Boolean).slice(0, 200) }) })));
 api.get('/kinks/:id/subs', wrap((req, res) => { if (req.query.auto !== '0') maybeSearch(Number(req.params.id)); res.json(kinkSubs(Number(req.params.id))); }));
 api.post('/kinks/:id/subs', wrap((req, res) => { const name = addKinkSub(Number(req.params.id), String(req.body?.name || ''), { origin: 'user', why: req.body?.why || null }); invalidatePool(); res.json({ name, ...kinkSubs(Number(req.params.id)) }); }));
 api.delete('/kinks/:id/subs/:name', wrap((req, res) => { removeKinkSub(Number(req.params.id), req.params.name); invalidatePool(); res.json(kinkSubs(Number(req.params.id))); }));
