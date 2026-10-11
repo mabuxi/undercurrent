@@ -301,12 +301,12 @@ export default function MemoryView() {
             const meta = metaOf(g.category);
             const lim = g.category === 'Turn-offs and limits';
             return (
-              <div className={`card2 catcard${lim ? ' limits' : ''}`} key={g.category} id={lim ? 'mem-disliked' : undefined} style={{ '--c': meta.color }}>
+              <div className={`card2 catcard notched${lim ? ' limits' : ''}`} key={g.category} id={lim ? 'mem-disliked' : undefined} style={{ '--c': meta.color }}>
                 <div className="catcard-h">
                   <span className="catic"><Icon name={meta.icon} /></span>
                   <div><h3>{t(g.category)}</h3><span className="mini-meta">{meta.hint}</span></div>
                   <span className="catn">{g.items.length}</span>
-                  <button type="button" className="icon-btn" onClick={() => addTo(g.category)} aria-label={t('Add to {name}', { name: t(g.category) })} title={t('Add to {name}', { name: t(g.category) })}><Icon name="plus" /></button>
+                  <button type="button" className="icon-btn notch-btn" onClick={() => addTo(g.category)} aria-label={t('Add to {name}', { name: t(g.category) })} title={t('Add to {name}', { name: t(g.category) })}><Icon name="plus" /></button>
                 </div>
                 {g.items.length ? <div className="memlist scrolly">{g.items.map((m) => <MemoryItem key={m.id} m={m} categories={mem.categories} onChange={load} />)}</div> : null}
                 {lim ? <DislikedBlock /> : null}

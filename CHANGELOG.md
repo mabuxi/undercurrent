@@ -3,6 +3,26 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.28.0 · 11 October 2026
+
+### Looks
+- A new Look card in Settings with three looks: Original (the one you know), Cutout and Signal. The Mac keeps your choice, so your iPhone looks the same, and the switch is instant.
+- Cutout: deep black, flat saturated colours and bold shapes with a glow in their own colour, in Unbounded and Manrope. Every window has a round cut-out at its top right where its button sits, with soft rounded edges where the cut-out meets the window. The first window of each column, the first kink of each group, the kink's banner and the second memory card are solid blocks of their colour. A lime pill slides under the open view in the phone's tab bar.
+- Signal: like a club poster, in Big Shoulders Display and Space Mono. Cream outlines, hard shadows in each colour, condensed uppercase titles, tilted stickers for matches and labels, striped bars for all time, on a dotted black background.
+- Both looks make the colours of kinks, windows and moods more vivid, use bolder icons, and work on the whole app: the feed, the windows, posts, the map, your kinks, a kink's page, memory, settings and the phone's tab bar. Their fonts are part of the app, so they work without the internet.
+- The Mac app's window background follows the look.
+
+### Shapes for kinks
+- Every kink has a shape, in every look. A group gets a family of shapes that fits what it is about (round shapes for the body, arches for places, capsules for clothing, stars for sex, petals and hearts for oral, drops for cum and fluids, links for dynamics, frames for camera, the sky for ethnicity, and more), and each kink in it gets its own variation of that family. Names choose fitting shapes too (a heart for kissing, a drop for a shower, a sun for the beach, a bolt for rough).
+- Each look draws them its own way: soft gradients in Original, flat with a glow in Cutout, and in Signal filled with the family's own pattern (dots, stripes, checks, waves…), outlined, with a hard shadow.
+- Tap a shape to pick another one (from its family or any other) or to change the colour; a group's shape picks the family for all its kinks. "Let the app choose" goes back to the app's shape.
+- The shapes show on the kink cards, the kink page, group titles, the kink chips on posts and in the full screen viewer, and in the title of windows about one kink.
+
+### Your kinks and a kink's page
+- Your kinks is now a page of its own under the map, with a big title, groups side by side when there is room, and new cards: the shape and the match on top, the name with who may change it (Locked, Grows, Managed), the bars, the evidence and the tags. Two cards per row on a phone.
+- A kink's page opens with a banner: its big shape, its group and mode, the name, why it is a kink, the buttons to show it or explore around it, and the match in big numbers with a gauge marking 50%. Edit, Combine, Fade, Bring back and Remove sit next to the match.
+- Its windows are arranged in two columns: who may change it and this week vs before side by side, then the tags with the suggested tags, what the assistant thinks and recent interactions; the Reddit communities, best matches and links on the side. Everything that was on the page is still there.
+
 ## 0.27.1 · 11 October 2026
 
 ### Kinks

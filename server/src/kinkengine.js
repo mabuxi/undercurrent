@@ -29,6 +29,7 @@ export function ensureKinkSchema() {
   if (!cols.includes('faded_at')) db.exec('ALTER TABLE kinks ADD COLUMN faded_at INTEGER');
   if (!cols.includes('parent_id')) db.exec('ALTER TABLE kinks ADD COLUMN parent_id INTEGER');
   if (!cols.includes('is_group')) db.exec('ALTER TABLE kinks ADD COLUMN is_group INTEGER DEFAULT 0');
+  if (!cols.includes('shape')) db.exec('ALTER TABLE kinks ADD COLUMN shape TEXT');
   const tcols = db.prepare('PRAGMA table_info(kink_tags)').all().map((c) => c.name);
   if (!tcols.includes('origin')) db.exec("ALTER TABLE kink_tags ADD COLUMN origin TEXT DEFAULT 'ai'");
   // Reddit communities that belong to a kink: added (by you or because the app was sure), suggested, or turned down.
@@ -423,6 +424,14 @@ export function syncKinks({ ai = null } = {}) {
     summary.groups = syncGroups(ai);
   })();
   return summary;
+}
+
+// The family of a kink (from its main concept, or what the local model said it belongs to) or of a group.
+export function familyOfRow(row, learned = getSetting('kinkFamilies', {}) || {}) {
+  const cs = conceptsOfRow(row);
+  if (row?.is_group) return cs.find((c) => c.startsWith('family:'))?.slice(7) || null;
+  const c = cs[0];
+  return c ? familyOf(c) || learned[c] || null : null;
 }
 
 // Families: a group exists once two of your kinks share a family, named plainly after it.

@@ -2,6 +2,7 @@ import { VersionCard } from './Updates.jsx';
 import { ModelsCard } from './ModelChooser.jsx';
 import { ProfilesCard } from './Profiles.jsx';
 import { LanguageCard } from './Language.jsx';
+import { LookCard } from './Look.jsx';
 import { Fragment, useEffect, useState } from 'react';
 import { api, fmtBytes } from '../api.js';
 import { useApp } from '../context.jsx';
@@ -387,6 +388,7 @@ export default function SettingsView() {
     <section className="center" style={{ paddingTop: 0 }}>
       <div className="jhead"><div><h2>{t('Settings')}</h2><p>{t('Sources, filters, the local model and accounts.')}</p></div></div>
       <LanguageCard />
+      <LookCard />
       <ProfilesCard />
       <VersionCard />
       <VideoSection s={settings} reload={reload} />

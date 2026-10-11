@@ -255,5 +255,6 @@ export default {
   "Reddit is not connected yet. Add your app details in Settings.": "Reddit n’est pas encore connecté. Ajoutez les informations de votre app dans les Réglages.",
   "Reddit refused the login: {error}": "Reddit a refusé la connexion : {error}",
   "unknown error": "erreur inconnue",
-  "no list of videos came back": "aucune liste de vidéos n’est revenue"
+  "no list of videos came back": "aucune liste de vidéos n’est revenue",
+  "Unknown look.": "Apparence inconnue."
 };

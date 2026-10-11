@@ -17,6 +17,8 @@ import { useUpdates, UpdateModal, WhatsNew } from './components/Updates.jsx';
 import TabBar from './components/TabBar.jsx';
 import { useNarrow } from './components/FeedView.jsx';
 import { t, tn } from './i18n.js';
+import { applyTheme } from './theme.js';
+import { assignShapes } from './shapes.jsx';
 
 export default function App() {
   const [filterState, setFiltersState] = useState({});
@@ -40,6 +42,15 @@ export default function App() {
   const [journeySpec, setJourneySpec] = useState(null);
   const [feedKey, setFeedKey] = useState(0);
   const [kinks, setKinks] = useState([]);
+  // The look (original, Cutout or Signal) and the shape of every kink, which it draws in its own way.
+  const [theme, setThemeState] = useState(() => document.documentElement.dataset.theme || 'original');
+  useEffect(() => {
+    const on = (e) => setThemeState(e.detail);
+    window.addEventListener('uc-theme', on);
+    return () => window.removeEventListener('uc-theme', on);
+  }, []);
+  const setTheme = useCallback((v) => setThemeState(applyTheme(v)), []);
+  const shapes = useMemo(() => assignShapes(kinks), [kinks]);
   const [fantasies, setFantasies] = useState([]);
   const [presets, setPresets] = useState([]);
   const [toastMsg, setToastMsg] = useState(null);
@@ -315,8 +326,8 @@ export default function App() {
   const ctx = useMemo(() => ({
     filters, opts, mix, setMix: (v) => { saveTune({ mix: v }); setOpts((o) => ({ ...o, mix: null })); setFeedKey((k) => k + 1); }, tune, withoutFilters, clearAll, mode, setFilters, patchFilters, applyMood, openMode,
     kinks, fantasies, presets, refreshMeta, toast, sessionId, update: updates.info, openUpdate: () => setUpdateOpen(true), askOut, setAskOut, settings, setSettings, feedKey, applyClient, refreshFeed: () => setFeedKey((k) => k + 1),
-    search, runSearch, searchMore, editChip, clearSearch, openProfile, clearFilter
-  }), [filters, opts, mix, mode, setFilters, patchFilters, applyMood, openMode, kinks, fantasies, presets, refreshMeta, toast, askOut, settings, feedKey, applyClient, search, runSearch, searchMore, editChip, clearSearch, openProfile, clearFilter, updates.info, tune, withoutFilters, saveTune, clearAll]);
+    search, runSearch, searchMore, editChip, clearSearch, openProfile, clearFilter, theme, setTheme, shapes
+  }), [theme, setTheme, shapes, filters, opts, mix, mode, setFilters, patchFilters, applyMood, openMode, kinks, fantasies, presets, refreshMeta, toast, askOut, settings, feedKey, applyClient, search, runSearch, searchMore, editChip, clearSearch, openProfile, clearFilter, updates.info, tune, withoutFilters, saveTune, clearAll]);
 
   return (
     <AppCtx.Provider value={ctx}>

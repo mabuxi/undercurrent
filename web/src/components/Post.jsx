@@ -7,6 +7,7 @@ import { Media } from './Media.jsx';
 import { AskPanel, Avatar, CommentsPanel, ProfilePanel, PerformerPanel, PersonPanel, HeatSlider, WhyPanel, plain } from './Panels.jsx';
 import Linkify from './Linkify.jsx';
 import { t, tn } from '../i18n.js';
+import { KShape } from '../shapes.jsx';
 import { useTranslate, TranslateButton, TranslatedNote } from './Translate.jsx';
 import { usePostActions } from '../postactions.js';
 import { useTkOpen } from '../tk.js';
@@ -443,7 +444,7 @@ export default function Post({ item: initial, focus = false, onStrong, onWeak, o
         ) : null}
         {item.kinks?.map((k) => (
           <span key={k.id} className="chip link kchip" style={{ '--c': k.color, '--c2': rgba(k.color, 0.16) }}>
-            <button type="button" onClick={tapOnly(() => setFilters({ kink: k.id }))} title={t('Show only {name}', { name: k.name })}>{k.name}</button>
+            <button type="button" onClick={tapOnly(() => setFilters({ kink: k.id }))} title={t('Show only {name}', { name: k.name })}><KShape id={k.id} color={k.color} size={13} className="kchip-sh" />{k.name}</button>
             <button type="button" className="kx" onClick={tapOnly(() => setKink(k, false))} aria-label={t('This post is not {name}', { name: k.name })} title={t('Not {name}: take it out', { name: k.name })}><Icon name="x" /></button>
           </span>
         ))}

@@ -203,6 +203,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         if what == "winfull-on" { viewerFull(true); return }
         if what == "winfull-off" { viewerFull(false); return }
         if what == "drag" { dragWindow() }
+        // The look changed: the window's own background follows the page's.
+        if what.hasPrefix("bg:#"), what.count == 10, let v = UInt32(what.dropFirst(4), radix: 16) {
+            window.backgroundColor = NSColor(red: CGFloat((v >> 16) & 0xFF) / 255, green: CGFloat((v >> 8) & 0xFF) / 255, blue: CGFloat(v & 0xFF) / 255, alpha: 1)
+        }
     }
 
     // ---------- Full screen with the full screen viewer ----------

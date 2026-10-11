@@ -1,0 +1,335 @@
+/* ===== The Cutout look =====
+   Deep black, flat saturated colour, bold shapes with a glow in their own colour, and windows with a round cut-out at
+   their top right where their button sits (soft fillets where the cut-out meets the edges). The first window of each
+   column, the first kink of each group, the kink banner and the second memory card are solid colour blocks.
+   Unbounded for titles and numbers, Manrope for everything else.
+   theme-cutout.css is made from theme-cutout.src.css by scripts/notch.py (it fills in the cut-out masks). */
+
+:root[data-theme="cutout"]{
+  --bg:#050505;--surface:#111111;--surface-2:#1A1A1A;--surface-3:#262626;
+  --line:rgba(255,255,255,.06);--line-2:rgba(255,255,255,.13);
+  --text:#F4F4F0;--text-2:#B9B9B2;--text-3:#7A7A74;
+  --accent:#C8FF1E;--accent-ink:#0B0B0B;
+  --following:#4D8DFF;--foryou:#FF3D9A;--discovery:#FFD21E;--short:#1EE68A;--long:#FF6B1A;--gif:#9B5CFF;--flame:#FF6B1A;--flame-2:#FFD21E;--ok:#1EE68A;
+  --display:'Unbounded','Manrope',-apple-system,sans-serif;--ui:'Manrope',-apple-system,'Segoe UI',sans-serif;--mono:'Manrope',-apple-system,sans-serif;
+  --hole:#1A1A1A;--hole-ink:#F4F4F0;
+}
+/* Every colour that comes from a kink, a window or a mood is made more vivid. */
+@supports (color:hsl(from red h s l)){
+  :root[data-theme="cutout"] *{--cv:hsl(from var(--c) h calc(min(100,s * 1.35 + 32)) calc(l * .42 + 33));--tcv:hsl(from var(--tc) h calc(min(100,s * 1.35 + 32)) calc(l * .42 + 33))}
+}
+:root[data-theme="cutout"] body{font-weight:500;font-variant-numeric:tabular-nums}
+:root[data-theme="cutout"] ::selection{background:var(--accent);color:#0B0B0B}
+
+/* Titles in Unbounded; sentences stay in Manrope so they read easily */
+:root[data-theme="cutout"] :is(.sechead h3,.jhead h2,.hello h2,.kb-head h2,.kh-name,.story h3,.thread h3,.fant h4,.jend h3,.jreveal h3,.uphead h3,.ob-h,.ob-title,.pc-main strong,.dp-question,.dp-final h3,.jplan h2,.fc-head strong){font-family:var(--display);font-style:normal;font-weight:800;letter-spacing:-.025em}
+:root[data-theme="cutout"] :is(.hello-sum,.fh-answer,.aitext,.memquote,.dnote,.dq,.serif,.scenario,.pv-fallback,.ptile .ptxt,.dp-scn,.hello-ans,.dislike .dq){font-family:var(--ui);font-style:normal;font-weight:600;letter-spacing:-.005em}
+:root[data-theme="cutout"] .aitext{font-size:15px;line-height:1.5}
+:root[data-theme="cutout"] .serif{font-size:16px}
+:root[data-theme="cutout"] .fant h4{font-size:17px;line-height:1.2}
+:root[data-theme="cutout"] .story h3,:root[data-theme="cutout"] .thread h3{font-size:22px;line-height:1.15}
+:root[data-theme="cutout"] .ob-title{font-size:clamp(44px,7vw,84px);background:none;color:var(--accent);-webkit-text-fill-color:var(--accent)}
+
+/* Top bar */
+:root[data-theme="cutout"] .top{border-bottom:0;box-shadow:0 14px 22px -18px #000}
+:root[data-theme="cutout"] .brand h1{font-family:var(--display);font-style:normal;font-weight:800;font-size:23px;letter-spacing:-.03em}
+:root[data-theme="cutout"].narrow .brand h1{font-size:17px;background:none;color:var(--text);-webkit-text-fill-color:var(--text)}
+:root[data-theme="cutout"] .sbar{background:var(--surface);border:0;border-radius:24px}
+:root[data-theme="cutout"] .sbar:focus-within{box-shadow:0 0 0 2px var(--accent)}
+:root[data-theme="cutout"] .sbar:has(.sb-field.has-chips){border-radius:24px}
+:root[data-theme="cutout"] .btn-accent{border-radius:24px;box-shadow:0 10px 26px -12px var(--accent)}
+:root[data-theme="cutout"] .btn-clear{border:0;border-radius:50%;background:var(--surface)}
+:root[data-theme="cutout"] .nav{background:none;border:0;padding:0;gap:6px}
+:root[data-theme="cutout"] .nav button{width:42px;height:42px;border-radius:50%;background:var(--surface);color:var(--text-2)}
+:root[data-theme="cutout"] .nav button:hover{background:var(--surface-2);color:var(--text)}
+:root[data-theme="cutout"] .nav button.on{background:var(--accent);color:#0B0B0B;box-shadow:0 10px 24px -10px var(--accent)}
+:root[data-theme="cutout"] .phonebtn{border:0;border-radius:50%;background:var(--surface)}
+:root[data-theme="cutout"] .deepbtn{border-radius:50%}
+:root[data-theme="cutout"] .schip{border:0;border-radius:14px;background:var(--surface-2)}
+:root[data-theme="cutout"] .schip-tag,:root[data-theme="cutout"] .schip-filter.schip-tag{background:color-mix(in srgb,var(--accent) 22%,var(--surface-2))}
+:root[data-theme="cutout"] .sb-steps,:root[data-theme="cutout"] .statuspop{background:var(--surface);border:0;border-radius:20px}
+:root[data-theme="cutout"] .sb-now{border-radius:14px}
+:root[data-theme="cutout"] .mockbar{border-radius:18px;background:rgba(255,210,30,.1)}
+:root[data-theme="cutout"] .uppill{border:0;background:var(--accent);color:#0B0B0B}
+:root[data-theme="cutout"] .uppill svg{color:#0B0B0B}
+
+/* Buttons, chips, inputs */
+:root[data-theme="cutout"] .ghost-btn{border:0;background:var(--surface-2);color:var(--text);border-radius:18px;font-weight:700}
+:root[data-theme="cutout"] .ghost-btn:hover{background:var(--surface-3)}
+:root[data-theme="cutout"] .ghost-btn.accent{background:var(--accent);color:var(--accent-ink);box-shadow:0 10px 22px -12px var(--accent)}
+:root[data-theme="cutout"] .ghost-btn.danger{color:#FF7A9C;background:rgba(255,61,154,.12)}
+:root[data-theme="cutout"] .icon-btn{border-radius:50%}
+:root[data-theme="cutout"] .chip.ghost,:root[data-theme="cutout"] button.chip.ghost.link{border:0;background:var(--surface-2);color:var(--text-2);border-radius:12px;font-weight:600}
+:root[data-theme="cutout"] .chip.btn{border:0;background:var(--surface-2);border-radius:12px;font-weight:600}
+:root[data-theme="cutout"] .chip.btn:hover{background:var(--surface-3)}
+:root[data-theme="cutout"] .chip.btn.on{background:var(--text);color:#0B0B0B}
+:root[data-theme="cutout"] .chip.btn.accent{background:var(--accent);color:#0B0B0B}
+:root[data-theme="cutout"] .chip:not(.ghost):not(.btn):not(.kchip){background:color-mix(in srgb,var(--cv,var(--c)) 22%,transparent);color:var(--cv,var(--c));border-radius:10px;font-weight:700}
+:root[data-theme="cutout"] button.chip.more{border:0;background:var(--surface-2);border-radius:12px}
+:root[data-theme="cutout"] .chip.kchip{background:var(--cv,var(--c));color:#0B0B0B;border-radius:12px;font-weight:700;--kfill:#0B0B0B;box-shadow:0 8px 18px -10px var(--cv,var(--c))}
+:root[data-theme="cutout"] .chip.kchip .kx:hover{background:rgba(0,0,0,.12)}
+:root[data-theme="cutout"] .chip.mine{background:color-mix(in srgb,var(--flame) 18%,transparent);color:var(--flame-2)}
+:root[data-theme="cutout"] input:not([type=range]):not([type=checkbox]):not([type=color]):not(.sb-field input,.kb-search input,.ksub-add input,.tp-row input),:root[data-theme="cutout"] textarea,:root[data-theme="cutout"] select{background:var(--surface-2);border:1px solid transparent;border-radius:14px}
+:root[data-theme="cutout"] input:not([type=range]):not([type=checkbox]):focus,:root[data-theme="cutout"] textarea:focus{border-color:var(--accent);outline:none}
+:root[data-theme="cutout"] .seg{border:0;background:var(--surface-2);border-radius:18px}
+:root[data-theme="cutout"] .seg button.on{background:var(--text);color:#0B0B0B}
+:root[data-theme="cutout"] .toggle .tbox{background:var(--surface-3)}
+:root[data-theme="cutout"] .toggle input:checked+.tbox::after{background:#0B0B0B}
+:root[data-theme="cutout"] .langswitch{background:var(--surface-2);border:0}
+:root[data-theme="cutout"] .langswitch button.on{background:var(--accent);color:#0B0B0B}
+:root[data-theme="cutout"] .track2{height:7px;border-radius:5px;background:var(--surface-3)}
+:root[data-theme="cutout"] .track2 i{border-radius:5px}
+:root[data-theme="cutout"] .sugg{border-radius:7px;background:var(--accent);color:#0B0B0B}
+:root[data-theme="cutout"] .sugg.pin{background:#0B0B0B;color:var(--text);box-shadow:inset 0 0 0 1px var(--line-2)}
+:root[data-theme="cutout"] .sugg.ask{background:var(--long);color:#0B0B0B}
+:root[data-theme="cutout"] .toast{background:var(--accent);color:#0B0B0B;border:0;border-radius:20px;font-weight:700;box-shadow:0 14px 30px -12px var(--accent)}
+:root[data-theme="cutout"] .linkbtn{color:var(--accent)}
+:root[data-theme="cutout"] .count{font-family:var(--ui);font-weight:700}
+:root[data-theme="cutout"] .fb-label,:root[data-theme="cutout"] .blockhead h3,:root[data-theme="cutout"] .tlabel{color:var(--text-3);font-weight:800}
+
+/* Panels: flat, rounded, no outlines */
+:root[data-theme="cutout"] :is(.card2,.bw,.tuner,.filterbar,.searchcard,.jopt,.jend,.mapwrap,.memtile,.fantcard,.pcard,.provcard,.mc-card,.jintro){background:var(--surface);border:0;border-radius:26px}
+:root[data-theme="cutout"] .card2{padding:18px}
+:root[data-theme="cutout"] .card2 h3{font-family:var(--display);font-weight:700;font-size:13px;letter-spacing:.01em;text-transform:uppercase}
+:root[data-theme="cutout"] .bw{padding:16px}
+:root[data-theme="cutout"] .bw-h{font-family:var(--display);font-weight:700;font-size:11.5px;letter-spacing:.02em;color:var(--text)}
+:root[data-theme="cutout"] .panel-in{background:var(--surface-2);border-radius:20px}
+:root[data-theme="cutout"] .upcard{background:var(--surface);border:0;border-radius:32px}
+:root[data-theme="cutout"] .empty{border-color:var(--surface-3);border-radius:26px}
+:root[data-theme="cutout"] .jhead h2{font-size:40px}
+
+/* The cut-out: the panel is drawn behind the content and masked, the button sits in the hole */
+:root[data-theme="cutout"] .win,:root[data-theme="cutout"] .notched{position:relative;isolation:isolate}
+:root[data-theme="cutout"] .win::before,:root[data-theme="cutout"] .notched::before{content:'';position:absolute;inset:0;z-index:-1;border-radius:inherit;background:var(--surface);pointer-events:none}
+:root[data-theme="cutout"] .win:has(>.win-head .win-btns.n1)::before,:root[data-theme="cutout"] .kcard.notched::before,:root[data-theme="cutout"] .catcard.notched::before{-webkit-mask:{NOTCH_SM};mask:{NOTCH_SM}}
+:root[data-theme="cutout"] .win:has(>.win-head .win-btns.n2)::before{-webkit-mask:{NOTCH_MD};mask:{NOTCH_MD}}
+:root[data-theme="cutout"] .khero.notched::before{-webkit-mask:{NOTCH_LG};mask:{NOTCH_LG}}
+:root[data-theme="cutout"] :is(.win-btns .icon-btn,.notch-btn){background:var(--hole);color:var(--hole-ink);border-radius:50%}
+:root[data-theme="cutout"] :is(.win-btns .icon-btn,.notch-btn):hover{background:#2A2A2A;color:#fff}
+
+/* Side windows */
+:root[data-theme="cutout"] .win{background:none;border:0;border-radius:30px}
+:root[data-theme="cutout"] .win.active::before{background:color-mix(in srgb,var(--accent) 9%,var(--surface))}
+:root[data-theme="cutout"] .win-head{padding:15px 98px 10px 18px;min-height:58px}
+:root[data-theme="cutout"] .win-head:has(.win-btns.n1){padding-right:60px}
+:root[data-theme="cutout"] .win-btns{position:absolute;top:6px;right:6px;display:flex;gap:2px}
+:root[data-theme="cutout"] .win-btns .icon-btn{width:34px;height:34px}
+:root[data-theme="cutout"] .win-title strong{font-family:var(--display);font-weight:700;font-size:12px;letter-spacing:.01em;text-transform:uppercase}
+:root[data-theme="cutout"] .win-title span{font-size:11.5px;font-weight:600}
+:root[data-theme="cutout"] .win-dot{width:11px;height:11px;background:var(--cv,var(--c))}
+:root[data-theme="cutout"] .win-body{border-top:0;padding:2px 14px 16px;gap:10px}
+:root[data-theme="cutout"] .incenter{border-radius:8px}
+:root[data-theme="cutout"] :is(.wgrid .tile,.pv,.spot .sm,.ptile,.mnthumb .thumb,.dp-tile){border-radius:18px}
+:root[data-theme="cutout"] .thumb{border-radius:10px}
+:root[data-theme="cutout"] :is(.tile .tb,.pv .tb,.ptile .tb,.dur,.res,.provider){background:#0B0B0B;color:#F4F4F0;border-radius:8px;font-weight:700}
+:root[data-theme="cutout"] .mini{border-radius:18px}
+:root[data-theme="cutout"] .car-dots i.on{background:var(--accent)}
+/* The first window of each column is a solid block of its colour, with dark type */
+:root[data-theme="cutout"] :is(.side .track>.win:first-child,.feed>.win:nth-of-type(4n+1)){
+  --surface:var(--cv,var(--accent));--surface-2:rgba(0,0,0,.13);--surface-3:rgba(0,0,0,.2);--text:#0B0B0B;--text-2:rgba(11,11,11,.78);--text-3:rgba(11,11,11,.6);
+  --line:rgba(0,0,0,.12);--line-2:rgba(0,0,0,.22);--accent:#0B0B0B;--accent-ink:var(--cv,#C8FF1E);--kfill:#0B0B0B;
+  color:#0B0B0B;filter:drop-shadow(0 18px 28px color-mix(in srgb,var(--cv,var(--c)) 30%,transparent))}
+:root[data-theme="cutout"] :is(.side .track>.win:first-child,.feed>.win:nth-of-type(4n+1)) .win-dot{background:#0B0B0B}
+:root[data-theme="cutout"] :is(.side .track>.win:first-child,.feed>.win:nth-of-type(4n+1)) .chip.btn.on{background:#0B0B0B;color:var(--cv,#fff)}
+:root[data-theme="cutout"] :is(.side .track>.win:first-child,.feed>.win:nth-of-type(4n+1)) .discovery,:root[data-theme="cutout"] :is(.side .track>.win:first-child,.feed>.win:nth-of-type(4n+1)) [style*="color: rgb(246, 195, 91)"]{color:#0B0B0B}
+
+/* Feed */
+:root[data-theme="cutout"] .hello h2{font-size:32px}
+:root[data-theme="cutout"] .hello-sum{font-size:16px;color:var(--text-2)}
+:root[data-theme="cutout"] .tunebtn{border:0;background:var(--surface);border-radius:18px}
+:root[data-theme="cutout"] .tunebtn.on{box-shadow:inset 0 0 0 2px var(--accent)}
+:root[data-theme="cutout"] .nowchip{border:0;border-radius:16px;background:color-mix(in srgb,var(--tcv,var(--tc)) 16%,var(--surface))}
+:root[data-theme="cutout"] .nowchip .nk,:root[data-theme="cutout"] .nowchip svg.i{color:var(--tcv,var(--tc))}
+:root[data-theme="cutout"] .nowchip.on{background:var(--tcv,var(--tc));color:#0B0B0B}
+:root[data-theme="cutout"] .nowchip.on :is(.nk,small,svg.i){color:#0B0B0B}
+:root[data-theme="cutout"] :is(.tchip,.moodcard){border:0;border-radius:16px;background:color-mix(in srgb,var(--tcv,var(--tc)) 15%,var(--surface))}
+:root[data-theme="cutout"] :is(.tchip,.moodcard).on{background:var(--tcv,var(--tc));color:#0B0B0B}
+:root[data-theme="cutout"] :is(.tchip,.moodcard).on :is(small,.i){color:#0B0B0B}
+:root[data-theme="cutout"] .moodcard .mc-ic{background:color-mix(in srgb,var(--tcv,var(--tc)) 26%,transparent);color:var(--tcv,var(--tc));border-radius:50%}
+:root[data-theme="cutout"] .moodcard.on .mc-ic{background:#0B0B0B;color:var(--tcv,var(--tc))}
+:root[data-theme="cutout"] .uslider{background:linear-gradient(90deg,var(--surface-3),var(--accent))}
+:root[data-theme="cutout"] .uslider::-webkit-slider-thumb{background:var(--text);border-color:var(--bg)}
+:root[data-theme="cutout"] .post{background:var(--surface);border:0;border-radius:32px;padding:20px 20px 14px}
+:root[data-theme="cutout"] .post.focus{box-shadow:0 0 0 2px var(--accent)}
+:root[data-theme="cutout"] .ptitle{font-family:var(--display);font-weight:700;font-size:18px;line-height:1.3;letter-spacing:-.015em}
+:root[data-theme="cutout"] .pill{border:0;border-radius:10px;padding:4px 9px;color:#0B0B0B}
+:root[data-theme="cutout"] .pill-foryou{background:var(--foryou)}
+:root[data-theme="cutout"] .pill-following{background:var(--following)}
+:root[data-theme="cutout"] .pill-discovery{background:var(--discovery)}
+:root[data-theme="cutout"] .pill-popular{background:var(--flame-2)}
+:root[data-theme="cutout"] .pill-deeper{background:var(--discovery)}
+:root[data-theme="cutout"] .meter{background:var(--surface-3);height:5px}
+:root[data-theme="cutout"] .meter i{background:var(--cv,var(--c))}
+:root[data-theme="cutout"] :is(.media,.imgbtn,.media-sleep,.viewer img,.viewer video){border-radius:24px}
+:root[data-theme="cutout"] .gallery .gtile,:root[data-theme="cutout"] .gallery .media{border-radius:16px}
+:root[data-theme="cutout"] .badge{border-radius:10px;color:#0B0B0B}
+:root[data-theme="cutout"] :is(.fsbtn,.mutebtn,button.play){background:#0B0B0B;color:#F4F4F0}
+:root[data-theme="cutout"] .avatar{border-radius:14px}
+:root[data-theme="cutout"] .perf .avatar{border-radius:50%}
+:root[data-theme="cutout"] .perf{background:var(--surface-2);border-radius:14px}
+:root[data-theme="cutout"] .pbar{border-top:0;padding-top:4px}
+:root[data-theme="cutout"] .vote{background:var(--surface-2);border-radius:24px;padding:3px}
+:root[data-theme="cutout"] .vote button{width:32px;height:32px}
+:root[data-theme="cutout"] .vote button.on{background:var(--accent);color:#0B0B0B}
+:root[data-theme="cutout"] .vote button.vdown.on{background:var(--following);color:#0B0B0B}
+:root[data-theme="cutout"] .likebar{background:rgba(255,61,154,.5)}
+:root[data-theme="cutout"] .heat{background:var(--surface-2);border-radius:24px}
+:root[data-theme="cutout"] .heat.on{background:linear-gradient(90deg,color-mix(in srgb,var(--flame) calc(14% + var(--h) * 30%),var(--surface-2)),var(--surface-2))}
+:root[data-theme="cutout"] .pb{border-radius:20px}
+:root[data-theme="cutout"] .pb.icon{width:36px;height:36px;border-radius:50%;background:var(--surface-2)}
+:root[data-theme="cutout"] .pb.icon:hover{background:var(--surface-3)}
+:root[data-theme="cutout"] .pb.on,:root[data-theme="cutout"] .pb.icon.on{color:var(--accent)}
+:root[data-theme="cutout"] .pb.icon.savebtn.on{color:var(--discovery)}
+:root[data-theme="cutout"] .chipwrap.hov>.chiprow{border:0;border-radius:18px;background:var(--surface-2)}
+:root[data-theme="cutout"] .dislike.ask,:root[data-theme="cutout"] .dchip{border-color:transparent}
+:root[data-theme="cutout"] .freshbar{box-shadow:0 12px 30px -10px var(--accent)}
+:root[data-theme="cutout"].narrow .post{border-radius:26px;padding:14px 12px 10px}
+
+/* Map and the kinks page */
+:root[data-theme="cutout"] .brainwrap{border:0;border-radius:30px;background:radial-gradient(120% 90% at 50% 40%,#151515 0%,#080808 70%)}
+:root[data-theme="cutout"] .braintools select,:root[data-theme="cutout"] .brainfind input{border:0}
+:root[data-theme="cutout"] .kb-head h2{font-size:44px;letter-spacing:-.03em}
+:root[data-theme="cutout"] .kb-search{background:var(--surface);border:0;border-radius:24px}
+:root[data-theme="cutout"] .kb-form{background:var(--surface);border-radius:24px}
+:root[data-theme="cutout"] .ks-head{color:var(--text)}
+:root[data-theme="cutout"] .ks-head .ks-name{font-family:var(--display);font-weight:700;font-size:17px;letter-spacing:-.01em;text-transform:none}
+:root[data-theme="cutout"] .ks-head .count{margin-left:0;padding:2px 8px;border-radius:8px;background:var(--surface-2);color:var(--text-2)}
+:root[data-theme="cutout"] .ks-line{background:none}
+:root[data-theme="cutout"] .ks-fam{text-transform:uppercase;font-weight:800}
+:root[data-theme="cutout"] .kcard,:root[data-theme="cutout"] button.kcard{background:none;border:0;border-radius:28px;padding:15px;gap:10px}
+:root[data-theme="cutout"] .kcard.clickable:hover{transform:translateY(-2px)}
+:root[data-theme="cutout"] .kc-top{padding-right:40px}
+:root[data-theme="cutout"] .kcard .kc-edit{position:absolute;top:6px;right:6px;width:34px;height:34px;margin:0}
+:root[data-theme="cutout"] .kc-match{font-family:var(--display);font-weight:700;font-size:12px;border-radius:10px;padding:4px 8px;background:var(--surface-2);color:var(--text-2)}
+:root[data-theme="cutout"] .kc-match.ok{background:var(--cv,var(--c));color:#0B0B0B}
+:root[data-theme="cutout"] .kc-name strong{font-family:var(--display);font-weight:700;font-size:14.5px;letter-spacing:-.01em}
+:root[data-theme="cutout"] .kc-name .kc-mode{font-weight:800}
+:root[data-theme="cutout"] .kc-bars i{background:var(--cv,var(--c))}
+:root[data-theme="cutout"] .kc-bars>div{font-weight:700}
+:root[data-theme="cutout"] .kc-tags .chip{border-radius:10px}
+:root[data-theme="cutout"] .kcard .sugg{border-radius:7px}
+/* The first kink of each group is a solid block of its colour */
+:root[data-theme="cutout"] .ksections .kgrid>.kcard:first-child{
+  --surface:var(--cv,var(--c));--surface-2:rgba(0,0,0,.13);--surface-3:rgba(0,0,0,.18);--text:#0B0B0B;--text-2:rgba(11,11,11,.76);--text-3:rgba(11,11,11,.62);--line-2:rgba(0,0,0,.2);--kfill:#0B0B0B;
+  color:#0B0B0B;filter:drop-shadow(0 16px 26px color-mix(in srgb,var(--cv,var(--c)) 30%,transparent))}
+:root[data-theme="cutout"] .ksections .kgrid>.kcard:first-child .kc-match{background:#0B0B0B;color:var(--cv,var(--c))}
+:root[data-theme="cutout"] .ksections .kgrid>.kcard:first-child .kc-bars i{background:#0B0B0B}
+:root[data-theme="cutout"] .ksections .kgrid>.kcard:first-child .kc-shape{filter:none}
+:root[data-theme="cutout"] .chip.ghost.rising{background:var(--surface);border-radius:16px}
+:root[data-theme="cutout"] .chipx.keep{background:var(--accent);color:#0B0B0B}
+:root[data-theme="cutout"] .shapepop{background:var(--surface-2);border:0;border-radius:22px}
+:root[data-theme="cutout"] .sp-opt{border-radius:14px}
+:root[data-theme="cutout"] .sp-opt.on{border-color:var(--accent)}
+:root[data-theme="cutout"] .cdot{box-shadow:0 0 0 2px rgba(255,255,255,.18)}
+
+/* The kink page: a solid banner of the kink's colour, its button in the cut-out */
+:root[data-theme="cutout"] .kback{background:var(--surface);border:0;color:var(--text);box-shadow:0 10px 24px rgba(0,0,0,.6)}
+:root[data-theme="cutout"] .khero{background:none;border:0;border-radius:40px;padding:60px 28px 26px;
+  --surface:var(--cv,var(--c));--surface-2:rgba(0,0,0,.13);--surface-3:rgba(0,0,0,.2);--text:#0B0B0B;--text-2:rgba(11,11,11,.78);--text-3:rgba(11,11,11,.62);--line:rgba(0,0,0,.12);--line-2:rgba(0,0,0,.24);--kfill:#0B0B0B;
+  color:#0B0B0B;filter:drop-shadow(0 22px 34px color-mix(in srgb,var(--cv,var(--c)) 28%,transparent))}
+:root[data-theme="cutout"] .khero .kh-notch{display:grid;place-items:center;position:absolute;top:7px;right:7px;width:48px;height:48px;padding:0;border:0;cursor:pointer}
+:root[data-theme="cutout"] .khero .kh-notch svg{width:19px;height:19px}
+:root[data-theme="cutout"] .khero .kh-name .kedit{display:none}
+:root[data-theme="cutout"] .kh-shape .kshape{filter:drop-shadow(0 14px 0 rgba(0,0,0,.16))}
+:root[data-theme="cutout"] .kh-name{font-size:clamp(40px,7cqi,74px)}
+:root[data-theme="cutout"] .gtag{background:#0B0B0B;border:0;color:var(--cv,var(--c));padding:5px 11px;border-radius:12px}
+:root[data-theme="cutout"] .gtag.mode svg.i{color:var(--cv,var(--c))}
+:root[data-theme="cutout"] .khero .kact-main{background:#0B0B0B;color:var(--cv,var(--c));box-shadow:none;border-radius:24px}
+:root[data-theme="cutout"] .khero .kact-x{background:rgba(0,0,0,.13);border:0;color:#0B0B0B;border-radius:24px}
+:root[data-theme="cutout"] .khero .kact-x svg{color:#0B0B0B}
+:root[data-theme="cutout"] .khero .kact-x:hover{background:rgba(0,0,0,.2)}
+:root[data-theme="cutout"] .kh-match b{font-family:var(--display);font-weight:800;letter-spacing:-.04em}
+:root[data-theme="cutout"] .kh-match>span{color:#0B0B0B;font-weight:800}
+:root[data-theme="cutout"] .kpage .gauge{background:rgba(0,0,0,.2)}
+:root[data-theme="cutout"] .kpage .gauge i{background:#0B0B0B}
+:root[data-theme="cutout"] .kpage .gauge em{background:var(--cv,var(--c));outline:2px solid #0B0B0B;width:4px;margin-left:-2px}
+:root[data-theme="cutout"] .khero .ghost-btn{background:rgba(0,0,0,.13);color:#0B0B0B}
+:root[data-theme="cutout"] .khero .ghost-btn:hover{background:rgba(0,0,0,.2)}
+:root[data-theme="cutout"] .khero .ghost-btn.accent{background:#0B0B0B;color:var(--cv,var(--c));box-shadow:none}
+:root[data-theme="cutout"] .khero .ghost-btn.danger{color:#5C0012}
+:root[data-theme="cutout"] .khero .kname-form .kname{background:rgba(0,0,0,.12);color:#0B0B0B}
+:root[data-theme="cutout"] .kcombine{background:var(--surface);border:0;border-radius:24px}
+:root[data-theme="cutout"] .kmodes{background:var(--surface-2);border-radius:22px}
+:root[data-theme="cutout"] .kmode{border-radius:18px}
+:root[data-theme="cutout"] .kmode.on{background:var(--cv,var(--c));color:#0B0B0B;box-shadow:0 10px 22px -12px var(--cv,var(--c))}
+:root[data-theme="cutout"] .kmode-text svg{color:var(--cv,var(--c))}
+:root[data-theme="cutout"] .kw-bars .kb-lately i,:root[data-theme="cutout"] .kc-bars .kb-lately i{background:var(--cv,var(--c))}
+:root[data-theme="cutout"] .kw-bars .kb-all i{background:color-mix(in srgb,var(--cv,var(--c)) 50%,transparent)}
+:root[data-theme="cutout"] .kimprove{background:#9B5CFF;border:0;border-radius:22px;color:#0B0B0B;--text-3:rgba(11,11,11,.7);--text-2:rgba(11,11,11,.8)}
+:root[data-theme="cutout"] .kimprove .kimprove-h svg{color:#0B0B0B}
+:root[data-theme="cutout"] .kimprove .chip.btn{background:rgba(0,0,0,.16);color:#0B0B0B;border:0}
+:root[data-theme="cutout"] .kimprove .chip.btn:hover{background:rgba(0,0,0,.26)}
+:root[data-theme="cutout"] .kimprove .chip em{color:rgba(11,11,11,.6)}
+:root[data-theme="cutout"] .kimprove-refresh{background:#0B0B0B;color:#9B5CFF}
+:root[data-theme="cutout"] .kimprove-refresh:hover{background:#000;color:#B98CFF}
+:root[data-theme="cutout"] .ksub{background:var(--surface-2);border:0;border-radius:16px}
+:root[data-theme="cutout"] .ksub-add{border:0;background:var(--surface-2);border-radius:16px}
+:root[data-theme="cutout"] .ksubs-sugg{background:var(--surface-2);border:0;border-radius:20px}
+:root[data-theme="cutout"] .ksugg{border-top-color:rgba(255,255,255,.05)}
+:root[data-theme="cutout"] .tagadd{border:0;background:var(--surface-2);border-radius:12px}
+:root[data-theme="cutout"] .postcard img,:root[data-theme="cutout"] .postcard .histph,:root[data-theme="cutout"] .evthumb{border-radius:14px}
+:root[data-theme="cutout"] .lbar i{background:var(--text)}
+:root[data-theme="cutout"] .evtype{border-radius:8px}
+:root[data-theme="cutout"] .hovercard{background:#111;border:0;border-radius:18px}
+:root[data-theme="cutout"] .kback-wrap .kback svg{color:var(--accent)}
+
+/* Memory */
+:root[data-theme="cutout"] .memtile b{font-family:var(--display);font-weight:700;font-size:26px}
+:root[data-theme="cutout"] .memtile:hover{background:var(--surface-2)}
+:root[data-theme="cutout"] .memtile.hot{box-shadow:inset 0 0 0 2px var(--discovery)}
+:root[data-theme="cutout"] .memnav{background:rgba(17,17,17,.88);border:0}
+:root[data-theme="cutout"] .memnav-b:hover{background:var(--surface-2)}
+:root[data-theme="cutout"] .catcard{background:none;border:0;border-radius:28px}
+:root[data-theme="cutout"] .catcard-h{padding-right:40px}
+:root[data-theme="cutout"] .catcard .notch-btn{position:absolute;top:6px;right:6px;width:34px;height:34px}
+:root[data-theme="cutout"] .catcard-h h3{font-family:var(--display);font-weight:700;font-size:14px;text-transform:none;letter-spacing:-.01em}
+:root[data-theme="cutout"] .catic{border:0;border-radius:12px;background:var(--cv,var(--c));color:#0B0B0B}
+:root[data-theme="cutout"] .catn{font-family:var(--display);font-weight:800;font-size:20px;color:var(--cv,var(--c))}
+:root[data-theme="cutout"] .catcard .memitem{border-top:0;margin-top:6px;padding:12px;border-radius:18px;background:var(--surface-2)}
+:root[data-theme="cutout"] .catcard .memlist .memitem:first-child{margin-top:0}
+:root[data-theme="cutout"] .catgrid>.catcard:nth-child(2){
+  --surface:var(--cv,var(--c));--surface-2:rgba(0,0,0,.13);--surface-3:rgba(0,0,0,.2);--text:#0B0B0B;--text-2:rgba(11,11,11,.8);--text-3:rgba(11,11,11,.62);--line:rgba(0,0,0,.12);--line-2:rgba(0,0,0,.22);
+  color:#0B0B0B;filter:drop-shadow(0 18px 28px color-mix(in srgb,var(--cv,var(--c)) 26%,transparent))}
+:root[data-theme="cutout"] .catgrid>.catcard:nth-child(2) .catic{background:#0B0B0B;color:var(--cv,var(--c))}
+:root[data-theme="cutout"] .catgrid>.catcard:nth-child(2) .catn{color:#0B0B0B}
+:root[data-theme="cutout"] .catgrid>.catcard:nth-child(2) .icon-btn:not(.notch-btn){color:#0B0B0B}
+:root[data-theme="cutout"] .catchip{border:0;background:var(--surface-2);border-radius:14px}
+:root[data-theme="cutout"] .catchip.on{background:var(--cv,var(--c));color:#0B0B0B}
+:root[data-theme="cutout"] .catchip.on svg{color:#0B0B0B}
+:root[data-theme="cutout"] .memcat{border:0;background:var(--surface-3)}
+:root[data-theme="cutout"] .memitem.proposed{background:color-mix(in srgb,var(--discovery) 10%,var(--surface-2))}
+:root[data-theme="cutout"] .dchip{background:var(--foryou);color:#0B0B0B;border:0;border-radius:10px}
+:root[data-theme="cutout"] .dchip button{color:rgba(11,11,11,.7)}
+:root[data-theme="cutout"] .dchip.guess{background:var(--surface-2);color:var(--text);border:1px dashed var(--discovery)}
+:root[data-theme="cutout"] .secic{color:var(--cv,var(--c))}
+:root[data-theme="cutout"] .fc-pct{background:var(--discovery);color:#0B0B0B;font-family:var(--ui);font-weight:800}
+
+/* Settings and the rest */
+:root[data-theme="cutout"] .folrow,:root[data-theme="cutout"] .memitem,:root[data-theme="cutout"] .personrow{border-top-color:rgba(255,255,255,.05)}
+:root[data-theme="cutout"] .profrow{border:0;background:var(--surface-2);border-radius:18px}
+:root[data-theme="cutout"] .okpill{border-radius:7px}
+:root[data-theme="cutout"] .diag{border-radius:18px}
+:root[data-theme="cutout"] .lookopt{border:0;border-radius:22px}
+:root[data-theme="cutout"] .lookopt.on{box-shadow:0 0 0 2px var(--accent)}
+
+/* The phone's tab bar: a black pill with a lime pill sliding under the open view */
+:root[data-theme="cutout"] .tabbar-in{background:rgba(17,17,17,.9);border:0;box-shadow:0 14px 36px rgba(0,0,0,.7)}
+:root[data-theme="cutout"] .tabpill{background:var(--accent);box-shadow:0 8px 22px -8px var(--accent)}
+:root[data-theme="cutout"] .tab{color:#9A9A94}
+:root[data-theme="cutout"] .tab.on,:root[data-theme="cutout"] .tab.on .tab-ic svg{color:#0B0B0B}
+:root[data-theme="cutout"] .tab-l{font-weight:800}
+
+/* Full screen viewer: only the accents follow the look */
+:root[data-theme="cutout"] .tk-b.up.on svg{color:#0B0B0B;background:var(--accent)}
+:root[data-theme="cutout"] .tk .tk-chip.kink{background:var(--cv,var(--c));color:#0B0B0B;--kfill:#0B0B0B}
+:root[data-theme="cutout"] .tk-follow{background:var(--accent);color:#0B0B0B}
+
+:root[data-theme="cutout"] .sechead h3{font-size:17px;font-weight:700}
+:root[data-theme="cutout"] .kb-head .ghost-btn.main{background:var(--accent);color:#0B0B0B;box-shadow:0 10px 22px -12px var(--accent)}
+:root[data-theme="cutout"] .khero .gtag .kshape{--kfill:var(--cv,var(--c))}
+:root[data-theme="cutout"] .readbadge{background:var(--surface-2);color:var(--accent);border-radius:14px}
+/* The shape picker inside a solid block keeps the dark look */
+:root[data-theme="cutout"] .shapepop{--surface:#111;--surface-2:#1A1A1A;--surface-3:#262626;--text:#F4F4F0;--text-2:#B9B9B2;--text-3:#7A7A74;--line:rgba(255,255,255,.06);--line-2:rgba(255,255,255,.13);--accent:#C8FF1E;--accent-ink:#0B0B0B;background:#1A1A1A;color:#F4F4F0;box-shadow:0 24px 50px rgba(0,0,0,.7)}
+:root[data-theme="cutout"] .khero .shapepop .ghost-btn{background:#262626;color:#F4F4F0}
+/* Bolder icons */
+:root[data-theme="cutout"] svg.i{stroke-width:2.2}

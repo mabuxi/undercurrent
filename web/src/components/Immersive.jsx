@@ -13,6 +13,7 @@ import { enterWindowFull, leaveWindowFull } from '../winfull.js';
 import { soundOn, setSound, onSound } from '../sound.js';
 import { t, tn } from '../i18n.js';
 import { tapOnly } from '../tapguard.js';
+import { KShape } from '../shapes.jsx';
 
 // The full screen viewer on a phone, like TikTok: one post fills the screen, a swipe up or down snaps to the next or
 // the previous one, nothing else in between (no windows), and the tab bar is out of the way. Everything a post can do
@@ -853,7 +854,7 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
           <div className="tk-sec"><span className="fb-label">{t('Kinks')}</span><div className="chiprow all">
             {(item.kinks || []).map((k) => (
               <span key={k.id} className="chip link kchip" style={{ '--c': k.color, '--c2': rgba(k.color, 0.16) }}>
-                <button type="button" onClick={tapOnly(() => leaveTo(() => setFilters({ kink: k.id })))}>{k.name}</button>
+                <button type="button" onClick={tapOnly(() => leaveTo(() => setFilters({ kink: k.id })))}><KShape id={k.id} color={k.color} size={13} className="kchip-sh" />{k.name}</button>
                 <button type="button" className="kx" onClick={tapOnly(() => acts.setKink(k, false))} aria-label={t('This post is not {name}', { name: k.name })}><Icon name="x" /></button>
               </span>
             ))}
@@ -957,7 +958,7 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
         ) : null}
         <div className="tk-tags">
           {(item.performers || []).slice(0, 3).map((p) => <button type="button" key={`p${p}`} className="tk-chip perf" onClick={tapOnly(() => { setSheet(`performer:${p}`); strong('performer'); })}><PersonPic name={p} thumb={thumbOf(p)} />{String(p).replace(/^@+/, '')}</button>)}
-          {(item.kinks || []).map((k) => <button type="button" key={`k${k.id}`} className="tk-chip kink" style={{ '--c': k.color }} onClick={tapOnly(() => leaveTo(() => setFilters({ kink: k.id })))}>{k.name}</button>)}
+          {(item.kinks || []).map((k) => <button type="button" key={`k${k.id}`} className="tk-chip kink" style={{ '--c': k.color }} onClick={tapOnly(() => leaveTo(() => setFilters({ kink: k.id })))}><KShape id={k.id} color={k.color} size={13} className="kchip-sh" />{k.name}</button>)}
           {tags.slice(0, 30).map((tag) => <button type="button" key={tag} className="tk-chip" onClick={tapOnly(() => leaveTo(() => runSearch(tag).catch(() => setFilters({ tags: [tag] }))))}>#{tag}</button>)}
         </div>
         <button type="button" className="tk-tagsbtn" onClick={() => setSheet('tags')} aria-label={t('Show all kinks and tags')}><Icon name="tag" /></button>

@@ -2,6 +2,26 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.28.0 · 11 octobre 2026
+
+### Apparences
+- Une nouvelle carte Apparence dans les Réglages, avec trois apparences : Original (celle que vous connaissez), Cutout et Signal. Le Mac garde votre choix, donc votre iPhone a la même apparence, et le changement est immédiat.
+- Cutout : noir profond, couleurs vives en aplat et formes audacieuses avec un halo de leur propre couleur, en Unbounded et Manrope. Chaque fenêtre a une découpe ronde en haut à droite où se place son bouton, avec des bords arrondis et doux là où la découpe rejoint la fenêtre. La première fenêtre de chaque colonne, le premier kink de chaque groupe, la bannière d’un kink et la deuxième carte de la mémoire sont des blocs pleins de leur couleur. Sur le téléphone, une pilule citron vert glisse sous la vue ouverte dans la barre d’onglets.
+- Signal : comme une affiche de club, en Big Shoulders Display et Space Mono. Contours crème, ombres franches de chaque couleur, titres condensés en majuscules, autocollants inclinés pour les correspondances et les étiquettes, barres rayées pour « depuis toujours », sur un fond noir pointillé.
+- Les deux apparences rendent plus vives les couleurs des kinks, des fenêtres et des humeurs, utilisent des icônes plus épaisses et s’appliquent à toute l’app : le fil, les fenêtres, les publications, la carte, vos kinks, la page d’un kink, la mémoire, les réglages et la barre d’onglets du téléphone. Leurs polices font partie de l’app, donc elles marchent sans internet.
+- Le fond de la fenêtre de l’app Mac suit l’apparence.
+
+### Des formes pour les kinks
+- Chaque kink a une forme, dans chaque apparence. Un groupe reçoit une famille de formes qui correspond à son sujet (formes rondes pour le corps, arches pour les lieux, capsules pour les vêtements, étoiles pour le sexe, pétales et cœurs pour l’oral, gouttes pour le sperme et les fluides, maillons pour les dynamiques, cadres pour la caméra, le ciel pour les origines, et d’autres), et chaque kink du groupe reçoit sa propre variante de cette famille. Les noms choisissent aussi des formes adaptées (un cœur pour les baisers, une goutte pour la douche, un soleil pour la plage, un éclair pour le brutal).
+- Chaque apparence les dessine à sa façon : dégradés doux dans Original, aplat avec halo dans Cutout, et dans Signal remplies du motif de leur famille (points, rayures, damier, vagues…), avec un contour et une ombre franche.
+- Touchez une forme pour en choisir une autre (de sa famille ou d’une autre) ou changer la couleur ; la forme d’un groupe choisit la famille de tous ses kinks. « Laisser l’app choisir » revient à la forme de l’app.
+- Les formes apparaissent sur les cartes de kinks, la page d’un kink, les titres des groupes, les étiquettes de kinks sur les publications et dans le lecteur plein écran, et dans le titre des fenêtres consacrées à un kink.
+
+### Vos kinks et la page d’un kink
+- Vos kinks est maintenant une page à part sous la carte, avec un grand titre, les groupes côte à côte quand il y a de la place, et de nouvelles cartes : la forme et la correspondance en haut, le nom avec qui peut le modifier (Verrouillé, Grandit, Géré), les barres, les preuves et les tags. Deux cartes par ligne sur un téléphone.
+- La page d’un kink s’ouvre sur une bannière : sa grande forme, son groupe et son mode, le nom, pourquoi c’est un kink, les boutons pour l’afficher ou explorer autour, et la correspondance en grand avec une jauge qui marque 50 %. Modifier, Combiner, Estomper, Ramener et Supprimer sont à côté de la correspondance.
+- Ses fenêtres sont rangées en deux colonnes : qui peut le modifier et cette semaine contre avant côte à côte, puis les tags avec les tags suggérés, ce que pense l’assistant et les interactions récentes ; les communautés Reddit, les meilleures correspondances et les liens sur le côté. Tout ce qui était sur la page est toujours là.
+
 ## 0.27.1 · 11 octobre 2026
 
 ### Kinks

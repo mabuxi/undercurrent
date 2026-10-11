@@ -7,6 +7,7 @@ import { TopReplies } from './Media.jsx';
 import { drawMap } from '../mapdraw.js';
 import { FantasyTools } from './FantasyEdit.jsx';
 import { t, tn } from '../i18n.js';
+import { KShape } from '../shapes.jsx';
 
 function thumbUrl(it) {
   const m = it.media || {};
@@ -734,14 +735,18 @@ export function Window({ w }) {
   const active = (w.type === 'map' && mode === 'map') || (mode === 'feed' && opts.activeWin === w.uid);
   const canExpand = w.type === 'map' || !!w.filter;
   const open = (it) => setFilters(w.filter || {}, { win: w.filter ? w.uid : null, focus: it.id });
+  // A window about one kink shows that kink's shape.
+  const kinkId = w.kink?.id || (w.filter && Object.keys(w.filter).length === 1 ? w.filter.kink : null);
   return (
-    <section className={`win${active ? ' active' : ''}`}>
+    <section className={`win${active ? ' active' : ''}${min ? ' min' : ''}`} style={{ '--c': w.color }}>
       <header className="win-head">
-        <span className="win-dot" style={{ '--c': w.color }} />
+        {kinkId ? <KShape id={kinkId} color={w.color} size={16} className="win-shape" /> : <span className="win-dot" style={{ '--c': w.color }} />}
         <div className="win-title"><strong>{w.title}</strong><span>{w.meta}</span></div>
         {active ? <span className="incenter">{t('In center')}</span> : null}
-        <button type="button" className="icon-btn" onClick={() => setMin(!min)} aria-label={min ? t('Open window') : t('Minimize window')}><Icon name={min ? 'plus' : 'min'} /></button>
-        {canExpand ? <button type="button" className="icon-btn" onClick={() => (w.type === 'map' ? openMode('map') : setFilters(w.filter, { win: w.uid }))} aria-label={t('Show in center')}><Icon name="expand" /></button> : null}
+        <span className={`win-btns n${canExpand ? 2 : 1}`}>
+          <button type="button" className="icon-btn" onClick={() => setMin(!min)} aria-label={min ? t('Open window') : t('Minimize window')}><Icon name={min ? 'plus' : 'min'} /></button>
+          {canExpand ? <button type="button" className="icon-btn" onClick={() => (w.type === 'map' ? openMode('map') : setFilters(w.filter, { win: w.uid }))} aria-label={t('Show in center')}><Icon name="expand" /></button> : null}
+        </span>
       </header>
       {!min ? <Body w={w} open={open} /> : null}
     </section>

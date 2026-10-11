@@ -520,6 +520,15 @@ export function cleanTune(b = {}) {
   if (typeof b.mood === 'string' && /^[a-z]{2,20}$/.test(b.mood)) out.mood = b.mood;
   return out;
 }
+// How the app looks: the original look, Cutout or Signal. Kept on the Mac, so the iPhone looks the same.
+export const THEMES = ['original', 'cutout', 'signal'];
+api.get('/settings/theme', wrap((req, res) => res.json({ theme: THEMES.includes(getSetting('theme', 'original')) ? getSetting('theme', 'original') : 'original', themes: THEMES })));
+api.put('/settings/theme', wrap((req, res) => {
+  const v = String(req.body?.theme || '');
+  if (!THEMES.includes(v)) return res.status(400).json({ error: tr('Unknown look.') });
+  setSetting('theme', v);
+  res.json({ theme: v });
+}));
 api.get('/settings/tune', wrap((req, res) => res.json(getSetting('tune', {}) || {})));
 api.put('/settings/tune', wrap((req, res) => { const v = cleanTune(req.body || {}); setSetting('tune', v); res.json(v); }));
 api.get('/settings/gender', wrap((req, res) => res.json({ ...genderPrefs(), autoValue: autoMale() })));

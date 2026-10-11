@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, rgba, FORMATS, ago } from '../api.js';
 import { useApp } from '../context.jsx';
 import BrainCanvas from './BrainCanvas.jsx';
-import KinkBoard, { evidenceLine, ColorDot, KINK_MODES, modeInfo, shareBars } from './KinkBoard.jsx';
+import KinkBoard, { evidenceLine, ShapeButton, KINK_MODES, modeInfo, shareBars } from './KinkBoard.jsx';
+import { KShape, Shape } from '../shapes.jsx';
 import { deeperSpec } from './Windows.jsx';
 import { Icon } from '../icons.jsx';
 import { t, tn } from '../i18n.js';
@@ -178,12 +179,36 @@ function Detail({ nodeKey, brain, reload, onSelect, startEdit = false }) {
   const groups = brain.groups;
   const journey = (mode) => openMode('journey', { ...(node.type === 'fantasy' ? { fantasy: node.id } : { kink: node.id }), mode });
   const color = full?.color || node.color;
+  const group = full?.parentId ? allKinks.find((k) => k.id === full.parentId) : null;
+  const mode = full && !full.isGroup ? modeInfo(full.mode) : null;
+  const match = full?.match;
+  const manage = (
+    <div className="kact-manage">
+      {node.type === 'tag' ? <button type="button" className="ghost-btn small accent" onClick={async () => { const r = await api(`/brain/promote/${node.id}`, { method: 'POST', body: {} }); toast(t('It is a kink now.')); await reload(); refreshMeta(); onSelect(`k${r.id}`); }}><Icon name="flame" />{t('Make it a kink')}</button> : null}
+      {kinkObj?.status === 'proposed' ? <button type="button" className="ghost-btn small accent" onClick={() => patch({ status: 'active' }, t('Kept.'))}><Icon name="check" />{t('Keep')}</button> : null}
+      {kinkObj ? <button type="button" className={`ghost-btn small${editing ? ' accent' : ''}`} onClick={() => setEditing((x) => !x)}><Icon name="edit" />{t('Edit')}</button> : null}
+      {kinkObj ? <button type="button" className={`ghost-btn small${combine ? ' accent' : ''}`} onClick={() => setCombine((x) => !x)} aria-expanded={combine}><Icon name="grid" />{t('Combine')}</button> : null}
+      {kinkObj && node.status !== 'hidden' && full?.status !== 'hidden' ? <button type="button" className="ghost-btn small" onClick={() => patch({ status: 'hidden' }, t('Faded. It comes back by itself once you are into it again.'))} title={t('It leaves your kinks and comes back by itself once you are into it again')}><Icon name="less" />{t('Fade')}</button> : null}
+      {kinkObj && (node.status === 'hidden' || full?.status === 'hidden') ? <button type="button" className="ghost-btn small accent" onClick={() => patch({ status: 'active' }, full?.mode === 'ai' ? t('It is back, and it grows now: the app can add to it but never fades it.') : t('It is back.'))}><Icon name="eye" />{t('Bring back')}</button> : null}
+      {kinkObj ? <button type="button" className="ghost-btn small danger" onClick={async () => { await api(`/kinks/${node.id}`, { method: 'DELETE' }); toast(t("Removed. It won't come back by itself.")); onSelect(null); reload(); refreshMeta(); }}><Icon name="trash" />{t('Remove')}</button> : null}
+      {node.type === 'fantasy' ? <button type="button" className="ghost-btn small danger" onClick={async () => { await api(`/fantasies/${node.id}`, { method: 'DELETE' }); onSelect(null); reload(); }}><Icon name="trash" />{t('Delete')}</button> : null}
+    </div>
+  );
   return (
-    <div className="braindetail" style={{ '--c': color }}>
+    <div className={`braindetail kpage t-${node.type}`} style={{ '--c': color }}>
       <div className="kback-wrap"><button type="button" className="kback" onClick={() => onSelect(null)}><Icon name="chevL" />{t('All kinks')}</button></div>
-      <div className="bw head khead">
-        <div className="ktitle">
-          {kinkObj ? <ColorDot big color={color} onChange={(c) => patch({ color: c })} label={t('Colour')} /> : <span className="win-dot" style={{ '--c': node.color }} />}
+      <section className="khero notched">
+        <div className="kh-shape">
+          {full ? <ShapeButton k={full} size={150} onPatch={(b) => patch(b, 'shape' in b ? t('Shape changed.') : null)} /> : <Shape shape={node.type === 'fantasy' ? 'diamond' : 'ring'} color={node.color} size={130} hollow={node.type === 'tag'} />}
+        </div>
+        <div className="kh-main">
+          <div className="kh-kick">
+            {group ? <span className="gtag" style={{ '--c': group.color }}><KShape id={group.id} color={group.color} size={14} />{group.name}</span> : null}
+            {mode ? <span className="gtag mode" title={mode.text}><Icon name={mode.icon} />{mode.name}</span> : null}
+            {!kinkObj ? <span className="gtag">{TYPE_LABEL[node.type]}</span> : null}
+            {node.origin === 'tag' ? <span className="gtag">{t('grew from a tag you kept coming back to')}</span> : null}
+            {node.status === 'proposed' ? <span className="gtag">{t('suggested')}</span> : null}
+          </div>
           {kinkObj && editing ? (
             <form className="kname-form" onSubmit={(e) => { e.preventDefault(); saveName(); }}>
               <input className="kname" value={name} onChange={(e) => setName(e.target.value)} autoFocus aria-label={t('Name')} />
@@ -191,153 +216,157 @@ function Detail({ nodeKey, brain, reload, onSelect, startEdit = false }) {
               <button type="button" className="ghost-btn small" onClick={() => { setName(node.name); setEditing(false); }}>{t('Cancel')}</button>
             </form>
           ) : (
-            <>
-              <b className="kname static">{node.name}</b>
-              {kinkObj ? <button type="button" className="icon-btn kedit" onClick={() => setEditing(true)} aria-label={t('Edit {name}', { name: node.name })} title={t('Rename')}><Icon name="edit" /></button> : null}
-            </>
+            <h2 className="kh-name">{node.name}{kinkObj ? <button type="button" className="icon-btn kedit" onClick={() => setEditing(true)} aria-label={t('Edit {name}', { name: node.name })} title={t('Rename')}><Icon name="edit" /></button> : null}</h2>
           )}
-        </div>
-        <span className="count ktype">{TYPE_LABEL[node.type]}{node.origin === 'tag' ? ` · ${t('grew from a tag you kept coming back to')}` : ''}{node.status === 'proposed' ? ` · ${t('suggested')}` : ''}</span>
-
-        <div className="kacts">
-          <button type="button" className="kact-main" onClick={() => setFilters(d?.filter || (node.type === 'tag' ? { tags: [node.name] } : node.type === 'fantasy' ? { fantasy: node.id } : { kink: node.id }))}><Icon name="eye" />{t('Show in feed')}</button>
-          {node.type !== 'tag' ? (
-            <div className="kact-explore">
-              {node.type === 'fantasy' ? <button type="button" onClick={async () => { const fs = await api('/fantasies').then((r) => r.fantasies).catch(() => []); const f = fs.find((x) => x.id === node.id); if (f) openMode('deeper', { fantasy: deeperSpec(f) }); }}><Icon name="spark" /><span>{t('Go deeper')}</span></button> : null}
-              <button type="button" onClick={() => journey('close')}><Icon name="route" /><span>{t('Dive deeper')}</span></button>
-              <button type="button" onClick={() => journey('branch')}><Icon name="branch" /><span>{t('Branch out')}</span></button>
-              <button type="button" onClick={() => journey('genre')}><Icon name="spark" /><span>{t('Something new near it')}</span></button>
-            </div>
-          ) : null}
-          <div className="kact-manage">
-            {node.type === 'tag' ? <button type="button" className="ghost-btn small accent" onClick={async () => { const r = await api(`/brain/promote/${node.id}`, { method: 'POST', body: {} }); toast(t('It is a kink now.')); await reload(); refreshMeta(); onSelect(`k${r.id}`); }}><Icon name="flame" />{t('Make it a kink')}</button> : null}
-            {kinkObj?.status === 'proposed' ? <button type="button" className="ghost-btn small accent" onClick={() => patch({ status: 'active' }, t('Kept.'))}><Icon name="check" />{t('Keep')}</button> : null}
-            {kinkObj ? <button type="button" className={`ghost-btn small${editing ? ' accent' : ''}`} onClick={() => setEditing((x) => !x)}><Icon name="edit" />{t('Edit')}</button> : null}
-            {kinkObj ? <button type="button" className={`ghost-btn small${combine ? ' accent' : ''}`} onClick={() => setCombine((x) => !x)} aria-expanded={combine}><Icon name="grid" />{t('Combine')}</button> : null}
-            {kinkObj && node.status !== 'hidden' && full?.status !== 'hidden' ? <button type="button" className="ghost-btn small" onClick={() => patch({ status: 'hidden' }, t('Faded. It comes back by itself once you are into it again.'))} title={t('It leaves your kinks and comes back by itself once you are into it again')}><Icon name="less" />{t('Fade')}</button> : null}
-            {kinkObj && (node.status === 'hidden' || full?.status === 'hidden') ? <button type="button" className="ghost-btn small accent" onClick={() => patch({ status: 'active' }, full?.mode === 'ai' ? t('It is back, and it grows now: the app can add to it but never fades it.') : t('It is back.'))}><Icon name="eye" />{t('Bring back')}</button> : null}
-            {kinkObj ? <button type="button" className="ghost-btn small danger" onClick={async () => { await api(`/kinks/${node.id}`, { method: 'DELETE' }); toast(t("Removed. It won't come back by itself.")); onSelect(null); reload(); refreshMeta(); }}><Icon name="trash" />{t('Remove')}</button> : null}
-            {node.type === 'fantasy' ? <button type="button" className="ghost-btn small danger" onClick={async () => { await api(`/fantasies/${node.id}`, { method: 'DELETE' }); onSelect(null); reload(); }}><Icon name="trash" />{t('Delete')}</button> : null}
+          {kinkObj ? <p className="kh-why">{full?.evidence ? evidenceLine(full.evidence) : full?.origin === 'user' ? t('You made this one yourself.') : t('Not enough clear likes behind it yet.')}</p> : null}
+          <div className="kacts">
+            <button type="button" className="kact-main" onClick={() => setFilters(d?.filter || (node.type === 'tag' ? { tags: [node.name] } : node.type === 'fantasy' ? { fantasy: node.id } : { kink: node.id }))}><Icon name="eye" />{t('Show in feed')}</button>
+            {node.type !== 'tag' ? (
+              <>
+                {node.type === 'fantasy' ? <button type="button" className="kact-x" onClick={async () => { const fs = await api('/fantasies').then((r) => r.fantasies).catch(() => []); const f = fs.find((x) => x.id === node.id); if (f) openMode('deeper', { fantasy: deeperSpec(f) }); }}><Icon name="spark" /><span>{t('Go deeper')}</span></button> : null}
+                <button type="button" className="kact-x" onClick={() => journey('close')}><Icon name="route" /><span>{t('Dive deeper')}</span></button>
+                <button type="button" className="kact-x" onClick={() => journey('branch')}><Icon name="branch" /><span>{t('Branch out')}</span></button>
+                <button type="button" className="kact-x" onClick={() => journey('genre')}><Icon name="spark" /><span>{t('Something new near it')}</span></button>
+              </>
+            ) : null}
           </div>
-          {combine ? (
-            <div className="kcombine">
-              <p className="wnote">{t('Combine {name} into which kink? The one you pick stays, with every tag of both.', { name: node.name })}</p>
-              <div className="chiprow">{allKinks.filter((k) => !k.isGroup && k.id !== node.id && k.status !== 'hidden').sort((a, b) => a.name.localeCompare(b.name)).map((k) => <button type="button" key={k.id} className="chip btn" style={{ '--c': k.color }} onClick={() => combineWith(k)}><span className="kc-dot" />{k.name}</button>)}</div>
+        </div>
+        <div className="kh-side">
+          {match != null ? (
+            <div className="kh-match" title={t('How much of a match it is to you. From 50% it is a kink.')}>
+              <b>{match}<small>%</small></b>
+              <span>{t('match')}</span>
+              <div className="gauge"><i style={{ width: `${match}%` }} /><em style={{ left: '50%' }} /></div>
+              <p className="kh-note">{match >= 50 ? t('From 50% something is a kink; this one is past it.') : full?.mode === 'ai' ? t('Under 50%: the app fades it if it stays there.') : t('Under 50%, but it is kept: only the app\'s own kinks fade by themselves.')}</p>
             </div>
           ) : null}
+          {manage}
         </div>
+        {kinkObj ? <button type="button" className="notch-btn kh-notch" onClick={() => setEditing((x) => !x)} aria-label={t('Edit {name}', { name: node.name })} title={t('Edit')}><Icon name="edit" /></button> : null}
+      </section>
+      {combine ? (
+        <div className="kcombine">
+          <p className="wnote">{t('Combine {name} into which kink? The one you pick stays, with every tag of both.', { name: node.name })}</p>
+          <div className="chiprow">{allKinks.filter((k) => !k.isGroup && k.id !== node.id && k.status !== 'hidden').sort((a, b) => a.name.localeCompare(b.name)).map((k) => <button type="button" key={k.id} className="chip btn" style={{ '--c': k.color }} onClick={() => combineWith(k)}><KShape id={k.id} color={k.color} size={14} />{k.name}</button>)}</div>
+        </div>
+      ) : null}
 
-        {kinkObj && full && !full.isGroup ? (
-          <div className="kmodebox">
-            <div className="kmodes" role="radiogroup" aria-label={t('Who may change it')}>
-              {KINK_MODES.map((m) => (
-                <button type="button" key={m.id} role="radio" aria-checked={full.mode === m.id} className={`kmode${full.mode === m.id ? ' on' : ''}`} onClick={() => { if (full.mode !== m.id) patch({ mode: m.id }, t('{mode}: {text}', { mode: m.name, text: m.text })); }}>
-                  <Icon name={m.icon} /><span>{m.name}</span>
+      <div className="kgrid2">
+        <div className="kcol">
+          {kinkObj && full && !full.isGroup ? (
+            <div className="krow2">
+              <div className="bw kw-modes">
+                <div className="bw-h"><span>{t('Who may change it')}</span></div>
+                <div className="kmodes" role="radiogroup" aria-label={t('Who may change it')}>
+                  {KINK_MODES.map((m) => (
+                    <button type="button" key={m.id} role="radio" aria-checked={full.mode === m.id} className={`kmode${full.mode === m.id ? ' on' : ''}`} onClick={() => { if (full.mode !== m.id) patch({ mode: m.id }, t('{mode}: {text}', { mode: m.name, text: m.text })); }}>
+                      <Icon name={m.icon} /><span>{m.name}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="kmode-text"><Icon name={modeInfo(full.mode).icon} /><span><b>{modeInfo(full.mode).name}.</b> {modeInfo(full.mode).text}</span></p>
+              </div>
+              <Weeks full={full} node={node} d={d} d7={d7} />
+            </div>
+          ) : <Weeks full={full} node={node} d={d} d7={d7} />}
+
+          {node.type === 'kink' ? (
+            <div className="bw ktags">
+              <div className="bw-h"><span>{t('Tags')}</span><span className="count">{allTags.length}</span></div>
+              <div className="chiprow">
+                {allTags.map((x) => {
+                  const origin = full?.tags?.find((y) => y.name === x.name)?.origin;
+                  const icon = full?.mode === 'lock' ? 'lock' : full?.mode === 'grow' ? (origin === 'user' ? 'lock' : 'why') : null;
+                  const tip = full?.mode === 'lock' ? t('Locked: the app never changes it') : full?.mode === 'grow' ? (origin === 'user' ? t('You added it: the app never removes it') : t('The app added it: it stays unless you remove it')) : '';
+                  return <span key={x.name} className="chip ghost ktag" title={tip}>{icon ? <Icon name={icon} /> : null}{x.name}<button type="button" className="chipx" aria-label={t('Remove {tag}', { tag: x.name })} onClick={() => setTags(allTags.filter((y) => y.name !== x.name))}>×</button></span>;
+                })}
+                <form onSubmit={(e) => { e.preventDefault(); if (tagIn.trim()) { addTag(tagIn, t('Tag added.')); setTagIn(''); } }}><input className="tagadd" value={tagIn} onChange={(e) => setTagIn(e.target.value)} placeholder={t('+ tag')} aria-label={t('Add tag')} /></form>
+              </div>
+              <div className="rowline wrapline kgroup"><span className="fb-label">{t('Group')}</span>
+                <select value={node.group || ''} onChange={(e) => patch({ parentId: e.target.value ? Number(e.target.value) : null }, t('Moved.'))} aria-label={t('Group')}>
+                  <option value="">{t('No group')}</option>
+                  {groups.map((g) => <option key={g.id} value={g.id}>{g.parentId ? `  ${groups.find((x) => x.id === g.parentId)?.name || ''} › ${g.name}` : g.name}</option>)}
+                </select>
+              </div>
+              {kinkObj ? <KinkTagIdeas kinkId={node.id} name={node.name} tagCount={allTags.length} onAdd={(tag) => addTag(tag, t('Added {tag}.', { tag }))} /> : null}
+            </div>
+          ) : node.type === 'tag' && d?.relatedTags?.length ? (
+            <div className="bw ktags"><div className="bw-h"><span>{t('Often comes with')}</span></div><div className="chiprow">{d.relatedTags.map((x) => <button type="button" key={x} className="chip btn" onClick={() => setFilters({ tags: [node.name, x] })}>{x}</button>)}</div></div>
+          ) : null}
+          <AiWidget nodeKey={nodeKey} />
+          <div className="bw">
+            <div className="bw-h"><span>{t('Recent interactions with this')}</span></div>
+            <div className="evlist">
+              {(d?.recent || []).slice(0, 12).map((r) => (
+                <button type="button" key={r.item_id} className="evrow evpost" onClick={() => setFilters({}, { focus: r.item_id })} title={t('Open: {title}', { title: r.title || '' })}>
+                  <span className="evthumb"><Thumb media={r.media} /></span>
+                  <span className="evtitle">{r.title || t('Post {id}', { id: r.item_id })}</span>
+                  <span className="evchips">{r.events.filter((e) => e.type !== 'dwell' || e.value >= 6000).slice(0, 4).map((e) => <span key={e.type} className={`evtype t-${e.type}`}>{EVENT_LABEL[e.type] || e.type}{e.type === 'dwell' ? ` ${secs(e.value)}` : e.type === 'rate' ? ` ${e.value}` : e.n > 1 ? ` ${e.n}×` : ''}</span>)}</span>
+                  <em>{ago(Math.round(r.ts / 1000))}</em>
                 </button>
               ))}
+              {d && !d.recent?.length ? <p className="wnote">{t('Nothing yet.')}</p> : null}
             </div>
-            <p className="kmode-text"><Icon name={modeInfo(full.mode).icon} /><span><b>{modeInfo(full.mode).name}.</b> {modeInfo(full.mode).text}</span></p>
           </div>
-        ) : null}
-
-        {node.type === 'kink' ? (
-          <div className="ktags">
-            <div className="bw-h"><span>{t('Tags')}</span><span className="count">{allTags.length}</span></div>
-            <div className="chiprow">
-              {allTags.map((x) => {
-                const origin = full?.tags?.find((y) => y.name === x.name)?.origin;
-                const icon = full?.mode === 'lock' ? 'lock' : full?.mode === 'grow' ? (origin === 'user' ? 'lock' : 'why') : null;
-                const tip = full?.mode === 'lock' ? t('Locked: the app never changes it') : full?.mode === 'grow' ? (origin === 'user' ? t('You added it: the app never removes it') : t('The app added it: it stays unless you remove it')) : '';
-                return <span key={x.name} className="chip ghost ktag" title={tip}>{icon ? <Icon name={icon} /> : null}{x.name}<button type="button" className="chipx" aria-label={t('Remove {tag}', { tag: x.name })} onClick={() => setTags(allTags.filter((y) => y.name !== x.name))}>×</button></span>;
-              })}
-              <form onSubmit={(e) => { e.preventDefault(); if (tagIn.trim()) { addTag(tagIn, t('Tag added.')); setTagIn(''); } }}><input className="tagadd" value={tagIn} onChange={(e) => setTagIn(e.target.value)} placeholder={t('+ tag')} aria-label={t('Add tag')} /></form>
+        </div>
+        <div className="kcol side">
+          {kinkObj && !full?.isGroup ? <KinkSubs kinkId={node.id} name={node.name} /> : null}
+          <div className="bw">
+            <div className="bw-h"><span>{t('Best matches')}</span></div>
+            <div className="postrow">
+              {posts.map((it) => <button type="button" key={it.id} className="postcard" onClick={() => setFilters(d?.filter || {}, { focus: it.id })} title={it.title}><Thumb media={it.media} /><span>{it.title}</span></button>)}
+              {!posts.length ? <p className="wnote">{t('Loading…')}</p> : null}
             </div>
-            <div className="rowline wrapline kgroup"><span className="fb-label">{t('Group')}</span>
-              <select value={node.group || ''} onChange={(e) => patch({ parentId: e.target.value ? Number(e.target.value) : null }, t('Moved.'))} aria-label={t('Group')}>
-                <option value="">{t('No group')}</option>
-                {groups.map((g) => <option key={g.id} value={g.id}>{g.parentId ? `  ${groups.find((x) => x.id === g.parentId)?.name || ''} › ${g.name}` : g.name}</option>)}
+          </div>
+          <div className="bw">
+            <div className="bw-h"><span>{t('Linked with')}</span><span className="count">{links.length}</span></div>
+            <div className="linklist">
+              {links.slice(0, 10).map((l) => (
+                <button type="button" key={l.other.key} className="linkrow" onClick={() => onSelect(l.other.key)} title={l.why || (l.together ? tn(l.together, '{n} shared interaction', '{n} shared interactions') : '')}>
+                  {l.other.type === 'kink' ? <KShape id={l.other.id} color={l.other.color} size={14} /> : <span className="win-dot" style={{ '--c': l.other.color }} />}<span className="ln">{l.other.name}</span>
+                  <span className="lbar"><i style={{ width: `${Math.round(l.w * 100)}%`, opacity: 0.35 + l.w * 0.65 }} /></span><em>{Math.round(l.w * 100)}%</em>
+                </button>
+              ))}
+              {!links.length ? <p className="wnote">{t('No links yet. They grow as you like posts that carry both.')}</p> : null}
+            </div>
+            {node.type === 'kink' ? (
+              <select value="" onChange={async (e) => { const v = e.target.value; if (!v) return; await api('/kinks/links', { method: 'POST', body: { a: node.id, b: Number(v) } }); reload(); }} aria-label={t('Link with another kink')}>
+                <option value="">{t('+ link with…')}</option>
+                {kinks.filter((k) => k.id !== node.id && !links.some((l) => l.other.key === k.key)).map((k) => <option key={k.key} value={k.id}>{k.name}</option>)}
               </select>
-            </div>
-            {kinkObj ? <KinkTagIdeas kinkId={node.id} name={node.name} tagCount={allTags.length} onAdd={(tag) => addTag(tag, t('Added {tag}.', { tag }))} /> : null}
+            ) : null}
           </div>
-        ) : node.type === 'tag' && d?.relatedTags?.length ? (
-          <div className="ktags"><div className="bw-h"><span>{t('Often comes with')}</span></div><div className="chiprow">{d.relatedTags.map((x) => <button type="button" key={x} className="chip btn" onClick={() => setFilters({ tags: [node.name, x] })}>{x}</button>)}</div></div>
-        ) : null}
+        </div>
       </div>
+    </div>
+  );
+}
 
-      <div className="bwgrid kgridw">
-        {kinkObj ? (
-          <div className="bw wide">
-            <div className="bw-h"><span>{t('Why this is a kink')}</span>{full?.match != null ? <span className={`kc-match big${full.match >= 50 ? ' ok' : ''}`}>{t('{n}% match', { n: full.match })}</span> : null}</div>
-            <p className="aitext small">{full?.evidence ? evidenceLine(full.evidence) : full?.origin === 'user' ? t('You made this one yourself.') : t('Not enough clear likes behind it yet.')}</p>
-            <p className="wnote">{full?.match >= 50 ? t('From 50% something is a kink; this one is past it.') : full?.mode === 'ai' ? t('Under 50%: the app fades it if it stays there.') : t('Under 50%, but it is kept: only the app\'s own kinks fade by themselves.')}</p>
-          </div>
-        ) : null}
-        {kinkObj && !full?.isGroup ? <KinkSubs kinkId={node.id} name={node.name} /> : null}
-        <AiWidget nodeKey={nodeKey} />
-        <div className="bw half">
-          <div className="bw-h"><span>{t('This week vs before')}</span></div>
-          {full?.points ? (
-            <div className="bars">
-              {shareBars(full.points, true).map((b) => {
-                const diff = b.key === 'lately' ? Math.round((b.share - full.points.shareAll) * 10) / 10 : null;
-                return (
-                  <div key={b.key} className="barrow">
-                    <div className="bt"><span>{b.label}</span><em className={diff == null ? '' : diff >= 0 ? 'up' : 'down'}>{b.trend ? <Icon name={b.trend} /> : null}{tn(b.pts, '{n} pt', '{n} pts')} · {t('{p}% of yours', { p: String(b.share).replace('.', ',') })}{diff != null && diff !== 0 ? ` (${diff > 0 ? '+' : ''}${String(diff).replace('.', ',')})` : ''}</em></div>
-                    <div className="track2"><i style={{ width: `${b.w}%`, background: b.key === 'now' ? 'var(--flame)' : b.key === 'all' ? rgba(node.color, 0.5) : node.color }} /></div>
-                  </div>
-                );
-              })}
-              <p className="wnote">{t('Points from every post with it: watching, heat, likes and saves. Lately is the last 7 days, right now the last 24 hours. The % is how much of all your points went to it in that time.')}</p>
-            </div>
-          ) : (
-            <div className="bars">
-              <div className="barrow"><div className="bt"><span>{t('All time')}</span><em>{node.allTime}%</em></div><div className="track2"><i style={{ width: `${node.allTime}%`, background: rgba(node.color, 0.5) }} /></div></div>
-              <div className="barrow"><div className="bt"><span>{t('Lately')}</span><em className={d7 >= 0 ? 'up' : 'down'}>{node.lately}% ({d7 >= 0 ? '+' : ''}{d7})</em></div><div className="track2"><i style={{ width: `${node.lately}%`, background: node.color }} /></div></div>
-            </div>
-          )}
-          {d ? <p className="wnote">{tn(d.week, '{n} post this week, {before} a week before that.', '{n} posts this week, {before} a week before that.', { before: d.perWeekBefore })} {Object.entries(d.counts || {}).filter(([ev]) => ev !== 'impression').map(([ev, c]) => `${c} ${EVENT_LABEL[ev] || ev}`).slice(0, 5).join(', ')}</p> : null}
+// Points over time for a kink (this week against before), or the old percentages for the other things on the map.
+function Weeks({ full, node, d, d7 }) {
+  return (
+    <div className="bw kw-bars">
+      <div className="bw-h"><span>{t('This week vs before')}</span></div>
+      {full?.points ? (
+        <div className="bars">
+          {shareBars(full.points, true).map((b) => {
+            const diff = b.key === 'lately' ? Math.round((b.share - full.points.shareAll) * 10) / 10 : null;
+            return (
+              <div key={b.key} className={`barrow kb-${b.key}`}>
+                <div className="bt"><span>{b.label}</span><em className={diff == null ? '' : diff >= 0 ? 'up' : 'down'}>{b.trend ? <Icon name={b.trend} /> : null}{tn(b.pts, '{n} pt', '{n} pts')} · {t('{p}% of yours', { p: String(b.share).replace('.', ',') })}{diff != null && diff !== 0 ? ` (${diff > 0 ? '+' : ''}${String(diff).replace('.', ',')})` : ''}</em></div>
+                <div className="track2"><i style={{ width: `${b.w}%` }} /></div>
+              </div>
+            );
+          })}
+          <p className="wnote">{t('Points from every post with it: watching, heat, likes and saves. Lately is the last 7 days, right now the last 24 hours. The % is how much of all your points went to it in that time.')}</p>
         </div>
-        <div className="bw half">
-          <div className="bw-h"><span>{t('Linked with')}</span><span className="count">{links.length}</span></div>
-          <div className="linklist">
-            {links.slice(0, 10).map((l) => (
-              <button type="button" key={l.other.key} className="linkrow" onClick={() => onSelect(l.other.key)} title={l.why || (l.together ? tn(l.together, '{n} shared interaction', '{n} shared interactions') : '')}>
-                <span className="win-dot" style={{ '--c': l.other.color }} /><span className="ln">{l.other.name}</span>
-                <span className="lbar"><i style={{ width: `${Math.round(l.w * 100)}%`, opacity: 0.35 + l.w * 0.65 }} /></span><em>{Math.round(l.w * 100)}%</em>
-              </button>
-            ))}
-            {!links.length ? <p className="wnote">{t('No links yet. They grow as you like posts that carry both.')}</p> : null}
-          </div>
-          {node.type === 'kink' ? (
-            <select value="" onChange={async (e) => { const v = e.target.value; if (!v) return; await api('/kinks/links', { method: 'POST', body: { a: node.id, b: Number(v) } }); reload(); }} aria-label={t('Link with another kink')}>
-              <option value="">{t('+ link with…')}</option>
-              {kinks.filter((k) => k.id !== node.id && !links.some((l) => l.other.key === k.key)).map((k) => <option key={k.key} value={k.id}>{k.name}</option>)}
-            </select>
-          ) : null}
+      ) : (
+        <div className="bars">
+          <div className="barrow kb-all"><div className="bt"><span>{t('All time')}</span><em>{node.allTime}%</em></div><div className="track2"><i style={{ width: `${node.allTime}%`, background: rgba(node.color, 0.5) }} /></div></div>
+          <div className="barrow kb-lately"><div className="bt"><span>{t('Lately')}</span><em className={d7 >= 0 ? 'up' : 'down'}>{node.lately}% ({d7 >= 0 ? '+' : ''}{d7})</em></div><div className="track2"><i style={{ width: `${node.lately}%`, background: node.color }} /></div></div>
         </div>
-        <div className="bw wide">
-          <div className="bw-h"><span>{t('Best matches')}</span></div>
-          <div className="postrow">
-            {posts.map((it) => <button type="button" key={it.id} className="postcard" onClick={() => setFilters(d?.filter || {}, { focus: it.id })} title={it.title}><Thumb media={it.media} /><span>{it.title}</span></button>)}
-            {!posts.length ? <p className="wnote">{t('Loading…')}</p> : null}
-          </div>
-        </div>
-        <div className="bw wide">
-          <div className="bw-h"><span>{t('Recent interactions with this')}</span></div>
-          <div className="evlist">
-            {(d?.recent || []).slice(0, 12).map((r) => (
-              <button type="button" key={r.item_id} className="evrow evpost" onClick={() => setFilters({}, { focus: r.item_id })} title={t('Open: {title}', { title: r.title || '' })}>
-                <span className="evthumb"><Thumb media={r.media} /></span>
-                <span className="evtitle">{r.title || t('Post {id}', { id: r.item_id })}</span>
-                <span className="evchips">{r.events.filter((e) => e.type !== 'dwell' || e.value >= 6000).slice(0, 4).map((e) => <span key={e.type} className={`evtype t-${e.type}`}>{EVENT_LABEL[e.type] || e.type}{e.type === 'dwell' ? ` ${secs(e.value)}` : e.type === 'rate' ? ` ${e.value}` : e.n > 1 ? ` ${e.n}×` : ''}</span>)}</span>
-                <em>{ago(Math.round(r.ts / 1000))}</em>
-              </button>
-            ))}
-            {d && !d.recent?.length ? <p className="wnote">{t('Nothing yet.')}</p> : null}
-          </div>
-        </div>
-      </div>
+      )}
+      {d ? <p className="wnote">{tn(d.week, '{n} post this week, {before} a week before that.', '{n} posts this week, {before} a week before that.', { before: d.perWeekBefore })} {Object.entries(d.counts || {}).filter(([ev]) => ev !== 'impression').map(([ev, c]) => `${c} ${EVENT_LABEL[ev] || ev}`).slice(0, 5).join(', ')}</p> : null}
     </div>
   );
 }
