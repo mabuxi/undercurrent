@@ -22,7 +22,7 @@ export function initialsOf(name) {
   return ((parts[0]?.[0] || '?') + (parts[1]?.[0] || parts[0]?.[1] || '')).toUpperCase();
 }
 export function Avatar({ name, size = 'm', color }) {
-  return <span className={`avatar av-${size}`} style={{ background: color || avatarColor(name) }}>{initialsOf(name)}</span>;
+  return <span className={`avatar av-${size}`} style={{ '--c': color || avatarColor(name) }}>{initialsOf(name)}</span>;
 }
 
 export function Flames({ value, onChange, id }) {

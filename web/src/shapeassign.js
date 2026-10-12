@@ -47,7 +47,7 @@ function hash(s) {
 }
 
 // The shape of every kink and group, worked out from the kinks you have: a Map of id → { shape, fam, pattern }.
-// A shape you picked yourself always stays; the rest is the same every time for the same kinks.
+// A shape you picked yourself always stays, then the one the model picked; the rest is the same every time for the same kinks.
 export function assignShapes(kinks = []) {
   const out = new Map();
   const groups = kinks.filter((k) => k.isGroup).sort((a, b) => a.id - b.id);
@@ -74,6 +74,8 @@ export function assignShapes(kinks = []) {
     const taken = new Set(kids.filter((k) => SHAPES[k.shape]).map((k) => k.shape));
     for (const k of kids) {
       if (SHAPES[k.shape]) { out.set(k.id, { shape: k.shape, fam: familyOfShape(k.shape), pattern: PATTERNS[familyOfShape(k.shape)] }); continue; }
+      // The shape the model picked for this kink, from any family, when no other kink in the group has it.
+      if (SHAPES[k.aiShape] && !taken.has(k.aiShape)) { taken.add(k.aiShape); const f = familyOfShape(k.aiShape); out.set(k.id, { shape: k.aiShape, fam: f, pattern: PATTERNS[f] }); continue; }
       const list = SHAPE_FAMILIES[fam];
       const kw = keywordShape(k.name);
       let s = kw && list.includes(kw) && !taken.has(kw) ? kw : list.find((x) => !taken.has(x));
@@ -85,6 +87,7 @@ export function assignShapes(kinks = []) {
   for (const k of plain) {
     if (out.has(k.id)) continue;
     if (SHAPES[k.shape]) { const f = familyOfShape(k.shape); out.set(k.id, { shape: k.shape, fam: f, pattern: PATTERNS[f] }); continue; }
+    if (SHAPES[k.aiShape]) { const f = familyOfShape(k.aiShape); out.set(k.id, { shape: k.aiShape, fam: f, pattern: PATTERNS[f] }); continue; }
     const kw = keywordShape(k.name);
     const fam = FAMILY_SHAPES[k.family] || familyOfShape(kw) || FAMS[hash(k.name) % FAMS.length];
     const list = SHAPE_FAMILIES[fam];

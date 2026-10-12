@@ -86,6 +86,14 @@ export function setProfileColor(id, color) {
   return x;
 }
 
+// The shape that stands for a profile (one of the app's shapes, by name); null goes back to the one picked for it.
+export function setProfileShape(id, shape) {
+  const p = readProfiles();
+  const x = p.list.find((y) => y.id === id);
+  if (x) { x.shape = typeof shape === 'string' && /^[a-zA-Z][a-zA-Z0-9]{1,23}$/.test(shape) ? shape : null; save(p); }
+  return x;
+}
+
 // Switching saves the choice and restarts the server on the other profile's database.
 export function switchProfile(id) {
   const p = readProfiles();

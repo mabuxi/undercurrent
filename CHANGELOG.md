@@ -3,6 +3,43 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.29.0 · 12 October 2026
+
+### Colours that fit each look
+- Every colour of a kink, window, chip or bar now follows the look: soft, less saturated and a little glassy in Original, vivid on black in Cutout and Signal. This also covers the colours you pick for kinks, the bars in windows and on the map, letter avatars and the pictures' fallbacks.
+- The filters are calm in every look: neutral chips, and only what is on takes the look's accent (lime in Cutout and Signal), instead of a different colour per chip. The gender slider uses the look's own pink to blue.
+
+### Windows
+- Cutout: about one window in five turns into a solid block of its colour, picked at random down the column (not always the first one), and never a window you read (threads, stories, "Keep reading"). Inside every window, the buttons take the colour of the window's dot or shape.
+- The glow under coloured windows is no longer cut off at the edge of the side columns.
+- The shape in the title of a window about one kink is bigger.
+- Signal is calmer: most windows now have a muted outline, a dark shadow and plain buttons; about one in five (the same ones that turn solid in Cutout) keeps the cream outline and coloured shadow, with a striped header in its colour. Panels in Settings and elsewhere have a quieter shadow too, except one in three.
+- Now and then (rarely) a window shows how one kink rose or dropped over all the weeks you have used the app, as a graph of its share of your points week by week. Each look draws it its own way: a soft glowing curve, a thick vivid line with a glowing dot, or a stepped outlined line over a hatched area. Only kinks with at least a month of history that clearly moved.
+
+### Shapes
+- The local model now picks a shape for each kink from all the shapes, not only the family of its group, so a shape can fit the kink itself better (lips, a drop, handcuffs, a lens, a moon…). It runs in the background shortly after you make or rename a kink and in the hourly round. A shape you picked yourself always wins; two kinks of one group still never share a shape.
+- Profiles have a shape and a colour too, drawn the way the look draws kink shapes. Tap it in Settings, Profiles, to pick another shape or colour.
+
+### The map
+- Each look draws the map its own way while keeping it readable: kinks are their shapes; Original keeps its soft families; Cutout puts flat dark panels behind families, a glow around each shape and rounded label pills; Signal draws families as dashed outlines on a dotted board, outlined shapes with a hard shadow and condensed uppercase labels. Links stay thin and quiet in every look. Tags are small dashed marks, fantasies diamonds in the look's yellow.
+- The small map in the side windows uses the shapes and the look's colours too.
+
+### Viewer, reactions and avatars
+- The full screen viewer follows the look: in Cutout, flat dark buttons that fill with their colour and glow when on, a solid heat slider and a lime Short, Mixed, Long switch; in Signal, cream outlined square buttons, a striped heat slider with a hard shadow, condensed labels.
+- The reaction in the middle of a post (like, dislike, save, heat) is a solid disc in its colour with a glow in Cutout, and a tilted sticker with a hard shadow and a dashed ring in Signal.
+- Avatars and profile pictures get the look's frame and letters: rounded squares in the display font in Cutout, cream framed squares with condensed letters in Signal.
+
+### Loading, icon and logo
+- The mark of the look sits next to the name in the top bar, and the loading screen shows it while the app starts: the original waves breathing, a lime Cutout panel with its round notch bouncing, a Signal sticker of striped waves jumping. The bar while the feed loads and the spinners follow the look.
+- The Mac app's loading screens (starting, updating, reconnecting) use the look you picked, with its fonts, and the Dock icon changes with the look. The home screen icon on the iPhone and the browser tab icon follow it too.
+- In Cutout and Signal, the view you are on opens into a pill with its name next to the icon, with a springy animation in Cutout and a stepped one in Signal.
+
+### Fixes
+- Removing or adding a tag on a kink is instant now: the list updates right away and the rest reloads in the background, and changing tags no longer makes the app ask the model again for its suggestions.
+- A shape picked from another family with a capital in its name (like the arch with a hole) was not saved.
+- An open shape picker no longer hides under the cards below it.
+- The map's help text speaks of shapes instead of circles.
+
 ## 0.28.0 · 11 October 2026
 
 ### Looks

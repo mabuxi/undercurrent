@@ -8,6 +8,8 @@ import { drawMap } from '../mapdraw.js';
 import { FantasyTools } from './FantasyEdit.jsx';
 import { t, tn } from '../i18n.js';
 import { KShape } from '../shapes.jsx';
+import { lookColor } from '../lookcolor.js';
+import { TrendBody } from './TrendGraph.jsx';
 
 function thumbUrl(it) {
   const m = it.media || {};
@@ -247,7 +249,11 @@ function Layout({ w, items, open }) {
 
 function MiniMap({ data }) {
   const ref = useRef(null);
-  useEffect(() => { drawMap(ref.current, data, false); }, [data]);
+  const { shapes, theme } = useApp();
+  useEffect(() => {
+    const draw = () => drawMap(ref.current, data, false, { shapes, theme, redraw: draw });
+    draw();
+  }, [data, shapes, theme]);
   return <div className="mmap-box"><canvas ref={ref} className="mmap" role="img" aria-label={t('Small map of your kinks and fantasies')} /></div>;
 }
 
@@ -547,7 +553,7 @@ function Body({ w, open }) {
           {w.kinks.map((k) => { const d = k.lately - k.allTime; return (
             <div className="barrow" key={k.id}>
               <div className="bt"><span>{k.name}</span><em className={d >= 0 ? 'up' : 'down'}>{d >= 0 ? '+' : ''}{d}</em></div>
-              <div className="duo"><div className="track2"><i style={{ width: `${k.allTime}%`, background: rgba(k.color, 0.45) }} /></div><div className="track2"><i style={{ width: `${k.lately}%`, background: k.color }} /></div></div>
+              <div className="duo"><div className="track2"><i style={{ width: `${k.allTime}%`, background: rgba(lookColor(k.color), 0.45) }} /></div><div className="track2"><i style={{ width: `${k.lately}%`, background: lookColor(k.color) }} /></div></div>
             </div>
           ); })}
         </div><p className="wnote">{t('Left bar all time, right bar the last week.')}</p></div>
@@ -561,7 +567,7 @@ function Body({ w, open }) {
             {w.groups.map((g) => (
               <div key={g.id} className="mapgroup" style={{ '--c': g.color }}>
                 <div className="bt"><button type="button" className="linkbtn plain" onClick={() => setFilters({ kink: g.id })}><strong>{g.name}</strong></button><em>{g.score}%</em></div>
-                <div className="track2"><i style={{ width: `${g.score}%`, background: g.color }} /></div>
+                <div className="track2"><i style={{ width: `${g.score}%`, background: lookColor(g.color) }} /></div>
                 <div className="chiprow">{g.kinks.map((k) => <button type="button" key={k.id} className="chip btn" style={{ '--c': k.color, '--c2': rgba(k.color, 0.16) }} onClick={() => setFilters({ kink: k.id })}>{k.name}</button>)}</div>
               </div>
             ))}
@@ -570,12 +576,14 @@ function Body({ w, open }) {
         );
       }
       return <div className="win-body"><MiniMap data={w} /><div className="wbtns"><button type="button" className="ghost-btn small" onClick={() => openMode('map')}><Icon name="map" />{t('Expand your map')}</button></div></div>;
+    case 'kinkTrend':
+      return <TrendBody w={w} onShow={() => setFilters({ kink: w.kink.id })} />;
     case 'rising':
       return (
         <div className="win-body">
           {w.rising.map((k) => (
             <button type="button" key={k.id} className="riserow" onClick={() => setFilters({ kink: k.id })}>
-              <span className="rise up">▲ {k.delta}</span><span className="rname" style={{ color: k.color }}>{k.name}</span><em>{t('{n}% this week', { n: k.lately })}</em>
+              <span className="rise up">▲ {k.delta}</span><span className="rname" style={{ color: lookColor(k.color) }}>{k.name}</span><em>{t('{n}% this week', { n: k.lately })}</em>
             </button>
           ))}
           {w.falling?.length ? <p className="wnote">{t('Cooling off: {list}', { list: w.falling.map((k) => `${k.name} (${k.delta})`).join(', ') })}</p> : null}
@@ -729,6 +737,13 @@ function MoodChip({ m, on }) {
   return <button type="button" className={`chip btn${on ? ' on' : ''}`} onClick={() => applyMood(m.id)}>{m.label}</button>;
 }
 
+const SOLIDABLE = new Set(['kinkList', 'kinkDeep', 'kinkSpot', 'discovery', 'pair', 'gifs', 'shortsRail', 'recentSaved', 'rateRecent', 'map', 'combo', 'trending']);
+function winHash(s) {
+  let h = 7;
+  for (const ch of String(s)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return h;
+}
+
 export function Window({ w }) {
   const { setFilters, openMode, opts, mode } = useApp();
   const [min, setMin] = useState(false);
@@ -737,10 +752,13 @@ export function Window({ w }) {
   const open = (it) => setFilters(w.filter || {}, { win: w.filter ? w.uid : null, focus: it.id });
   // A window about one kink shows that kink's shape.
   const kinkId = w.kink?.id || (w.filter && Object.keys(w.filter).length === 1 ? w.filter.kink : null);
+  // In the Cutout and Signal looks about one window in five is a solid block of its colour: only windows of pictures
+  // and videos, never ones to read (stories, threads, memories, fantasies, limits).
+  const solid = SOLIDABLE.has(w.type) && !(w.type === 'kinkList' && w.layout === 'list') && winHash(`${w.uid}${w.title}`) % 5 === 0;
   return (
-    <section className={`win${active ? ' active' : ''}${min ? ' min' : ''}`} style={{ '--c': w.color }}>
+    <section className={`win${active ? ' active' : ''}${min ? ' min' : ''}${solid ? ' solid' : ''}`} data-type={w.type} style={{ '--c': w.color }}>
       <header className="win-head">
-        {kinkId ? <KShape id={kinkId} color={w.color} size={16} className="win-shape" /> : <span className="win-dot" style={{ '--c': w.color }} />}
+        {kinkId ? <KShape id={kinkId} color={w.color} size={24} className="win-shape" /> : <span className="win-dot" style={{ '--c': w.color }} />}
         <div className="win-title"><strong>{w.title}</strong><span>{w.meta}</span></div>
         {active ? <span className="incenter">{t('In center')}</span> : null}
         <span className={`win-btns n${canExpand ? 2 : 1}`}>

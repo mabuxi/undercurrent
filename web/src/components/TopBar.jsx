@@ -6,6 +6,7 @@ import { useActivity } from '../activity.js';
 import { t, tn, getLang } from '../i18n.js';
 import { PhoneModal } from './Phone.jsx';
 import { useNarrow } from './FeedView.jsx';
+import { logoUrl } from '../logo.js';
 
 const LOADED = Date.now();
 
@@ -38,7 +39,7 @@ function Chip({ c, onRemove }) {
 }
 
 export default function TopBar() {
-  const { setFilters, filters, openMode, mode, askOut, setAskOut, search, runSearch, editChip, toast, clearSearch, clearFilter, kinks, fantasies, opts, update, openUpdate, clearAll: clearEverything } = useApp();
+  const { setFilters, filters, openMode, mode, askOut, setAskOut, search, runSearch, editChip, toast, clearSearch, clearFilter, kinks, fantasies, opts, update, openUpdate, clearAll: clearEverything, theme } = useApp();
   const acts = useActivity();
   const [q, setQ] = useState('');
   const [deep, setDeep] = useState(readDeep);
@@ -151,6 +152,7 @@ export default function TopBar() {
   return (
     <header className="top" ref={headRef}>
       <button type="button" className="brand" onClick={() => setFilters({})} aria-label={t('Back to the mixed feed')}>
+        <img className="brandmark" src={logoUrl(theme || 'original')} alt="" aria-hidden="true" />
         <h1>Undercurrent</h1>
       </button>
       <div className="askwrap">
@@ -224,11 +226,11 @@ export default function TopBar() {
         {update?.available ? <button type="button" className="uppill" onClick={openUpdate} title={t('Version {v} is available', { v: update.latest })}><Icon name="spark" />{t('Update to {v}', { v: update.latest })}</button> : null}
         {!window.navigator.standalone && !/iPhone|iPad|Android/i.test(navigator.userAgent) ? <button type="button" className="phonebtn" onClick={() => setPhone(true)} title={t('Open on your iPhone')} aria-label={t('Open on your iPhone')}><Icon name="phone" /></button> : null}
         <nav className="nav" aria-label={t('Views')}>
-          <button type="button" className={mode === 'feed' && !filters.saved ? 'on' : ''} onClick={() => { if (filters.saved) setFilters({}); openMode('feed'); }} title={t('Feed')} aria-label={t('Feed')}><Icon name="home" /></button>
-          <button type="button" className={mode === 'feed' && filters.saved ? 'on' : ''} onClick={() => { openMode('feed'); setFilters({ saved: true }); }} title={t('Saved posts')} aria-label={t('Saved posts')}><Icon name="save" /></button>
-          <button type="button" className={mode === 'map' ? 'on' : ''} onClick={() => openMode('map')} title={t('Your map')} aria-label={t('Your map')}><Icon name="map" /></button>
-          <button type="button" className={mode === 'memory' ? 'on' : ''} onClick={() => openMode('memory')} title={t('Memory, kinks and fantasies')} aria-label={t('Memory')}><Icon name="brain" /></button>
-          <button type="button" className={mode === 'settings' ? 'on' : ''} onClick={() => openMode('settings')} title={t('Settings')} aria-label={t('Settings')}><Icon name="gear" /></button>
+          <button type="button" className={mode === 'feed' && !filters.saved ? 'on' : ''} onClick={() => { if (filters.saved) setFilters({}); openMode('feed'); }} title={t('Feed')} aria-label={t('Feed')}><Icon name="home" /><span className="navlbl" aria-hidden="true">{t('Feed')}</span></button>
+          <button type="button" className={mode === 'feed' && filters.saved ? 'on' : ''} onClick={() => { openMode('feed'); setFilters({ saved: true }); }} title={t('Saved posts')} aria-label={t('Saved posts')}><Icon name="save" /><span className="navlbl" aria-hidden="true">{t('Saved')}</span></button>
+          <button type="button" className={mode === 'map' ? 'on' : ''} onClick={() => openMode('map')} title={t('Your map')} aria-label={t('Your map')}><Icon name="map" /><span className="navlbl" aria-hidden="true">{t('Map')}</span></button>
+          <button type="button" className={mode === 'memory' ? 'on' : ''} onClick={() => openMode('memory')} title={t('Memory, kinks and fantasies')} aria-label={t('Memory')}><Icon name="brain" /><span className="navlbl" aria-hidden="true">{t('Memory')}</span></button>
+          <button type="button" className={mode === 'settings' ? 'on' : ''} onClick={() => openMode('settings')} title={t('Settings')} aria-label={t('Settings')}><Icon name="gear" /><span className="navlbl" aria-hidden="true">{t('Settings')}</span></button>
         </nav>
       </div>
       {phone ? <PhoneModal onClose={() => setPhone(false)} /> : null}

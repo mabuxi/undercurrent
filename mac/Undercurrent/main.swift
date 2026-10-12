@@ -133,6 +133,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildMenu()
+        applyLookIcon()
         let config = WKWebViewConfiguration()
         config.mediaTypesRequiringUserActionForPlayback = []
         config.preferences.javaScriptCanOpenWindowsAutomatically = false
@@ -167,7 +168,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.appearance = NSAppearance(named: .darkAqua)
-        window.backgroundColor = NSColor(red: 0.067, green: 0.051, blue: 0.071, alpha: 1)
+        window.backgroundColor = look == "cutout" ? NSColor(red: 0.02, green: 0.02, blue: 0.02, alpha: 1) : look == "signal" ? NSColor(red: 0.043, green: 0.043, blue: 0.043, alpha: 1) : NSColor(red: 0.067, green: 0.051, blue: 0.071, alpha: 1)
         window.minSize = NSSize(width: 760, height: 560)
         window.contentView = web
         window.center()
@@ -203,6 +204,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         if what == "winfull-on" { viewerFull(true); return }
         if what == "winfull-off" { viewerFull(false); return }
         if what == "drag" { dragWindow() }
+        // The look changed: remembered for the loading screens, and the Dock icon follows it.
+        if what.hasPrefix("look:") {
+            let l = String(what.dropFirst(5))
+            if LOOKS.contains(l) && l != look { UserDefaults.standard.set(l, forKey: "look"); applyLookIcon() }
+            return
+        }
         // The look changed: the window's own background follows the page's.
         if what.hasPrefix("bg:#"), what.count == 10, let v = UInt32(what.dropFirst(4), radix: 16) {
             window.backgroundColor = NSColor(red: CGFloat((v >> 16) & 0xFF) / 255, green: CGFloat((v >> 8) & 0xFF) / 255, blue: CGFloat(v & 0xFF) / 255, alpha: 1)
@@ -481,20 +488,97 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { webView.reload() }
 
+    // ---------- The look (original, Cutout or Signal) ----------
+
+    let LOOKS = ["original", "cutout", "signal"]
+    var look: String { let l = UserDefaults.standard.string(forKey: "look") ?? "original"; return LOOKS.contains(l) ? l : "original" }
+
+    // The Dock icon of the look (the original look keeps the app's own icon).
+    func applyLookIcon() {
+        let l = look
+        if l == "original" { NSApp.applicationIconImage = nil; return }
+        if let img = NSImage(contentsOfFile: installPath + "/web/dist/icons/mac-\(l).png") { NSApp.applicationIconImage = img }
+    }
+
+    // The fonts of the looks, from the built app, so the loading screen uses the same type as the page.
+    func fontFace(_ family: String, _ prefix: String, _ weight: Int) -> String {
+        let dir = installPath + "/web/dist/assets"
+        guard let name = (try? FileManager.default.contentsOfDirectory(atPath: dir))?.first(where: { $0.hasPrefix(prefix) && $0.hasSuffix(".woff2") }),
+              let data = FileManager.default.contents(atPath: dir + "/" + name) else { return "" }
+        return "@font-face{font-family:'\(family)';font-weight:\(weight);src:url(data:font/woff2;base64,\(data.base64EncodedString())) format('woff2')}"
+    }
+    lazy var lookFonts: [String: String] = [
+        "cutout": fontFace("Unbounded", "unbounded-latin-800-normal", 800) + fontFace("Manrope", "manrope-latin-600-normal", 600) + fontFace("Manrope", "manrope-latin-700-normal", 700),
+        "signal": fontFace("Big Shoulders Display", "big-shoulders-display-latin-900-normal", 900) + fontFace("Space Mono", "space-mono-latin-400-normal", 400) + fontFace("Space Mono", "space-mono-latin-700-normal", 700)
+    ]
+
+    // The mark of each look (the same drawings as web/src/logo.js).
+    let LOGO: [String: String] = [
+        "original": """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="ob" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2B2030"/><stop offset="1" stop-color="#140F17"/></linearGradient><linearGradient id="ow" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#F6D5C9"/><stop offset=".4" stop-color="#E39A83"/><stop offset=".75" stop-color="#C98BC4"/><stop offset="1" stop-color="#A58FE0"/></linearGradient><filter id="og" x="-20%" y="-60%" width="140%" height="220%"><feGaussianBlur stdDeviation="2.4"/></filter></defs><rect width="100" height="100" rx="23" fill="url(#ob)"/><g fill="none" stroke-linecap="round"><path d="M24 33q13-7 26 0t26 0" stroke="#8E7684" stroke-width="3" opacity=".7"/><path d="M19 45q15-8 31 0t31 0" stroke="#B88F8A" stroke-width="4" opacity=".85"/><path d="M15 59q17-9 35 0t35 0" stroke="url(#ow)" stroke-width="7" filter="url(#og)" opacity=".75"/><path d="M15 59q17-9 35 0t35 0" stroke="url(#ow)" stroke-width="6.5"/><path d="M22 72q14-7 28 0t28 0" stroke="#7E6874" stroke-width="3" opacity=".7"/></g></svg>
+""",
+        "cutout": """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="24" fill="#050505"/><path d="M10 28Q10 10 28 10H50Q58 10 58.5 18A20 20 0 0 0 82 41.5Q90 42 90 50V72Q90 90 72 90H28Q10 90 10 72Z" fill="#C8FF1E"/><circle cx="78" cy="22" r="9" fill="#FF4FA0"/><g fill="none" stroke="#0B0B0B" stroke-linecap="round"><path d="M20 52q10-7 20 0t20 0t20 0" stroke-width="7.5"/><path d="M20 70q10-7 20 0t20 0t20 0" stroke-width="7.5"/></g></svg>
+""",
+        "signal": """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="sd" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#0B0B0B"/><circle cx="1" cy="1" r=".9" fill="#34332D"/></pattern><pattern id="ss" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#D4FF3A"/><rect width="2.2" height="6" fill="#0B0B0B" opacity=".9"/></pattern></defs><rect width="100" height="100" rx="20" fill="url(#sd)"/><g transform="rotate(-7 50 50)" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M17 42q11-10 22 0t22 0t22 0" stroke="#FF5CA8" stroke-width="15" transform="translate(4 4)"/><path d="M17 42q11-10 22 0t22 0t22 0" stroke="#F3F0E4" stroke-width="15"/><path d="M17 42q11-10 22 0t22 0t22 0" stroke="url(#ss)" stroke-width="9"/><path d="M17 66q11-10 22 0t22 0t22 0" stroke="#3B82FF" stroke-width="15" transform="translate(4 4)"/><path d="M17 66q11-10 22 0t22 0t22 0" stroke="#F3F0E4" stroke-width="15"/><path d="M17 66q11-10 22 0t22 0t22 0" stroke="#FF5CA8" stroke-width="9"/></g></svg>
+"""
+    ]
+
+    let LOOK_CSS: [String: String] = [
+        "original": """
+        html,body{background:#110D12;color:#EFE6EA;font:14px -apple-system,system-ui,sans-serif}
+        .t{font:600 11px -apple-system,system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#E8C66B;border:1px solid rgba(232,198,107,.45);border-radius:999px;padding:4px 10px}
+        h1{font:italic 64px 'Instrument Serif',Georgia,serif;margin:0;background:linear-gradient(100deg,#F6D5C9,#E39A83 40%,#C98BC4 75%,#A58FE0);-webkit-background-clip:text;color:transparent}
+        p{color:#B6A8B0}
+        .m{filter:drop-shadow(0 18px 36px rgba(227,154,131,.28));animation:mb 1.8s ease-in-out infinite}
+        @keyframes mb{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+        .s{width:28px;height:28px;border-radius:50%;border:3px solid rgba(227,154,131,.25);border-top-color:#E39A83;animation:r 0.9s linear infinite}
+        button{padding:10px 18px;border-radius:999px;background:linear-gradient(100deg,#E39A83,#C98BC4);color:#1C0F14;font-weight:600}
+        """,
+        "cutout": """
+        html,body{background:#050505;color:#F4F4F0;font:600 14px 'Manrope',-apple-system,sans-serif}
+        .t{font:700 11px 'Manrope',-apple-system,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#0B0B0B;background:#C8FF1E;border-radius:999px;padding:5px 12px}
+        h1{font:800 46px 'Unbounded',-apple-system,sans-serif;letter-spacing:-.035em;margin:0;color:#F4F4F0}
+        p{color:#A3A39B}
+        .m{filter:drop-shadow(0 20px 40px rgba(200,255,30,.25));animation:cb 1.1s cubic-bezier(.34,1.56,.64,1) infinite alternate}
+        @keyframes cb{from{transform:translateY(4px) scale(.97)}to{transform:translateY(-8px) scale(1.03)}}
+        .s{width:84px;height:8px;border-radius:4px;background:linear-gradient(90deg,#C8FF1E,#C8FF1E) 0 0/40% 100% no-repeat,#1A1A1A;animation:cs 1.2s ease-in-out infinite}
+        @keyframes cs{0%{background-position:-70% 0,0 0}100%{background-position:170% 0,0 0}}
+        button{padding:12px 20px;border-radius:999px;background:#C8FF1E;color:#0B0B0B;font-weight:700;box-shadow:0 10px 24px -10px #C8FF1E}
+        """,
+        "signal": """
+        html,body{background:#0B0B0B;color:#F3F0E4;font:400 13px 'Space Mono',Menlo,monospace}
+        body{background:radial-gradient(circle 1px at 1px 1px,#2A2925 98%,transparent) 0 0/22px 22px,#0B0B0B}
+        .t{font:700 11px 'Space Mono',Menlo,monospace;text-transform:uppercase;color:#0B0B0B;background:#D4FF3A;border:2px solid #0B0B0B;border-radius:5px;padding:3px 9px;transform:rotate(-3deg);box-shadow:3px 3px 0 #F3F0E4}
+        h1{font:900 66px 'Big Shoulders Display','Arial Narrow',sans-serif;text-transform:uppercase;letter-spacing:.01em;line-height:.9;margin:0;color:#F3F0E4}
+        p{color:#C9C4B4}
+        .m svg{border-radius:20px;box-shadow:6px 6px 0 #FF5CA8}
+        .m{animation:st 1.2s steps(1) infinite}
+        @keyframes st{0%{transform:rotate(-6deg)}50%{transform:rotate(4deg) scale(1.04)}}
+        .s{width:96px;height:12px;border:2px solid #F3F0E4;border-radius:3px;background:repeating-linear-gradient(-45deg,#D4FF3A 0 6px,#0B0B0B 6px 10px);background-size:28px 100%;animation:ss .6s linear infinite}
+        @keyframes ss{to{background-position:28px 0}}
+        button{padding:9px 18px;border-radius:10px;background:#D4FF3A;color:#0B0B0B;border:2px solid #0B0B0B;box-shadow:4px 4px 0 #FF5CA8;font:900 18px 'Big Shoulders Display','Arial Narrow',sans-serif;text-transform:uppercase}
+        """
+    ]
+
     // ---------- Screens while the app is not there ----------
 
     func page(_ body: String) -> String {
+        let l = look
         return """
         <html><head><meta charset="utf-8"><style>
-        html,body{margin:0;height:100%;background:#110D12;color:#EFE6EA;font:14px -apple-system,system-ui,sans-serif;-webkit-user-select:none}
+        \(lookFonts[l] ?? "")
+        html,body{margin:0;height:100%;-webkit-user-select:none}
         .c{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;padding:0 40px}
-        .t{font:600 11px -apple-system,system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#E8C66B;border:1px solid rgba(232,198,107,.45);border-radius:999px;padding:4px 10px}
-        h1{font:italic 64px 'Instrument Serif',Georgia,serif;margin:0;background:linear-gradient(100deg,#F6D5C9,#E39A83 40%,#C98BC4 75%,#A58FE0);-webkit-background-clip:text;color:transparent}
-        p{color:#B6A8B0;margin:0;max-width:520px;line-height:1.5}
-        .s{width:28px;height:28px;border-radius:50%;border:3px solid rgba(227,154,131,.25);border-top-color:#E39A83;animation:r 0.9s linear infinite}
+        p{margin:0;max-width:520px;line-height:1.5}
+        .m{width:92px;height:92px}
+        .m svg{width:100%;height:100%;display:block}
         @keyframes r{to{transform:rotate(360deg)}}
-        button{all:unset;cursor:pointer;padding:10px 18px;border-radius:999px;background:linear-gradient(100deg,#E39A83,#C98BC4);color:#1C0F14;font-weight:600}
-        </style></head><body><div class="c">\(body)</div></body></html>
+        button{all:unset;cursor:pointer}
+        \(LOOK_CSS[l] ?? "")
+        button{cursor:pointer}
+        </style></head><body><div class="c"><div class="m">\(LOGO[l] ?? "")</div>\(body)</div></body></html>
         """
     }
 

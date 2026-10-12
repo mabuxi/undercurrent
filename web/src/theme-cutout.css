@@ -124,14 +124,14 @@
 :root[data-theme="cutout"] :is(.tile .tb,.pv .tb,.ptile .tb,.dur,.res,.provider){background:#0B0B0B;color:#F4F4F0;border-radius:8px;font-weight:700}
 :root[data-theme="cutout"] .mini{border-radius:18px}
 :root[data-theme="cutout"] .car-dots i.on{background:var(--accent)}
-/* The first window of each column is a solid block of its colour, with dark type */
-:root[data-theme="cutout"] :is(.side .track>.win:first-child,.feed>.win:nth-of-type(4n+1)){
+/* About one window in five (pictures and videos only) is a solid block of its colour, with dark type */
+:root[data-theme="cutout"] .win.solid{
   --surface:var(--cv,var(--accent));--surface-2:rgba(0,0,0,.13);--surface-3:rgba(0,0,0,.2);--text:#0B0B0B;--text-2:rgba(11,11,11,.78);--text-3:rgba(11,11,11,.6);
   --line:rgba(0,0,0,.12);--line-2:rgba(0,0,0,.22);--accent:#0B0B0B;--accent-ink:var(--cv,#C8FF1E);--kfill:#0B0B0B;
   color:#0B0B0B;filter:drop-shadow(0 18px 28px color-mix(in srgb,var(--cv,var(--c)) 30%,transparent))}
-:root[data-theme="cutout"] :is(.side .track>.win:first-child,.feed>.win:nth-of-type(4n+1)) .win-dot{background:#0B0B0B}
-:root[data-theme="cutout"] :is(.side .track>.win:first-child,.feed>.win:nth-of-type(4n+1)) .chip.btn.on{background:#0B0B0B;color:var(--cv,#fff)}
-:root[data-theme="cutout"] :is(.side .track>.win:first-child,.feed>.win:nth-of-type(4n+1)) .discovery,:root[data-theme="cutout"] :is(.side .track>.win:first-child,.feed>.win:nth-of-type(4n+1)) [style*="color: rgb(246, 195, 91)"]{color:#0B0B0B}
+:root[data-theme="cutout"] .win.solid .win-dot{background:#0B0B0B}
+:root[data-theme="cutout"] .win.solid .chip.btn.on{background:#0B0B0B;color:var(--cv,#fff)}
+:root[data-theme="cutout"] .win.solid .discovery,:root[data-theme="cutout"] .win.solid [style*="color: rgb(246, 195, 91)"]{color:#0B0B0B}
 
 /* Feed */
 :root[data-theme="cutout"] .hello h2{font-size:32px}
@@ -333,3 +333,77 @@
 :root[data-theme="cutout"] .khero .shapepop .ghost-btn{background:#262626;color:#F4F4F0}
 /* Bolder icons */
 :root[data-theme="cutout"] svg.i{stroke-width:2.2}
+
+/* Inside a window, its buttons and accents take the window's own colour */
+:root[data-theme="cutout"] .win:not(.solid){--accent:var(--cv,#C8FF1E);--accent-ink:#0B0B0B}
+:root[data-theme="cutout"] .win:not(.solid) .ghost-btn.accent{box-shadow:0 10px 22px -12px var(--accent)}
+:root[data-theme="cutout"] .win .win-shape{margin:-4px 0 -4px -4px}
+/* Texts that had their own fixed colour stay readable on a solid block */
+:root[data-theme="cutout"] .win.solid :is(.dp-question,.dp-wq,.kicker,.hc-note,.discovery,.memline em,.newestline,.wmatch,.readbadge){color:#0B0B0B}
+:root[data-theme="cutout"] .win.solid .wmatch .track2 i{background:#0B0B0B}
+:root[data-theme="cutout"] .win.solid :is(.dp-opt,.choice){background:rgba(0,0,0,.12);border-color:transparent;color:#0B0B0B}
+:root[data-theme="cutout"] .uslider.gender{background:linear-gradient(90deg,#FF5CA8,#9B5CFF 50%,#4D8DFF)}
+/* Filters in one calm look: dark chips, the accent only for what is on */
+:root[data-theme="cutout"] .nowchip{background:var(--surface);color:var(--text)}
+:root[data-theme="cutout"] .nowchip .nk{color:var(--text-3)}
+:root[data-theme="cutout"] .nowchip svg.i{color:var(--text-2)}
+:root[data-theme="cutout"] .nowchip.on,:root[data-theme="cutout"] :is(.tchip,.moodcard).on{background:var(--accent);color:#0B0B0B;box-shadow:0 10px 22px -12px var(--accent)}
+:root[data-theme="cutout"] .nowchip.on :is(.nk,small,svg.i),:root[data-theme="cutout"] :is(.tchip,.moodcard).on :is(small,.i){color:#0B0B0B}
+:root[data-theme="cutout"] :is(.tchip,.moodcard){background:var(--surface-2);color:var(--text)}
+:root[data-theme="cutout"] :is(.tchip,.moodcard):hover{background:var(--surface-3)}
+:root[data-theme="cutout"] .tchip .i{color:var(--text-2)}
+:root[data-theme="cutout"] .moodcard .mc-ic{background:var(--surface-3);color:var(--text)}
+:root[data-theme="cutout"] .moodcard.on .mc-ic{background:#0B0B0B;color:var(--accent)}
+:root[data-theme="cutout"] .fsel{border:0;border-radius:14px}
+:root[data-theme="cutout"] .fsel .i{color:var(--accent)}
+:root[data-theme="cutout"] .gband{border-color:rgba(255,255,255,.35);border-radius:999px}
+/* The full screen viewer and the reactions: flat solid blocks, a glow in their own colour, no frosted glass */
+:root[data-theme="cutout"] .tk :is(.tk-b svg,.tk-modes,.tk-tb,.tk-ctl button,.tk-fast,.tk-tagsbtn){background:rgba(11,11,11,.8);box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;filter:none}
+:root[data-theme="cutout"] .tk .tk-b.up.on svg{background:#C8FF1E;color:#0B0B0B;box-shadow:0 8px 20px -6px rgba(200,255,30,.7)}
+:root[data-theme="cutout"] .tk .tk-b.down.on svg{background:#4D8DFF;color:#0B0B0B;box-shadow:0 8px 20px -6px rgba(77,141,255,.7)}
+:root[data-theme="cutout"] .tk .tk-b.save.on svg{background:#FFC93C;color:#0B0B0B;box-shadow:0 8px 20px -6px rgba(255,201,60,.7)}
+:root[data-theme="cutout"] .tk .tk-hot.on .tk-b.hot svg{background:color-mix(in srgb,#FF7A1A calc((1 - var(--h)) * 100%),#FFC93C);color:#0B0B0B;box-shadow:0 8px 20px -6px rgba(255,122,26,.7)}
+:root[data-theme="cutout"] .tk-hottrack{background:#0B0B0B;border:0;border-radius:25px;-webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:0 18px 40px rgba(0,0,0,.55)}
+:root[data-theme="cutout"] .tk-hotfill{background:linear-gradient(to top,#FF7A1A,#FFC93C);box-shadow:0 0 24px rgba(255,122,26,.6)}
+:root[data-theme="cutout"] .tk-hotword{font-family:var(--display);font-weight:700;font-size:9.5px;letter-spacing:.02em}
+:root[data-theme="cutout"] .tk-modes button{color:rgba(244,244,240,.7)}
+:root[data-theme="cutout"] .tk-modes button.on{background:var(--accent);color:#0B0B0B}
+:root[data-theme="cutout"] .tk-av,:root[data-theme="cutout"] .tk-avi{background:var(--cv,var(--c));border-radius:16px}
+:root[data-theme="cutout"] .tk-av :is(.avatar,img){border-radius:14px}
+:root[data-theme="cutout"] .tk-avi .tk-pic{border-radius:9px}
+:root[data-theme="cutout"] .tk-avi{border-radius:11px}
+:root[data-theme="cutout"] .postfx{--fxc:#2A2A2A}
+:root[data-theme="cutout"] .fx-up{--fxc:#C8FF1E}
+:root[data-theme="cutout"] .fx-down{--fxc:#4D8DFF}
+:root[data-theme="cutout"] .fx-save{--fxc:#FFC93C}
+:root[data-theme="cutout"] .heatfx{--fxc:color-mix(in srgb,#FF7A1A calc((1 - var(--h)) * 100%),#FFC93C)}
+:root[data-theme="cutout"] .fxdisc{background:var(--fxc);color:#0B0B0B;border:0;-webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:0 22px 50px -12px var(--fxc)}
+:root[data-theme="cutout"] :is(.fx-hide,.fx-undo,.heatfx.out) .fxdisc{background:#161616;color:var(--text-2);box-shadow:0 18px 40px rgba(0,0,0,.5)}
+:root[data-theme="cutout"] .heatfx .fxdisc{color:#0B0B0B}
+:root[data-theme="cutout"] .fxglyph,:root[data-theme="cutout"] .heatfx .hfflame{filter:none}
+:root[data-theme="cutout"] .fxring,:root[data-theme="cutout"] .heatfx.burst .fxring{border:3px solid var(--fxc)}
+/* Avatars: rounded squares, the letters in the display font; pictures get the same rounded frame */
+:root[data-theme="cutout"] .avatar:not(img){font-family:var(--display);font-weight:700;letter-spacing:-.04em;color:#0B0B0B}
+:root[data-theme="cutout"] .av-m:not(img){font-size:12px}
+:root[data-theme="cutout"] :is(.avimg,.pcard-main img){border-radius:14px}
+:root[data-theme="cutout"] .av-s,:root[data-theme="cutout"] .tk-pic{border-radius:7px}
+:root[data-theme="cutout"] .tk-person-pic{border-radius:16px;background:var(--cv,var(--c,#C8FF1E))}
+:root[data-theme="cutout"] .tk-person-pic .tk-pic{border-radius:14px}
+:root[data-theme="cutout"] .profshape .shapebtn .kshape{filter:drop-shadow(0 6px 12px color-mix(in srgb,var(--cv,var(--c)) 45%,transparent))}
+/* Loading: the lime mark bounces, the bar is a lime pill; spinners are a thick lime arc */
+:root[data-theme="cutout"] .bootmark{border-radius:24px;filter:drop-shadow(0 20px 40px rgba(200,255,30,.25));animation:cbounce 1.1s cubic-bezier(.34,1.56,.64,1) infinite alternate}
+:root[data-theme="cutout"] .bootbar,:root[data-theme="cutout"] .feedwait::after{height:8px;width:84px;border-radius:4px;background:linear-gradient(90deg,var(--accent),var(--accent)) 0 0/40% 100% no-repeat,#1A1A1A}
+:root[data-theme="cutout"] .brandmark{border-radius:10px}
+:root[data-theme="cutout"] .spinner{border-width:4px;border-color:#1E1E1E;border-top-color:var(--accent)}
+@keyframes cbounce{from{transform:translateY(4px) scale(.97)}to{transform:translateY(-8px) scale(1.03)}}
+/* The view you are on opens into a pill with its name */
+:root[data-theme="cutout"] .nav button{width:auto;min-width:42px;padding:0;border-radius:21px;box-sizing:border-box;transition:padding .45s cubic-bezier(.34,1.56,.64,1),background .25s,color .25s,box-shadow .25s}
+:root[data-theme="cutout"] .nav button.on{padding:0 16px 0 13px}
+:root[data-theme="cutout"] .navlbl{display:inline-block;max-width:0;overflow:hidden;white-space:nowrap;opacity:0;font-family:var(--display);font-weight:700;font-size:12px;letter-spacing:-.01em;transition:max-width .45s cubic-bezier(.34,1.56,.64,1),opacity .2s,margin .45s cubic-bezier(.34,1.56,.64,1)}
+:root[data-theme="cutout"] .nav button.on .navlbl{max-width:120px;opacity:1;margin-left:7px;transition-delay:0s,.12s,0s}
+/* The trend graph: a thick vivid line over a flat tint, a big glowing dot for this week */
+:root[data-theme="cutout"] .trendg .tg-line{stroke-width:4.5}
+:root[data-theme="cutout"] .trendg .tg-dot{filter:drop-shadow(0 0 10px var(--cv,var(--c)))}
+:root[data-theme="cutout"] .trendg .tg-peak{stroke:#2A2A2A;stroke-dasharray:none;stroke-width:2;stroke-linecap:round}
+:root[data-theme="cutout"] .tg-axis{font-weight:700}
+:root[data-theme="cutout"] .bootmark{box-shadow:none}

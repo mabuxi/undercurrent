@@ -110,7 +110,8 @@ export async function tagIdeas(id, { skip = [], count = 10 } = {}) {
   const shown = new Set(skip.map((x) => normalizeTag(x)));
   const ok = (x) => x.name && !have.has(x.name) && !isBlocked({ title: x.name, tags: [x.name] }).blocked;
   let pool = POOL.get(k.id);
-  if (!pool || Date.now() - pool.at > 30 * 60000 || pool.sig !== k.tags.length) {
+  // Changing the kink's tags does not ask the model again: tags it has and tags you took off are filtered out below.
+  if (!pool || Date.now() - pool.at > 30 * 60000) {
     const byName = nameTags(k).map((x) => ({ ...x, sure: x.why === 'name' ? 90 : 80 }));
     let ai = await fromModel(k, [...have], 24, true);
     // The model can be busy with something else for a moment: one more try.
@@ -120,7 +121,7 @@ export async function tagIdeas(id, { skip = [], count = 10 } = {}) {
     for (const x of byName) list.set(x.name, x);
     for (const x of ai) if (!list.has(x.name)) list.set(x.name, { name: x.name, posts: counts.get(x.name) || 0, why: 'ai', sure: x.sure });
     // Without the model's ideas the list is kept only a minute, so they are asked for again soon.
-    pool = { at: Date.now() - (ai.length || config.mock ? 0 : 29 * 60000), sig: k.tags.length, items: [...list.values()].filter((x) => x.sure >= 40) };
+    pool = { at: Date.now() - (ai.length || config.mock ? 0 : 29 * 60000), items: [...list.values()].filter((x) => x.sure >= 40) };
     POOL.set(k.id, pool);
   }
   // The model's ideas and the written forms take turns, the surest and most used first in each.

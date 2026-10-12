@@ -104,8 +104,6 @@
 :root[data-theme="signal"] .panel-in{background:var(--surface-2);border:2px dashed var(--line-2);border-radius:10px}
 :root[data-theme="signal"] .empty{border:2px dashed var(--line-2);border-radius:14px}
 :root[data-theme="signal"] .card2:nth-of-type(3n+1){--shc:var(--accent)}
-:root[data-theme="signal"] .card2:nth-of-type(3n+2){--shc:var(--pop)}
-:root[data-theme="signal"] .card2:nth-of-type(3n){--shc:var(--following)}
 
 /* Side windows */
 :root[data-theme="signal"] .win{background:var(--surface);border:var(--bw) solid var(--ink);border-radius:14px;box-shadow:var(--sh) var(--sh) 0 var(--cv,var(--accent));overflow:visible;margin:0 var(--sh) 2px 0}
@@ -331,3 +329,87 @@
 :root[data-theme="signal"] .sechead h3{font-size:26px;font-weight:900}
 :root[data-theme="signal"] .readbadge{background:none;border:2px solid var(--ink);color:var(--accent);border-radius:8px}
 :root[data-theme="signal"] .readbadge b{font-family:var(--display);font-weight:900;font-size:20px}
+
+/* 0.29: a calmer Signal. Most windows step back: a muted outline, a dark shadow and plain buttons. About one window in
+   five (the same ones that turn solid in Cutout, never one you read) keeps the cream outline and coloured shadow, with
+   a header in its colour. Inside every window the buttons take the window's own colour. */
+:root[data-theme="signal"] .win{--accent:var(--cv,#D4FF3A)}
+:root[data-theme="signal"] .win:not(.solid){border-color:var(--line-2);box-shadow:var(--sh) var(--sh) 0 #1A1A18}
+:root[data-theme="signal"] .win:not(.solid) .win-btns .icon-btn{background:var(--surface-2);border-color:var(--line-2);color:var(--text-2)}
+:root[data-theme="signal"] .win:not(.solid) .win-btns .icon-btn:hover{background:var(--cv,var(--accent));border-color:var(--ink);color:#0B0B0B}
+:root[data-theme="signal"] .win:not(.solid) .win-dot{border-color:var(--line-2)}
+:root[data-theme="signal"] .win.solid .win-head{margin:0;padding:12px 12px 10px;border-bottom:var(--bw) solid var(--ink);border-radius:12px 12px 0 0;background:repeating-linear-gradient(-45deg,transparent 0 9px,rgba(0,0,0,.09) 9px 11px),var(--cv,var(--accent));color:#0B0B0B;--text-3:rgba(11,11,11,.7);--kfill:#0B0B0B;--kstroke:#0B0B0B}
+:root[data-theme="signal"] .win.solid.min .win-head{border-bottom:0;border-radius:12px}
+:root[data-theme="signal"] .win.solid .win-title :is(strong,span){color:#0B0B0B}
+:root[data-theme="signal"] .win.solid .win-dot{background:#0B0B0B;border-color:#0B0B0B}
+:root[data-theme="signal"] .win.solid .win-btns .icon-btn{background:#0B0B0B;border-color:#0B0B0B;color:var(--cv,var(--accent))}
+:root[data-theme="signal"] .win.solid .win-btns .icon-btn:hover{background:var(--ink);color:#0B0B0B}
+:root[data-theme="signal"] .win.solid .win-body{padding-top:12px}
+/* Filters in one calm look: outlined chips, the lime accent only for what is on */
+:root[data-theme="signal"] .nowchip,:root[data-theme="signal"] :is(.tchip,.moodcard){border-color:var(--line-2)}
+:root[data-theme="signal"] .nowchip .nk{color:var(--text-3)}
+:root[data-theme="signal"] :is(.nowchip,.tchip) svg.i{color:var(--text-2)}
+:root[data-theme="signal"] .moodcard .mc-ic{background:var(--surface-3);border-color:var(--line-2);color:var(--text)}
+:root[data-theme="signal"] :is(.nowchip,.tchip,.moodcard).on{background:var(--accent);border-color:var(--ink);color:#0B0B0B;box-shadow:3px 3px 0 var(--pop)}
+:root[data-theme="signal"] .moodcard.on .mc-ic{background:#0B0B0B;color:var(--accent)}
+:root[data-theme="signal"] .fsel .i{color:var(--accent)}
+:root[data-theme="signal"] .uslider.gender{background:linear-gradient(90deg,#FF5CA8,#A97BFF 50%,#3B82FF)}
+:root[data-theme="signal"] .gband{border:2px dashed var(--ink);border-radius:4px;background:rgba(243,240,228,.06)}
+/* Panels outside the feed keep their outline but a quieter shadow */
+:root[data-theme="signal"] .card2{--shc:#1F1F1C}
+:root[data-theme="signal"] .card2:nth-of-type(3n+1){--shc:var(--accent)}
+/* The full screen viewer and the reactions: cream outlined tiles, stickers with a hard shadow, striped heat */
+:root[data-theme="signal"] .tk :is(.tk-b svg,.tk-tb,.tk-ctl button,.tk-fast,.tk-tagsbtn){background:#141414;border-radius:10px;box-shadow:inset 0 0 0 2px #F3F0E4;-webkit-backdrop-filter:none;backdrop-filter:none;filter:none}
+:root[data-theme="signal"] .tk .tk-b.up.on svg{background:#D4FF3A;color:#0B0B0B;box-shadow:inset 0 0 0 2px #0B0B0B,3px 3px 0 #F3F0E4}
+:root[data-theme="signal"] .tk .tk-b.down.on svg{background:#3B82FF;color:#0B0B0B;box-shadow:inset 0 0 0 2px #0B0B0B,3px 3px 0 #F3F0E4}
+:root[data-theme="signal"] .tk .tk-b.save.on svg{background:#FFD23A;color:#0B0B0B;box-shadow:inset 0 0 0 2px #0B0B0B,3px 3px 0 #F3F0E4}
+:root[data-theme="signal"] .tk .tk-hot.on .tk-b.hot svg{background:color-mix(in srgb,#FF7A1A calc((1 - var(--h)) * 100%),#FFD23A);color:#0B0B0B;box-shadow:inset 0 0 0 2px #0B0B0B,3px 3px 0 #F3F0E4}
+:root[data-theme="signal"] .tk-hottrack{background:#141414;border:2px solid #F3F0E4;border-radius:12px;-webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:5px 5px 0 var(--pop)}
+:root[data-theme="signal"] .tk-hotfill{border-radius:7px;clip-path:inset(calc((1 - var(--h)) * 100%) 0 0 0 round 7px);box-shadow:none;background:repeating-linear-gradient(-45deg,rgba(0,0,0,.16) 0 6px,transparent 6px 12px),linear-gradient(to top,#FF7A1A,#FFD23A)}
+:root[data-theme="signal"] .tk-hotword{font-family:var(--display);font-weight:900;font-size:13px;text-transform:uppercase;letter-spacing:.03em}
+:root[data-theme="signal"] .tk .tk-modes{background:#141414;border-radius:12px;box-shadow:inset 0 0 0 2px #F3F0E4;-webkit-backdrop-filter:none;backdrop-filter:none}
+:root[data-theme="signal"] .tk-modes button{border-radius:8px;font-family:var(--display);font-weight:800;font-size:15px;text-transform:uppercase;color:rgba(243,240,228,.7)}
+:root[data-theme="signal"] .tk-modes button.on{background:var(--accent);color:#0B0B0B}
+:root[data-theme="signal"] .tk-av,:root[data-theme="signal"] .tk-avi{background:#F3F0E4;border-radius:12px;box-shadow:3px 3px 0 var(--cv,var(--c))}
+:root[data-theme="signal"] .tk-av :is(.avatar,img){border:0;border-radius:10px}
+:root[data-theme="signal"] .tk-avi{border-radius:8px}
+:root[data-theme="signal"] .tk-avi .tk-pic{border-radius:6px}
+:root[data-theme="signal"] .postfx{--fxc:#2A2925}
+:root[data-theme="signal"] .fx-up{--fxc:#D4FF3A}
+:root[data-theme="signal"] .fx-down{--fxc:#3B82FF}
+:root[data-theme="signal"] .fx-save{--fxc:#FFD23A}
+:root[data-theme="signal"] .heatfx{--fxc:color-mix(in srgb,#FF7A1A calc((1 - var(--h)) * 100%),#FFD23A)}
+:root[data-theme="signal"] .fxdisc{rotate:-6deg;border-radius:24px;background:var(--fxc);color:#0B0B0B;border:3px solid #0B0B0B;-webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:7px 7px 0 #F3F0E4}
+:root[data-theme="signal"] :is(.fx-hide,.fx-undo,.heatfx.out) .fxdisc{background:#141414;color:var(--text-2);border-color:#F3F0E4;box-shadow:5px 5px 0 #0B0B0B}
+:root[data-theme="signal"] .heatfx .fxdisc{color:#0B0B0B}
+:root[data-theme="signal"] .fxglyph,:root[data-theme="signal"] .heatfx .hfflame{filter:none}
+:root[data-theme="signal"] .fxring,:root[data-theme="signal"] .heatfx.burst .fxring{rotate:-6deg;border-radius:24px;border:3px dashed var(--fxc)}
+:root[data-theme="signal"] .fxline{stroke-width:2.8;stroke-linecap:square;stroke-linejoin:miter}
+/* Avatars: cream framed squares with condensed letters; pictures get the same frame */
+:root[data-theme="signal"] .avatar:not(img){font-family:var(--display);font-weight:900;color:#0B0B0B;letter-spacing:.01em}
+:root[data-theme="signal"] :is(.avimg,.pcard-main img){border-radius:10px;border:2px solid var(--ink);box-sizing:border-box}
+:root[data-theme="signal"] .av-s,:root[data-theme="signal"] .tk-pic{border-radius:4px}
+:root[data-theme="signal"] .tk-person-pic{border-radius:12px;background:#F3F0E4;box-shadow:3px 3px 0 var(--cv,var(--c,#D4FF3A))}
+:root[data-theme="signal"] .tk-person-pic .tk-pic{border-radius:9px}
+:root[data-theme="signal"] .profshape .shapebtn .kshape{transform:rotate(-6deg)}
+/* Loading: the sticker jumps like a poster being slapped on, the bar is striped; spinners are square */
+:root[data-theme="signal"] .bootmark{border-radius:20px;filter:none;box-shadow:6px 6px 0 var(--pop);animation:sstamp 1.2s steps(1) infinite}
+:root[data-theme="signal"] .bootbar,:root[data-theme="signal"] .feedwait::after{width:96px;height:12px;border-radius:3px;border:2px solid var(--ink);background:repeating-linear-gradient(-45deg,var(--accent) 0 6px,#0B0B0B 6px 10px);background-size:28px 100%;animation:sstripes .6s linear infinite}
+:root[data-theme="signal"] .brandmark{border-radius:8px;transform:rotate(-4deg)}
+:root[data-theme="signal"] .brand:hover .brandmark{transform:rotate(3deg) scale(1.06)}
+:root[data-theme="signal"] .spinner{border-radius:6px;border:3px solid var(--line-2);border-top-color:var(--accent);border-right-color:var(--pop);animation:spin 1.2s steps(8) infinite}
+@keyframes sstamp{0%{transform:rotate(-6deg)}50%{transform:rotate(4deg) scale(1.04)}}
+@keyframes sstripes{to{background-position:28px 0}}
+/* The view you are on opens into a sticker with its name, in big condensed type */
+:root[data-theme="signal"] .nav button{width:auto;min-width:42px;padding:0;transition:padding .3s steps(4),background .15s,box-shadow .15s,transform .2s}
+:root[data-theme="signal"] .nav button.on{padding:0 14px 0 11px;transform:rotate(-2deg)}
+:root[data-theme="signal"] .navlbl{display:inline-block;max-width:0;overflow:hidden;white-space:nowrap;opacity:0;font-family:var(--display);font-weight:900;font-size:18px;text-transform:uppercase;letter-spacing:.02em;line-height:1;transition:max-width .3s steps(4),opacity .1s,margin .3s steps(4)}
+:root[data-theme="signal"] .nav button.on .navlbl{max-width:130px;opacity:1;margin-left:7px}
+/* The trend graph: a stepped line, cream outlined, over a hatched area, with square marks */
+:root[data-theme="signal"] .trendg .tg-ink{stroke:#F3F0E4;stroke-width:6;stroke-linejoin:miter}
+:root[data-theme="signal"] .trendg .tg-line{stroke-width:3;stroke-linecap:square;stroke-linejoin:miter}
+:root[data-theme="signal"] .trendg .tg-mark{stroke:#0B0B0B;stroke-width:1.5}
+:root[data-theme="signal"] .trendg .tg-base{stroke:var(--line-2);stroke-width:2;stroke-dasharray:4 4}
+:root[data-theme="signal"] .trendg .tg-peak{stroke:#F3F0E4;stroke-width:1.5;stroke-dasharray:3 3}
+:root[data-theme="signal"] .trendg .tg-dot{filter:none;stroke:#0B0B0B;stroke-width:2}
+:root[data-theme="signal"] .tg-axis{font-family:var(--display);font-weight:800;text-transform:uppercase;font-size:12px;letter-spacing:.03em}

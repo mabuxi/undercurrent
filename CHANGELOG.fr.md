@@ -2,6 +2,43 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.29.0 · 12 octobre 2026
+
+### Des couleurs qui vont avec chaque apparence
+- Toutes les couleurs des kinks, fenêtres, étiquettes et barres suivent maintenant l’apparence : douces, moins saturées et un peu vitrées dans Original, vives sur noir dans Cutout et Signal. Cela vaut aussi pour les couleurs que vous choisissez pour les kinks, les barres des fenêtres et de la carte, les avatars à initiales et les images de remplacement.
+- Les filtres sont calmes dans toutes les apparences : des étiquettes neutres, et seul ce qui est activé prend l’accent de l’apparence (citron vert dans Cutout et Signal), au lieu d’une couleur différente par étiquette. Le curseur de genre utilise le rose et le bleu de l’apparence.
+
+### Fenêtres
+- Cutout : environ une fenêtre sur cinq devient un bloc plein de sa couleur, choisie au hasard dans la colonne (pas toujours la première), et jamais une fenêtre à lire (discussions, histoires, « Continuer à lire »). Dans chaque fenêtre, les boutons prennent la couleur de son point ou de sa forme.
+- Le halo sous les fenêtres colorées n’est plus coupé au bord des colonnes latérales.
+- La forme dans le titre d’une fenêtre consacrée à un kink est plus grande.
+- Signal est plus calme : la plupart des fenêtres ont maintenant un contour discret, une ombre sombre et des boutons simples ; environ une sur cinq (les mêmes qui deviennent pleines dans Cutout) garde le contour crème et l’ombre colorée, avec un en-tête rayé de sa couleur. Les panneaux des Réglages et d’ailleurs ont aussi une ombre plus discrète, sauf un sur trois.
+- De temps en temps (rarement), une fenêtre montre comment un kink a monté ou baissé depuis que vous utilisez l’app, avec un graphique de sa part de vos points semaine après semaine. Chaque apparence le dessine à sa façon : une courbe douce et lumineuse, un trait épais et vif avec un point lumineux, ou une ligne en escalier cernée au-dessus d’une zone hachurée. Seulement pour les kinks avec au moins un mois d’historique qui ont nettement bougé.
+
+### Formes
+- Le modèle local choisit maintenant une forme pour chaque kink parmi toutes les formes, pas seulement la famille de son groupe, pour qu’elle corresponde mieux au kink lui-même (des lèvres, une goutte, des menottes, un objectif, une lune…). Il le fait en arrière-plan peu après la création ou le renommage d’un kink, et lors de la ronde horaire. Une forme que vous avez choisie gagne toujours ; deux kinks d’un même groupe n’ont jamais la même forme.
+- Les profils ont aussi une forme et une couleur, dessinées comme l’apparence dessine les formes des kinks. Touchez-la dans Réglages, Profils, pour choisir une autre forme ou couleur.
+
+### La carte
+- Chaque apparence dessine la carte à sa façon tout en la gardant lisible : les kinks sont leurs formes ; Original garde ses familles douces ; Cutout met des panneaux sombres en aplat derrière les familles, un halo autour de chaque forme et des étiquettes en pilules ; Signal dessine les familles en contours pointillés sur un fond à pois, des formes cernées avec une ombre franche et des étiquettes condensées en majuscules. Les liens restent fins et discrets partout. Les tags sont de petites marques pointillées, les fantasmes des losanges du jaune de l’apparence.
+- La petite carte des fenêtres latérales utilise aussi les formes et les couleurs de l’apparence.
+
+### Lecteur, réactions et avatars
+- Le lecteur plein écran suit l’apparence : dans Cutout, des boutons sombres en aplat qui se remplissent de leur couleur avec un halo quand ils sont actifs, un curseur de chaleur plein et un sélecteur Court, Mélangé, Long citron vert ; dans Signal, des boutons carrés cernés de crème, un curseur de chaleur rayé avec une ombre franche, des libellés condensés.
+- La réaction au milieu d’une publication (j’aime, je n’aime pas, enregistrer, chaleur) est un disque plein de sa couleur avec un halo dans Cutout, et un autocollant incliné avec une ombre franche et un anneau pointillé dans Signal.
+- Les avatars et photos de profil prennent le cadre et les lettres de l’apparence : carrés arrondis dans la police des titres dans Cutout, carrés cernés de crème avec des lettres condensées dans Signal.
+
+### Chargement, icône et logo
+- Le symbole de l’apparence est à côté du nom dans la barre du haut, et l’écran de chargement l’affiche pendant le démarrage : les vagues d’origine qui respirent, un panneau Cutout citron vert avec sa découpe ronde qui rebondit, un autocollant Signal de vagues rayées qui saute. La barre pendant le chargement du fil et les indicateurs de chargement suivent l’apparence.
+- Les écrans de chargement de l’app Mac (démarrage, mise à jour, reconnexion) utilisent l’apparence choisie, avec ses polices, et l’icône du Dock change avec l’apparence. L’icône de l’écran d’accueil de l’iPhone et celle de l’onglet du navigateur la suivent aussi.
+- Dans Cutout et Signal, la vue ouverte s’agrandit en pilule avec son nom à côté de l’icône, avec une animation à ressort dans Cutout et par à-coups dans Signal.
+
+### Corrections
+- Retirer ou ajouter un tag à un kink est instantané : la liste se met à jour tout de suite et le reste se recharge en arrière-plan, et changer les tags ne fait plus redemander ses suggestions au modèle.
+- Une forme choisie dans une autre famille avec une majuscule dans son nom (comme l’arche percée) n’était pas enregistrée.
+- Un sélecteur de forme ouvert ne passe plus sous les cartes qui le suivent.
+- Le texte d’aide de la carte parle de formes au lieu de cercles.
+
 ## 0.28.0 · 11 octobre 2026
 
 ### Apparences

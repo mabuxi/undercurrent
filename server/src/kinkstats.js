@@ -1,5 +1,5 @@
 import { getDb, now } from './db.js';
-import { engagement } from './profile.js';
+import { engagement, weeklyEngagement } from './profile.js';
 import { tagsForItems } from './store.js';
 import { kinkIndex, kinksForTags } from './kinks.js';
 
@@ -68,5 +68,45 @@ export function kinkPoints(kinks) {
     });
   }
   last = { key, at: now(), v: out };
+  return out;
+}
+
+// Week by week, from your first week with the app to this one: the share of your points that went to each kink
+// (0 to 100), oldest first. For the graph of how a kink rose or dropped over all time.
+let weeksCache = { at: 0, key: '', v: null };
+export function kinkWeeks(kinks, weeks = 52) {
+  const key = kinks.map((k) => `${k.id}:${(k.tags || []).length}`).join('|');
+  if (weeksCache.v && weeksCache.key === key && now() - weeksCache.at < 10 * 60000) return weeksCache.v;
+  const per = weeklyEngagement(weeks);
+  const tagMap = tagsForItems([...per.keys()]);
+  const q = getDb().prepare('SELECT community FROM items WHERE id = ?');
+  const idx = kinkIndex(kinks.map((k) => ({ ...k, status: 'active' })));
+  const total = new Array(weeks).fill(0);
+  const sums = new Map();
+  for (const [id, wk] of per) {
+    const ks = kinksForTags(tagMap.get(id) || [], idx, q.get(id)?.community || null);
+    for (const [w, p] of wk) {
+      total[w] += Math.max(0, p);
+      for (const k of ks) {
+        if (!sums.has(k.id)) sums.set(k.id, new Array(weeks).fill(0));
+        sums.get(k.id)[w] += p;
+      }
+    }
+  }
+  let first = weeks - 1;
+  while (first > 0 && !total[first]) first--;
+  // A week you did not use the app keeps the week before (no fake dip), and each week is evened out with the ones
+  // next to it, so the line shows where a kink is going rather than the noise of single weeks.
+  const out = new Map();
+  for (const [id, arr] of sums) {
+    const raw = arr.slice(0, first + 1).reverse().map((v, i) => { const tot = total[first - i]; return tot > 0 ? (Math.max(0, v) / tot) * 100 : null; });
+    let prev = raw.find((v) => v != null) ?? 0;
+    const filled = raw.map((v) => (v == null ? prev : (prev = v)));
+    out.set(id, filled.map((v, i) => {
+      const near = filled.slice(Math.max(0, i - 1), i + 2);
+      return Math.round(((v * 2 + near.reduce((a, b) => a + b, 0) - v) / (near.length + 1)) * 10) / 10;
+    }));
+  }
+  weeksCache = { at: now(), key, v: out };
   return out;
 }

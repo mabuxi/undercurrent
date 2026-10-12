@@ -1,8 +1,55 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, ago, fmtBytes } from '../api.js';
 import { useApp } from '../context.jsx';
 import { Icon } from '../icons.jsx';
 import { t, tn, locale } from '../i18n.js';
+import { Shape, SHAPES } from '../shapes.jsx';
+import { ColorDot } from './KinkBoard.jsx';
+
+// Each profile has a shape and a colour, drawn the way the look draws kink shapes. The app picks a shape from its
+// name until you pick one.
+const PROFILE_SHAPES = ['star5', 'heart', 'moon', 'bolt', 'flower', 'diamond', 'spark', 'sun', 'drop', 'hexagon', 'leaf', 'planet', 'clover', 'burst', 'infinity', 'squircle', 'tulip', 'eclipse'];
+export function profileShape(p) {
+  if (SHAPES[p?.shape]) return p.shape;
+  let h = 7;
+  for (const ch of String(p?.id || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return PROFILE_SHAPES[h % PROFILE_SHAPES.length];
+}
+
+function ProfileIcon({ p, onChange }) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const away = (e) => { if (!wrap.current?.contains(e.target)) setOpen(false); };
+    const esc = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('pointerdown', away);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('pointerdown', away); document.removeEventListener('keydown', esc); };
+  }, [open]);
+  const color = p.color || '#E39A83';
+  const shape = profileShape(p);
+  const patch = (body) => api(`/profiles/${p.id}`, { method: 'PATCH', body }).then(onChange);
+  return (
+    <span className="shapebtn-wrap profshape" ref={wrap} style={{ '--c': color }}>
+      <button type="button" className="shapebtn" onClick={() => setOpen((x) => !x)} aria-expanded={open} aria-label={t('Shape and colour of {name}', { name: p.name })} title={t('Shape and colour')}>
+        <Shape shape={shape} color={color} size={34} />
+      </button>
+      {open ? (
+        <div className="shapepop" role="dialog" aria-label={t('Shape and colour of {name}', { name: p.name })}>
+          <div className="sp-t">{t('Shape of {name}', { name: p.name })}</div>
+          <div className="sp-grid">
+            {PROFILE_SHAPES.map((s) => <button type="button" key={s} className={`sp-opt solo${shape === s ? ' on' : ''}`} onClick={() => { patch({ shape: s }); setOpen(false); }} aria-label={s}><Shape shape={s} color={color} size={26} /></button>)}
+          </div>
+          <div className="sp-foot">
+            <ColorDot color={color} onChange={(c) => patch({ color: c })} label={t('Colour of {name}', { name: p.name })} />
+            {p.shape ? <button type="button" className="ghost-btn small" onClick={() => { patch({ shape: null }); setOpen(false); }}><Icon name="spark" />{t('Let the app choose')}</button> : null}
+          </div>
+        </div>
+      ) : null}
+    </span>
+  );
+}
 
 // Waits for the server to come back on the other profile, then reloads the page.
 function waitForProfile(id, onTimeout) {
@@ -30,7 +77,7 @@ function ProfileRow({ p, onChange, onSwitch }) {
   }
   return (
     <div className={`profrow${p.active ? ' current' : ''}`} style={{ '--c': p.color }}>
-      <label className="profdot" title={t('Colour')}><input type="color" value={p.color || '#E39A83'} onChange={(e) => api(`/profiles/${p.id}`, { method: 'PATCH', body: { color: e.target.value } }).then(onChange)} aria-label={t('Colour of {name}', { name: p.name })} /></label>
+      <ProfileIcon p={p} onChange={onChange} />
       <div className="profinfo">
         {edit ? (
           <form onSubmit={(e) => { e.preventDefault(); act('rename', async () => { await api(`/profiles/${p.id}`, { method: 'PATCH', body: { name } }); setEdit(false); onChange(); }); }}>

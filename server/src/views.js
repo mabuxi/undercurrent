@@ -12,6 +12,7 @@ import { listMemory } from './memory.js';
 import { userLimits } from './safety.js';
 import { displayTag } from './tagquality.js';
 import { tr, trn } from './i18n.js';
+import { kinkWeeks } from './kinkstats.js';
 import { suggestFor } from './setup.js';
 import { knownVariants } from './concepts.js';
 import { deeperQuick, fantasyTags } from './deeper.js';
@@ -70,7 +71,7 @@ function pickLayout(r) {
 }
 const SAVES = new Set(['recentSaved', 'oldSaves', 'savedPick']);
 let LAST_SAVES = 0;
-const RARE = new Set(['fantasySuggest', 'fantasyDeep', 'combo', 'tonight', 'analytics', 'map', 'limits', 'savedFant', 'moodCheck', 'rateRecent', 'recentSaved', 'oldSaves', 'shortsRail', 'memory', 'newKink', 'savedPick']);
+const RARE = new Set(['kinkTrend', 'fantasySuggest', 'fantasyDeep', 'combo', 'tonight', 'analytics', 'map', 'limits', 'savedFant', 'moodCheck', 'rateRecent', 'recentSaved', 'oldSaves', 'shortsRail', 'memory', 'newKink', 'savedPick']);
 
 // Windows that come in variants take turns, so two analytics or map windows in a row never look the same.
 const TURN = new Map();
@@ -423,6 +424,24 @@ function build(type, r, ctx) {
       if (!m) return null;
       return { type, title: m.status === 'recheck' ? tr('Still true?') : tr('Is this you?'), meta: m.status === 'recheck' ? tr('an older memory, to keep it right') : tr('a memory the assistant suggests'), memory: { id: m.id, category: m.category, content: m.content, evidence: m.evidence, status: m.status }, color: '#C9A7E8' };
     }
+    // Now and then: how one kink rose or dropped over all the weeks you have used the app, as a graph. Only a kink with
+    // at least a month of history that clearly moved.
+    case 'kinkTrend': {
+      const series = kinkWeeks(ctx.kinks);
+      const avg = (a) => a.reduce((x, y) => x + y, 0) / Math.max(1, a.length);
+      const cands = ctx.kinks.map((k) => {
+        const s = series.get(k.id) || [];
+        if (s.length < 4) return null;
+        const half = Math.floor(s.length / 2);
+        const change = avg(s.slice(half)) - avg(s.slice(0, half));
+        const span = Math.max(...s) - Math.min(...s);
+        return span >= 3 && Math.abs(change) >= 1 ? { k, s, change } : null;
+      }).filter(Boolean).sort((a, b) => Math.abs(b.change) - Math.abs(a.change)).slice(0, 3);
+      if (!cands.length) return null;
+      const c = cands[Math.floor(r() * cands.length)];
+      const up = c.change >= 0;
+      return { type: 'kinkTrend', title: c.k.label || c.k.name, meta: up ? tr('rising over all time') : tr('dropping over all time'), kink: { id: c.k.id, name: c.k.label || c.k.name, color: c.k.color }, series: c.s, change: Math.round(c.change * 10) / 10, filter: { kink: c.k.id }, color: c.k.color };
+    }
     case 'memory': {
       const mem = listMemory();
       return { type, title: tr('Memory'), meta: tr('{n} remembered · {m} to review', { n: mem.filter((m) => m.status === 'active').length, m: mem.filter((m) => m.status === 'proposed').length }), memories: mem.slice(0, 4), color: '#C9A7E8' };
@@ -477,7 +496,7 @@ function analytics(r, ctx) {
 // Content windows (categories, formats, kinks, mixes, fantasies, creators) make up most of the column;
 // every two or three windows one of the other kinds (numbers, map, journeys, memory…) comes in between.
 const CONTENT_W = [['formatMix', 7], ['kinkDeep', 4], ['kinkList', 4], ['kinkMix', 3], ['nearby', 2], ['pair', 2], ['combo', 2], ['fantasy', 2], ['fantasySuggest', 2], ['fantasyDeep', 2], ['newKink', 2], ['performer', 2], ['creator', 2], ['hotThread', 3], ['stories', 1], ['gifs', 1], ['shortsRail', 1], ['gallery', 1], ['trending', 1], ['discovery', 1], ['community', 1], ['followLatest', 2], ['followSpotlight', 1], ['following', 1], ['kinkSpot', 1], ['tagNow', 1]];
-const OTHER_W = [['analytics', 4], ['map', 3], ['journey', 4], ['rateRecent', 2], ['recentSaved', 0.5], ['oldSaves', 0.5], ['tonight', 1], ['limits', 1], ['savedFant', 1], ['moodCheck', 1], ['memory', 1]];
+const OTHER_W = [['analytics', 4], ['map', 3], ['journey', 4], ['rateRecent', 2], ['recentSaved', 0.5], ['oldSaves', 0.5], ['tonight', 1], ['limits', 1], ['savedFant', 1], ['moodCheck', 1], ['memory', 1], ['kinkTrend', 1.2]];
 const RHYTHM = [0, 0, 1, 0, 0, 0, 1];
 function pickFrom(list, r) {
   const total = list.reduce((a, b) => a + b[1], 0);

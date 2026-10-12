@@ -52,7 +52,7 @@ import { lustUrl, lustTest, TUBE_CDNS, tubeReferer } from './sources/lustpress.j
 import { invalidatePool } from './searchstate.js';
 import { setupStatus, pullModels, installOllama, conceptCatalog, suggestFor, moreFor, aiKinks, SOURCE_ORDER, modelOptions, chooseModels } from './setup.js';
 import { fantasyIdeas } from './fantasyideas.js';
-import { listProfiles, createProfile, renameProfile, setProfileColor, switchProfile, deleteProfile, backupProfile, restoreBackup, deleteBackup, revealInFinder } from './profiles.js';
+import { listProfiles, createProfile, renameProfile, setProfileColor, setProfileShape, switchProfile, deleteProfile, backupProfile, restoreBackup, deleteBackup, revealInFinder } from './profiles.js';
 import { updateStatus, applyUpdate, job as updateJob, whatsNew, markSeen, changelog } from './update.js';
 import { lang, languageSet, setLanguage, LANGS, tr, trn, replyIn } from './i18n.js';
 import { kinkLabel, translateItem } from './translate.js';
@@ -1249,6 +1249,7 @@ api.post('/profiles', wrap((req, res) => {
 api.patch('/profiles/:id', wrap((req, res) => {
   if (req.body?.name) renameProfile(req.params.id, req.body.name);
   if (req.body?.color) setProfileColor(req.params.id, req.body.color);
+  if (req.body && 'shape' in req.body) setProfileShape(req.params.id, req.body.shape);
   res.json(listProfiles());
 }));
 api.post('/profiles/:id/switch', wrap((req, res) => res.json(switchProfile(req.params.id))));

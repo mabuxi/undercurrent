@@ -30,6 +30,7 @@ export function ensureKinkSchema() {
   if (!cols.includes('parent_id')) db.exec('ALTER TABLE kinks ADD COLUMN parent_id INTEGER');
   if (!cols.includes('is_group')) db.exec('ALTER TABLE kinks ADD COLUMN is_group INTEGER DEFAULT 0');
   if (!cols.includes('shape')) db.exec('ALTER TABLE kinks ADD COLUMN shape TEXT');
+  if (!cols.includes('ai_shape')) db.exec('ALTER TABLE kinks ADD COLUMN ai_shape TEXT');
   const tcols = db.prepare('PRAGMA table_info(kink_tags)').all().map((c) => c.name);
   if (!tcols.includes('origin')) db.exec("ALTER TABLE kink_tags ADD COLUMN origin TEXT DEFAULT 'ai'");
   // Reddit communities that belong to a kink: added (by you or because the app was sure), suggested, or turned down.

@@ -1,8 +1,32 @@
 import { useEffect, useRef, useState } from 'react';
 import { t } from '../i18n.js';
+import { useApp } from '../context.jsx';
+import { lookColor, shapeImage } from '../lookcolor.js';
 
 const TWO_PI = Math.PI * 2;
-const BG = '#1A1420';
+let BG = '#1A1420';
+
+// How the map looks in each look. Original: soft glassy blobs and gradient shapes. Cutout: flat dark panels behind each
+// family, vivid shapes with a glow, rounded label pills. Signal: dashed family outlines on a dotted board, outlined
+// shapes with a hard shadow, condensed uppercase labels in boxes. Links stay thin and quiet in every look, so a busy
+// map stays readable.
+const LOOKS = {
+  original: {
+    bg: '#1A1420', edge: '#CFC2C9', text: '#EFE6EA', tagFill: '#231B29', tagLine: '#B6A8B0', fantasy: '#F6C35B', sel: '#EFE6EA', recent: '#FFFFFF',
+    kinkFont: '600 12.5px Manrope, sans-serif', tagFont: '500 11px Manrope, sans-serif', fantFont: 'italic 15px "Instrument Serif", Georgia, serif', groupFont: (sub) => `${sub ? 600 : 700} ${sub ? 10.5 : 12}px Manrope, sans-serif`,
+    numFont: '500 10.5px "IBM Plex Mono", monospace', up: '#7FC49B', down: '#E07070', labelR: 6, upper: false
+  },
+  cutout: {
+    bg: '#0E0E0E', edge: '#8A8A84', text: '#F4F4F0', tagFill: '#1A1A1A', tagLine: '#77776F', fantasy: '#FFC93C', sel: '#C8FF1E', recent: '#C8FF1E',
+    kinkFont: '700 12.5px Manrope, sans-serif', tagFont: '600 11px Manrope, sans-serif', fantFont: '700 12px Manrope, sans-serif', groupFont: (sub) => `700 ${sub ? 9.5 : 10.5}px Unbounded, Manrope, sans-serif`,
+    numFont: '700 10.5px Manrope, sans-serif', up: '#5CF0A0', down: '#FF6B6B', labelR: 9, upper: false, glow: true
+  },
+  signal: {
+    bg: '#0E0E0D', edge: '#F3F0E4', text: '#F3F0E4', tagFill: '#141414', tagLine: '#8A8578', fantasy: '#FFD23A', sel: '#D4FF3A', recent: '#D4FF3A',
+    kinkFont: '800 15px "Big Shoulders Display", "Arial Narrow", sans-serif', tagFont: '400 10.5px "Space Mono", monospace', fantFont: '800 14px "Big Shoulders Display", "Arial Narrow", sans-serif', groupFont: (sub) => `900 ${sub ? 13 : 15}px "Big Shoulders Display", "Arial Narrow", sans-serif`,
+    numFont: '700 10.5px "Space Mono", monospace', up: '#2EF29A', down: '#FF5CA8', labelR: 3, upper: true, boxed: true
+  }
+};
 
 function hex(c) {
   const m = String(c || '#999999').replace('#', '');
@@ -63,6 +87,10 @@ function blobPath(ctx, members, pad, t) {
 }
 
 export default function BrainCanvas({ data, view, selected, onSelect, onHover, height = 560 }) {
+  const app = useApp();
+  const theme = LOOKS[app?.theme] ? app.theme : 'original';
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
   const canvasRef = useRef(null);
   const [hint, setHint] = useState(false);
   const sim = useRef({ nodes: new Map(), edges: [], alpha: 1, cam: { x: 0, y: 0, k: 1 }, hover: null, drag: null, pan: null, moved: false, w: 800, h: height });
@@ -183,20 +211,30 @@ export default function BrainCanvas({ data, view, selected, onSelect, onHover, h
       n.sr = n.r * Math.max(0.7, Math.min(1.35, Math.pow(cam.k, 0.3)));
     };
 
+    let dots = null;
     const draw = () => {
       const ctx = canvas.getContext('2d');
       const now = performance.now();
       const v = viewRef.current || {};
+      const look = themeRef.current;
+      const L = LOOKS[look];
+      BG = L.bg;
       ctx.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);
       ctx.fillStyle = BG;
       ctx.fillRect(0, 0, S.w, S.h);
+      if (look === 'signal') {
+        // A dotted board, like the page behind it.
+        if (!dots) { const c = document.createElement('canvas'); c.width = 16; c.height = 16; const x = c.getContext('2d'); x.fillStyle = '#2A2925'; x.fillRect(0, 0, 1.6, 1.6); dots = ctx.createPattern(c, 'repeat'); }
+        ctx.fillStyle = dots; ctx.fillRect(0, 0, S.w, S.h);
+      }
       const nodes = [...S.nodes.values()];
       for (const n of nodes) toScreen(n);
       const focus = S.hover || selRef.current;
       const neighbors = new Set();
       if (focus) for (const e of S.edges) { if (e.a === focus) neighbors.add(e.b); if (e.b === focus) neighbors.add(e.a); }
+      const shapes = app?.shapes;
 
-      // Families: translucent organic shapes. Where two overlap, their colours mix.
+      // Families: soft shapes around their kinks, drawn the way the look draws panels.
       const groupMembers = new Map();
       for (const n of nodes) for (const gid of [n.topGroup, n.group !== n.topGroup ? n.group : null].filter(Boolean)) {
         if (!groupMembers.has(gid)) groupMembers.set(gid, []);
@@ -207,16 +245,28 @@ export default function BrainCanvas({ data, view, selected, onSelect, onHover, h
         const g = (data?.groups || []).find((x) => x.id === gid);
         if (!g || !members.length) continue;
         const sub = !!g.parentId;
-        const h = blobPath(ctx, members, sub ? 26 : 44, now);
+        const gc = lookColor(g.color || '#888888', look);
+        const h = blobPath(ctx, members, sub ? 26 : look === 'cutout' ? 50 : 44, look === 'signal' ? 0 : now);
         if (!h) continue;
         const dimG = focus && !members.some((m) => m.key === focus || neighbors.has(m.key));
-        ctx.fillStyle = alpha(g.color || '#888888', dimG ? 0.05 : sub ? 0.12 : 0.14);
-        ctx.fill();
-        ctx.lineWidth = 1.2;
-        ctx.strokeStyle = alpha(g.color || '#888888', dimG ? 0.15 : 0.45);
-        ctx.stroke();
+        if (look === 'cutout') {
+          ctx.fillStyle = alpha(gc, dimG ? 0.04 : sub ? 0.1 : 0.12);
+          ctx.fill();
+        } else if (look === 'signal') {
+          ctx.fillStyle = alpha(gc, dimG ? 0.03 : 0.07);
+          ctx.fill();
+          ctx.setLineDash([7, 6]); ctx.lineWidth = 2;
+          ctx.strokeStyle = alpha(gc, dimG ? 0.2 : 0.75);
+          ctx.stroke(); ctx.setLineDash([]);
+        } else {
+          ctx.fillStyle = alpha(gc, dimG ? 0.05 : sub ? 0.12 : 0.14);
+          ctx.fill();
+          ctx.lineWidth = 1.2;
+          ctx.strokeStyle = alpha(gc, dimG ? 0.15 : 0.45);
+          ctx.stroke();
+        }
         const top = h.reduce((m, p) => (p[1] < m[1] ? p : m), h[0]);
-        labels.push({ text: g.name.toUpperCase(), x: top[0], y: top[1] - 6, color: mix(g.color || '#bbbbbb', 0.05, '#ffffff'), font: `${sub ? 600 : 700} ${sub ? 10.5 : 12}px Manrope, sans-serif`, prio: sub ? 2 : 3, group: true });
+        labels.push({ text: g.name.toUpperCase(), x: top[0], y: top[1] - 6, color: look === 'original' ? mix(gc, 0.05, '#ffffff') : look === 'signal' ? '#0B0B0B' : gc, fill: look === 'signal' ? gc : null, font: L.groupFont(sub), prio: sub ? 2 : 3, group: true, dim: dimG });
       }
 
       for (const e of S.edges) {
@@ -225,10 +275,13 @@ export default function BrainCanvas({ data, view, selected, onSelect, onHover, h
         if (!a || !b) continue;
         const lit = focus && (e.a === focus || e.b === focus);
         const dim = focus && !lit;
-        const base = e.fantasy ? '#F6C35B' : '#CFC2C9';
-        ctx.strokeStyle = mix(base, dim ? 0.92 : lit ? 0.05 : 0.74 - e.w * 0.3);
+        const base = e.fantasy ? L.fantasy : L.edge;
+        if (look === 'original') ctx.strokeStyle = mix(base, dim ? 0.92 : lit ? 0.05 : 0.74 - e.w * 0.3);
+        else ctx.strokeStyle = alpha(base, dim ? 0.06 : lit ? 0.9 : 0.16 + e.w * 0.22);
         ctx.lineWidth = lit ? 1.4 + e.w * 2.6 : 0.8 + e.w * 1.4;
+        if (look === 'signal' && e.fantasy) ctx.setLineDash([4, 4]);
         ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy); ctx.stroke();
+        ctx.setLineDash([]);
       }
 
       for (const n of nodes) {
@@ -238,31 +291,57 @@ export default function BrainCanvas({ data, view, selected, onSelect, onHover, h
         const r = n.sr * (0.5 + 0.5 * grow);
         const recent = n.lastMs && Date.now() - n.lastMs < 10 * 60000;
         if (n.type === 'kink') {
-          ctx.fillStyle = mix(n.color, n.status === 'proposed' ? Math.max(fade, 0.45) : fade);
-          ctx.beginPath(); ctx.arc(n.sx, n.sy, r, 0, TWO_PI); ctx.fill();
-          ctx.strokeStyle = mix(n.color, Math.min(0.95, fade + 0.35), '#000000');
-          ctx.lineWidth = 1.5;
-          ctx.stroke();
-          if (n.status === 'proposed') { ctx.setLineDash([3, 4]); ctx.strokeStyle = mix(n.color, fade); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(n.sx, n.sy, r + 4, 0, TWO_PI); ctx.stroke(); ctx.setLineDash([]); }
+          // Each kink is drawn as its own shape, in its colour as the look shows it.
+          const sh = shapes?.get(Number(n.id)) || { shape: 'circle', pattern: 'dots' };
+          const box = r * (look === 'signal' ? 2.5 : 2.3);
+          const img = shapeImage(sh.shape, n.color, look, sh.pattern, box);
+          const c = lookColor(n.color, look);
+          ctx.globalAlpha = dim ? 0.26 : n.status === 'proposed' ? 0.55 : 1;
+          if (L.glow && !dim) { ctx.shadowColor = alpha(c, 0.55); ctx.shadowBlur = 18; }
+          if (img) {
+            if (look === 'signal') { const D = box * (146 / 118); ctx.drawImage(img, n.sx - D / 2 + box * 0.03, n.sy - D / 2 + box * 0.03, D, D); }
+            else ctx.drawImage(img, n.sx - box / 2, n.sy - box / 2, box, box);
+          } else {
+            ctx.fillStyle = c; ctx.beginPath(); ctx.arc(n.sx, n.sy, r, 0, TWO_PI); ctx.fill();
+          }
+          ctx.shadowBlur = 0; ctx.shadowColor = 'transparent';
+          ctx.globalAlpha = 1;
+          if (n.status === 'proposed') { ctx.setLineDash([3, 4]); ctx.strokeStyle = alpha(c, dim ? 0.3 : 0.9); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(n.sx, n.sy, r + 6, 0, TWO_PI); ctx.stroke(); ctx.setLineDash([]); }
         } else if (n.type === 'tag') {
-          ctx.fillStyle = '#231B29';
-          ctx.beginPath(); ctx.arc(n.sx, n.sy, r, 0, TWO_PI); ctx.fill();
-          ctx.strokeStyle = mix('#B6A8B0', fade);
-          ctx.lineWidth = 1.4;
-          ctx.stroke();
-          if (n.promote) { ctx.strokeStyle = mix('#E8C66B', fade); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(n.sx, n.sy, r + 3.5, 0, TWO_PI); ctx.stroke(); }
+          // Tags: small hollow marks, dashed like tags that are almost a kink everywhere else in the app.
+          ctx.fillStyle = L.tagFill;
+          if (look === 'signal') { ctx.beginPath(); ctx.rect(n.sx - r, n.sy - r, r * 2, r * 2); } else { ctx.beginPath(); ctx.arc(n.sx, n.sy, r, 0, TWO_PI); }
+          ctx.fill();
+          ctx.strokeStyle = look === 'original' ? mix(L.tagLine, fade) : alpha(L.tagLine, dim ? 0.3 : 1);
+          ctx.lineWidth = look === 'signal' ? 1.6 : 1.4;
+          if (look !== 'original') ctx.setLineDash([2.5, 2.5]);
+          ctx.stroke(); ctx.setLineDash([]);
+          if (n.promote) { ctx.strokeStyle = alpha(L.fantasy, dim ? 0.3 : 1); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(n.sx, n.sy, r + 3.5, 0, TWO_PI); ctx.stroke(); }
         } else {
-          ctx.fillStyle = mix('#F6C35B', n.saved ? fade : Math.max(fade, 0.35));
-          drawDiamond(ctx, n.sx, n.sy, r * 1.15); ctx.fill();
-          ctx.strokeStyle = mix('#F6C35B', 0.4, '#000000'); ctx.lineWidth = 1.2; ctx.stroke();
+          if (look === 'original') { ctx.fillStyle = mix(L.fantasy, n.saved ? fade : Math.max(fade, 0.35)); drawDiamond(ctx, n.sx, n.sy, r * 1.15); ctx.fill(); ctx.strokeStyle = mix(L.fantasy, 0.4, '#000000'); ctx.lineWidth = 1.2; ctx.stroke(); }
+          else {
+            ctx.globalAlpha = dim ? 0.3 : n.saved ? 1 : 0.7;
+            if (look === 'signal') { ctx.fillStyle = '#F3F0E4'; drawDiamond(ctx, n.sx + 4, n.sy + 4, r * 1.15); ctx.fill(); }
+            if (L.glow) { ctx.shadowColor = alpha(L.fantasy, 0.5); ctx.shadowBlur = 14; }
+            ctx.fillStyle = L.fantasy; drawDiamond(ctx, n.sx, n.sy, r * 1.15); ctx.fill();
+            ctx.shadowBlur = 0; ctx.shadowColor = 'transparent';
+            if (look === 'signal') { ctx.strokeStyle = '#0B0B0B'; ctx.lineWidth = 2; ctx.stroke(); }
+            ctx.globalAlpha = 1;
+          }
         }
-        if (recent && !dim) { ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.arc(n.sx + r * 0.75, n.sy - r * 0.75, 3, 0, TWO_PI); ctx.fill(); }
-        if (selRef.current === n.key) { ctx.strokeStyle = '#EFE6EA'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(n.sx, n.sy, r + 7, 0, TWO_PI); ctx.stroke(); }
+        if (recent && !dim) { ctx.fillStyle = L.recent; ctx.beginPath(); ctx.arc(n.sx + r * 0.85, n.sy - r * 0.85, 3.2, 0, TWO_PI); ctx.fill(); }
+        if (selRef.current === n.key) {
+          ctx.strokeStyle = L.sel; ctx.lineWidth = look === 'signal' ? 3 : 2.5;
+          if (look === 'signal') ctx.setLineDash([6, 4]);
+          ctx.beginPath(); ctx.arc(n.sx, n.sy, r + 9, 0, TWO_PI); ctx.stroke(); ctx.setLineDash([]);
+        }
         const important = focus === n.key || neighbors.has(n.key) || selRef.current === n.key;
         if (dim && n.type === 'tag') continue;
-        const font = n.type === 'fantasy' ? 'italic 15px "Instrument Serif", Georgia, serif' : `${n.type === 'kink' ? 600 : 500} ${n.type === 'kink' ? 12.5 : 11}px Manrope, sans-serif`;
-        const color = n.type === 'fantasy' ? mix('#F6C35B', fade) : n.type === 'tag' ? mix('#B6A8B0', fade) : mix('#EFE6EA', fade);
-        labels.push({ text: n.name, x: n.sx, y: n.sy + r + 16, color, font, prio: important ? 10 : n.type === 'kink' ? 4 + n.sr / 20 : n.type === 'fantasy' ? 4 : 1, force: important || v.labelsAll, delta: n.type === 'kink' && focus === n.key ? n.lately - n.allTime : null });
+        const font = n.type === 'fantasy' ? L.fantFont : n.type === 'kink' ? L.kinkFont : L.tagFont;
+        const base = n.type === 'fantasy' ? L.fantasy : n.type === 'tag' ? L.tagLine : L.text;
+        const color = look === 'original' ? mix(base, fade) : alpha(base, dim ? 0.35 : 1);
+        const text = L.upper && n.type !== 'tag' ? n.name.toUpperCase() : n.name;
+        labels.push({ text, x: n.sx, y: n.sy + r + (look === 'signal' ? 19 : 16), color, font, prio: important ? 10 : n.type === 'kink' ? 4 + n.sr / 20 : n.type === 'fantasy' ? 4 : 1, force: important || v.labelsAll, delta: n.type === 'kink' && focus === n.key ? n.lately - n.allTime : null, boxed: L.boxed && n.type === 'kink' && important });
       }
 
       // Labels last, biggest first; a label that would sit on top of another one waits until you zoom or hover.
@@ -270,29 +349,33 @@ export default function BrainCanvas({ data, view, selected, onSelect, onHover, h
       const placed = [];
       for (const l of labels) {
         ctx.font = l.font;
-        const w = ctx.measureText(l.text).width + 10;
-        const box = { x1: l.x - w / 2, y1: l.y - 13, x2: l.x + w / 2, y2: l.y + 4 };
+        const w = ctx.measureText(l.text).width + (look === 'original' ? 10 : 14);
+        const hgt = look === 'signal' ? 20 : look === 'cutout' ? 19 : 17;
+        const box = { x1: l.x - w / 2, y1: l.y - hgt + 4, x2: l.x + w / 2, y2: l.y + 4 };
         const hit = placed.some((p) => box.x1 < p.x2 && box.x2 > p.x1 && box.y1 < p.y2 && box.y2 > p.y1);
         if (hit && !l.force) continue;
         placed.push(box);
-        ctx.fillStyle = l.group ? 'rgba(26,20,32,.82)' : BG;
+        ctx.globalAlpha = l.dim ? 0.45 : 1;
+        ctx.fillStyle = l.fill || (l.group && look === 'original' ? 'rgba(26,20,32,.82)' : look === 'cutout' ? '#161616' : BG);
         ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(box.x1, box.y1, w, 17, 6); else ctx.rect(box.x1, box.y1, w, 17);
+        if (ctx.roundRect) ctx.roundRect(box.x1, box.y1, w, hgt, look === 'cutout' ? hgt / 2 : L.labelR); else ctx.rect(box.x1, box.y1, w, hgt);
         ctx.fill();
+        if (look === 'signal' && (l.group || l.boxed)) { ctx.strokeStyle = l.group ? '#0B0B0B' : '#F3F0E4'; ctx.lineWidth = 1.6; ctx.stroke(); }
         ctx.fillStyle = l.color;
         ctx.textAlign = 'center';
-        ctx.fillText(l.text, l.x, l.y);
+        ctx.fillText(l.text, l.x, l.y - (look === 'signal' ? 1 : 0));
+        ctx.globalAlpha = 1;
         if (l.delta !== null && l.delta !== undefined) {
-          ctx.font = '500 10.5px "IBM Plex Mono", monospace';
-          ctx.fillStyle = l.delta >= 0 ? '#7FC49B' : '#E07070';
-          ctx.fillText(`${l.delta >= 0 ? '▲' : '▼'} ${Math.abs(l.delta)}`, l.x, l.y + 14);
+          ctx.font = L.numFont;
+          ctx.fillStyle = l.delta >= 0 ? L.up : L.down;
+          ctx.fillText(`${l.delta >= 0 ? '▲' : '▼'} ${Math.abs(l.delta)}`, l.x, l.y + 15);
         }
       }
     };
 
     raf = requestAnimationFrame(step);
     return () => { cancelAnimationFrame(raf); ro.disconnect(); };
-  }, [height, data]);
+  }, [height, data, app?.shapes]);
 
   function toWorld(e) {
     const S = sim.current;

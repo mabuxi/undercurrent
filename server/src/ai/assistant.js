@@ -2,6 +2,7 @@ import { getDb, now } from '../db.js';
 import { chat, fastModel } from './ollama.js';
 import { listKinks, listFantasies } from '../kinks.js';
 import { syncKinks, syncGroups, learnFamilies, logSummary } from '../kinkengine.js';
+import { pickShapes } from '../kinkshapes.js';
 import { topTags } from '../profile.js';
 import { memoryForPrompt, addMemory, listMemory, CATEGORIES } from '../memory.js';
 import { itemTags } from '../store.js';
@@ -202,6 +203,7 @@ export async function reflect() {
 export async function refreshKinks() {
   const s = syncKinks();
   try { const fams = await learnFamilies(chat, fastModel()); if (fams) syncGroups(fams); } catch {}
+  try { await pickShapes(chat, fastModel()); } catch {}
   logSummary(s);
   return s;
 }

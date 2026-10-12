@@ -256,5 +256,7 @@ export default {
   "Reddit refused the login: {error}": "Reddit a refusé la connexion : {error}",
   "unknown error": "erreur inconnue",
   "no list of videos came back": "aucune liste de vidéos n’est revenue",
-  "Unknown look.": "Apparence inconnue."
+  "Unknown look.": "Apparence inconnue.",
+  "rising over all time": "en hausse depuis le début",
+  "dropping over all time": "en baisse depuis le début"
 };

@@ -9,8 +9,12 @@ export function applyTheme(theme, { save = true, remember = true } = {}) {
   el.dataset.theme = v;
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', BG[v]);
   if (remember) { try { localStorage.setItem('uc-theme', v); } catch {} }
-  // The Mac app's window shows the same background behind the page.
-  try { window.webkit?.messageHandlers?.uc?.postMessage(`bg:${BG[v]}`); } catch {}
+  // The icon on the home screen and in the browser tab follows the look (the original look keeps the first icon).
+  const icon = (sel, size, first) => document.querySelector(sel)?.setAttribute('href', v === 'original' ? first : `/icons/${v}-${size}.png`);
+  icon('link[rel="apple-touch-icon"]', 180, '/apple-touch-icon.png');
+  icon('link[rel="icon"]', 192, '/icon-192.png');
+  // The Mac app's window shows the same background behind the page, and its icon and loading screen follow the look.
+  try { window.webkit?.messageHandlers?.uc?.postMessage(`bg:${BG[v]}`); window.webkit?.messageHandlers?.uc?.postMessage(`look:${v}`); } catch {}
   if (save) fetch('/api/settings/theme', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: v }) }).catch(() => {});
   window.dispatchEvent(new CustomEvent('uc-theme', { detail: v }));
   return v;

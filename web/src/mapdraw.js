@@ -1,5 +1,6 @@
 import { rgba } from './api.js';
 import { t, tn } from './i18n.js';
+import { lookColor, shapeImage } from './lookcolor.js';
 
 function solid(c, t, to = '#1A1420') {
   const h = (x) => { const m = String(x || '#999999').replace('#', ''); const f = m.length === 3 ? m.split('').map((y) => y + y).join('') : m.padEnd(6, '9'); return [0, 2, 4].map((i) => parseInt(f.slice(i, i + 2), 16)); };
@@ -97,7 +98,7 @@ export function layout(nodes, edges, w, h) {
   return pos;
 }
 
-export function drawGraph(canvas, graph, { big = true, selected = null, height } = {}) {
+export function drawGraph(canvas, graph, { big = true, selected = null, height, shapes = null, theme = 'original', redraw = null } = {}) {
   if (!canvas || !graph) return [];
   const box = canvas.parentElement;
   const w = Math.max(220, box.clientWidth);
@@ -129,7 +130,7 @@ export function drawGraph(canvas, graph, { big = true, selected = null, height }
   for (const e of edges) {
     const A = pos.get(e.a);
     const B = pos.get(e.b);
-    ctx.strokeStyle = `rgba(236,222,230,${0.1 + e.w * 0.35})`;
+    ctx.strokeStyle = theme === 'original' ? `rgba(236,222,230,${0.1 + e.w * 0.35})` : `rgba(243,240,228,${0.08 + e.w * 0.3})`;
     ctx.lineWidth = big ? 1 + e.w * 4 : 1;
     ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke();
     if (big) hits.push({ x: (A[0] + B[0]) / 2, y: (A[1] + B[1]) / 2, r: 8, edge: e });
@@ -160,9 +161,22 @@ export function drawGraph(canvas, graph, { big = true, selected = null, height }
     const [x, y] = pos.get(nd.id);
     const r = radius(nd);
     const fade = nd.faded ? 0.65 : nd.status === 'proposed' ? 0.45 : 0;
-    ctx.fillStyle = solid(nd.color, fade);
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = solid(nd.color, 0.45, '#000000'); ctx.lineWidth = 1.2; ctx.stroke();
+    // Each kink (and group) as its shape, drawn the way the look draws it; a plain disc until the shape is ready.
+    const sh = shapes?.get(Number(nd.id));
+    const box = r * (theme === 'signal' ? 2.5 : 2.3);
+    const img = sh ? shapeImage(sh.shape, nd.color, theme, sh.pattern, box) : null;
+    if (img) {
+      ctx.globalAlpha = fade ? 1 - fade * 0.75 : 1;
+      if (theme === 'cutout') { ctx.shadowColor = rgba(lookColor(nd.color, theme), 0.5); ctx.shadowBlur = big ? 16 : 8; }
+      if (theme === 'signal') { const D = box * (146 / 118); ctx.drawImage(img, x - D / 2 + box * 0.03, y - D / 2 + box * 0.03, D, D); }
+      else ctx.drawImage(img, x - box / 2, y - box / 2, box, box);
+      ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; ctx.globalAlpha = 1;
+    } else {
+      if (sh && redraw && !drawGraph.waiting) { drawGraph.waiting = true; setTimeout(() => { drawGraph.waiting = false; redraw(); }, 150); }
+      ctx.fillStyle = theme === 'original' ? solid(nd.color, fade) : lookColor(nd.color, theme);
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      if (theme === 'original') { ctx.strokeStyle = solid(nd.color, 0.45, '#000000'); ctx.lineWidth = 1.2; ctx.stroke(); }
+    }
     if (nd.kind === 'group' && big) {
       nd.kids?.forEach((k, i) => {
         const a = (i / Math.max(1, nd.kids.length)) * Math.PI * 2;
@@ -196,6 +210,6 @@ export function drawGraph(canvas, graph, { big = true, selected = null, height }
   return hits;
 }
 
-export function drawMap(canvas, data, big) {
-  return drawGraph(canvas, graphFor(data, null), { big });
+export function drawMap(canvas, data, big, opts = {}) {
+  return drawGraph(canvas, graphFor(data, null), { big, ...opts });
 }

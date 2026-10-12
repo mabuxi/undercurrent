@@ -86,6 +86,11 @@ export async function mockChat({ kind, user, schema }) {
       ...lines.map((l) => ({ category: 'Kinks and interests', content: `Lately more into ${l.replace('- rising:', '').split('(')[0].trim()}.`, evidence: 'rising over the last week' }))
     ] };
   }
+  if (kind === 'kink-shapes') {
+    const names = schema?.properties?.items?.items?.properties?.shape?.enum || ['circle'];
+    const pick = (n) => { let h = 7; for (const ch of n) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return names[h % names.length]; };
+    return { items: [...user.matchAll(/^(\d+)\.\s*([^(\n]*)/gm)].map((m) => ({ id: Number(m[1]), shape: pick(m[2].trim()) })) };
+  }
   if (kind === 'name-kinks') {
     const groups = [...user.matchAll(/^\d+\.\s*(.*)$/gm)].map((m) => m[1]);
     return { kinks: groups.map((g) => ({ name: g.split(',')[0].trim().replace(/^\w/, (c) => c.toUpperCase()), description: `Built around ${g}.` })) };

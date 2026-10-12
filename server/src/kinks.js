@@ -6,6 +6,7 @@ import { conceptsOf, isKinkConcept } from './concepts.js';
 import { ensureKinkSchema, familyOfRow, locksOf, conceptsOfRow, rememberRemoved, removedConcepts, dropKink, moveReferences, recolor, modeOf, kinkMatch, fillKink, conceptEvidence, MODES } from './kinkengine.js';
 import { kinkPoints } from './kinkstats.js';
 import { growSoon } from './kinktags.js';
+import { shapeSoon } from './kinkshapes.js';
 import { tr } from './i18n.js';
 
 export const PALETTE = ['#D98A99', '#A58FE0', '#66B5A6', '#D2A15E', '#7FA7D9', '#C98BC4', '#E3A58F', '#93C47D', '#E07A7A', '#7FD0C2', '#B7A4E8', '#E8C66B'];
@@ -48,7 +49,7 @@ export function listKinks({ includeHidden = false } = {}) {
     const nowv = score01(aff, tags, 'short');
     return {
       id: k.id, name: k.name, label: kinkLabel({ name: k.name, locks: locksOf(k), isGroup: !!k.is_group, concepts: conceptsOfRow(k) }), color: k.color, description: k.description, origin: k.origin, status: k.status, parentId: k.parent_id || null, isGroup: !!k.is_group,
-      concepts: conceptsOfRow(k), family: familyOfRow(k, learned), shape: k.shape || null, locks: locksOf(k), evidence: k.evidence ? JSON.parse(k.evidence) : null, created: k.created, fadedAt: k.faded_at || null,
+      concepts: conceptsOfRow(k), family: familyOfRow(k, learned), shape: k.shape || null, aiShape: k.ai_shape || null, locks: locksOf(k), evidence: k.evidence ? JSON.parse(k.evidence) : null, created: k.created, fadedAt: k.faded_at || null,
       tags: tags.map((t) => ({ id: t.tag_id, name: t.name, weight: t.weight, origin: t.origin })),
       subs: subsOf.get(k.id) || [],
       mode: k.is_group ? null : modeOf(k), match: k.is_group ? null : kinkMatch(k, stats),
@@ -129,7 +130,7 @@ export function createKink({ name, tags = [], description = '', color, origin = 
   }
   if (!isGroup) forgetRemovedAll(conceptsForUser(clean, tags));
   // A kink you make starts in "grows": the app adds the tags it knows for it, your own stay.
-  if (!isGroup && origin === 'user') { fillKink(id); growSoon(id); }
+  if (!isGroup && origin === 'user') { fillKink(id); growSoon(id); shapeSoon(); }
   return id;
 }
 
@@ -190,7 +191,9 @@ export function updateKink(id, patch, { byUser = true } = {}) {
   let name = patch.name != null ? String(patch.name).trim().slice(0, 60) || cur.name : cur.name;
   if (name !== cur.name && db.prepare('SELECT id FROM kinks WHERE name = ? COLLATE NOCASE AND id != ?').get(name, id)) throw Object.assign(new Error(tr('There is already a kink or group called {name}.', { name })), { status: 400 });
   // The shape you picked for a kink (or the family of shapes for a group); null goes back to the one the app picks.
-  if ('shape' in patch) db.prepare('UPDATE kinks SET shape = ? WHERE id = ?').run(typeof patch.shape === 'string' && /^[a-z][a-z0-9]{1,23}$/.test(patch.shape) ? patch.shape : null, id);
+  if ('shape' in patch) db.prepare('UPDATE kinks SET shape = ? WHERE id = ?').run(typeof patch.shape === 'string' && /^[a-zA-Z][a-zA-Z0-9]{1,23}$/.test(patch.shape) ? patch.shape : null, id);
+  // A new name lets the model pick a shape again.
+  if (name !== cur.name) { db.prepare('UPDATE kinks SET ai_shape = NULL WHERE id = ?').run(id); if (!cur.is_group) shapeSoon(); }
   db.prepare('UPDATE kinks SET name = ?, color = ?, description = ?, status = ?, parent_id = ?, is_group = ?, locks = ?, faded_at = ?, updated = ? WHERE id = ?')
     .run(name, patch.color ?? cur.color, patch.description ?? cur.description, patch.status ?? cur.status, parent, 'isGroup' in patch ? (patch.isGroup ? 1 : 0) : cur.is_group, JSON.stringify(locks), patch.status === 'hidden' && cur.status !== 'hidden' ? now() : cur.faded_at, now(), id);
   if (patch.tags) {

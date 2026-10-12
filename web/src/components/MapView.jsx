@@ -8,6 +8,7 @@ import { deeperSpec } from './Windows.jsx';
 import { Icon } from '../icons.jsx';
 import { t, tn } from '../i18n.js';
 import { EVENT_LABEL, secs, Thumb } from './History.jsx';
+import { lookColor } from '../lookcolor.js';
 
 const TYPE_LABEL = { kink: t('Kink'), tag: t('Hot tag'), fantasy: t('Fantasy') };
 function HoverCard({ hover, brain }) {
@@ -149,9 +150,12 @@ function Detail({ nodeKey, brain, reload, onSelect, startEdit = false }) {
   const [editing, setEditing] = useState(startEdit);
   const [combine, setCombine] = useState(false);
   const [tagIn, setTagIn] = useState('');
+  // Tags you just changed show straight away; the server's answer replaces them when it is in.
+  const [tagsNow, setTagsNow] = useState(null);
   const kinks = useMemo(() => brain.nodes.filter((n) => n.type === 'kink'), [brain]);
   const loadDetail = () => api(`/brain/node/${nodeKey}`).then((r) => {
     setD(r);
+    setTagsNow(null);
     api('/feed', { method: 'POST', body: { filters: { ...r.filter, includeSeen: true }, limit: 6, mix: 0 } }).then((f) => setPosts(f.items)).catch(() => {});
   }).catch(() => setD(null));
   useEffect(() => { setName(node?.name || ''); setD(null); setPosts([]); loadDetail(); }, [nodeKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -159,11 +163,16 @@ function Detail({ nodeKey, brain, reload, onSelect, startEdit = false }) {
   const kinkObj = node.type === 'kink' ? node : null;
   const full = kinkObj ? allKinks.find((k) => k.id === node.id) : null;
   // Always every tag of the kink, with its weight, so changing one never loses the others.
-  const allTags = d?.kinkTags || full?.tags?.map((x) => ({ name: x.name, weight: x.weight ?? 1 })) || (node.tags || []).map((x) => ({ name: x, weight: 1 }));
-  async function patch(body, msg) {
-    try { await api(`/kinks/${node.id}`, { method: 'PATCH', body }); if (msg) toast(msg); await reload(); refreshMeta(); loadDetail(); } catch (e) { toast(e.message); }
+  const allTags = tagsNow || d?.kinkTags || full?.tags?.map((x) => ({ name: x.name, weight: x.weight ?? 1 })) || (node.tags || []).map((x) => ({ name: x, weight: 1 }));
+  async function patch(body, msg, { quick = false } = {}) {
+    try {
+      await api(`/kinks/${node.id}`, { method: 'PATCH', body });
+      if (msg) toast(msg);
+      // Quick changes (tags) do not wait for the whole map to be worked out again.
+      if (quick) { refreshMeta(); loadDetail(); reload(); } else { await reload(); refreshMeta(); loadDetail(); }
+    } catch (e) { toast(e.message); setTagsNow(null); }
   }
-  const setTags = (list, msg) => patch({ tags: list }, msg);
+  const setTags = (list, msg) => { setTagsNow(list); return patch({ tags: list }, msg, { quick: true }); };
   const addTag = (tag, msg) => { const v = tag.trim().toLowerCase(); if (!v || allTags.some((x) => x.name === v)) return; setTags([...allTags, { name: v, weight: 1 }], msg); };
   async function saveName() {
     const v = name.trim();
@@ -363,7 +372,7 @@ function Weeks({ full, node, d, d7 }) {
       ) : (
         <div className="bars">
           <div className="barrow kb-all"><div className="bt"><span>{t('All time')}</span><em>{node.allTime}%</em></div><div className="track2"><i style={{ width: `${node.allTime}%`, background: rgba(node.color, 0.5) }} /></div></div>
-          <div className="barrow kb-lately"><div className="bt"><span>{t('Lately')}</span><em className={d7 >= 0 ? 'up' : 'down'}>{node.lately}% ({d7 >= 0 ? '+' : ''}{d7})</em></div><div className="track2"><i style={{ width: `${node.lately}%`, background: node.color }} /></div></div>
+          <div className="barrow kb-lately"><div className="bt"><span>{t('Lately')}</span><em className={d7 >= 0 ? 'up' : 'down'}>{node.lately}% ({d7 >= 0 ? '+' : ''}{d7})</em></div><div className="track2"><i style={{ width: `${node.lately}%`, background: lookColor(node.color) }} /></div></div>
         </div>
       )}
       {d ? <p className="wnote">{tn(d.week, '{n} post this week, {before} a week before that.', '{n} posts this week, {before} a week before that.', { before: d.perWeekBefore })} {Object.entries(d.counts || {}).filter(([ev]) => ev !== 'impression').map(([ev, c]) => `${c} ${EVENT_LABEL[ev] || ev}`).slice(0, 5).join(', ')}</p> : null}
@@ -447,7 +456,7 @@ export default function MapView() {
       <div className="jhead">
         <div>
           <h2>{t('Your map')}</h2>
-          <p>{t('Everything the assistant knows about your taste, live. Kinks are the bright circles, sized by how much you are into them; kinks of the same family share a colour. Hollow dots are things you are clearly into that are almost a kink. Gold diamonds are fantasies. Lines get stronger every time you enjoy things together. Hover for details, click a circle or a kink below for everything about it, drag to rearrange.')}</p>
+          <p>{t('Everything the assistant knows about your taste, live. Kinks are the bright shapes, sized by how much you are into them; kinks of the same family share a colour and a kind of shape. Small hollow marks are things you are clearly into that are almost a kink. Gold diamonds are fantasies. Lines get stronger every time you enjoy things together. Hover for details, click a shape or a kink below for everything about it, drag to rearrange.')}</p>
         </div>
         <div className="wbtns">
           <button type="button" className="ghost-btn" onClick={() => run('find', async () => { const r = await api('/kinks/refresh', { method: 'POST', body: {} }); const parts = [r.created?.length ? t('new: {list}', { list: r.created.join(', ') }) : null, r.back?.length ? t('back: {list}', { list: r.back.join(', ') }) : null, r.faded?.length ? t('faded: {list}', { list: r.faded.join(', ') }) : null, r.merged?.length ? t('combined {n}', { n: r.merged.length }) : null].filter(Boolean); toast(parts.length ? t('Kinks updated. {changes}.', { changes: parts.join(' · ') }) : t('Kinks are up to date.')); await load(); refreshMeta(); })} disabled={!!busy}>{busy === 'find' ? t('Updating') : t('Update kinks now')}</button>
@@ -490,7 +499,7 @@ export default function MapView() {
               return (
                 <div className="barrow" key={k.id} onClick={() => select(`k${k.id}`)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') select(`k${k.id}`); }}>
                   <div className="bt"><span>{k.name}{k.status === 'proposed' ? ` (${t('suggested')})` : ''}</span><em className={d >= 0 ? 'up' : 'down'}>{d >= 0 ? '+' : ''}{String(d).replace('.', ',')}</em></div>
-                  <div className="duo"><div className="track2"><i style={{ width: `${p ? Math.min(100, p.shareLately) : k.lately}%`, background: k.color }} /></div><div className="track2"><i style={{ width: `${p ? Math.min(100, p.shareAll) : k.allTime}%`, background: rgba(k.color, 0.45) }} /></div></div>
+                  <div className="duo"><div className="track2"><i style={{ width: `${p ? Math.min(100, p.shareLately) : k.lately}%`, background: lookColor(k.color) }} /></div><div className="track2"><i style={{ width: `${p ? Math.min(100, p.shareAll) : k.allTime}%`, background: rgba(k.color, 0.45) }} /></div></div>
                 </div>
               );
             }) : <p className="wnote">{t("No kinks yet. They appear once you've given heat to, liked or saved a few posts, or add your own below.")}</p>}

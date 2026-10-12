@@ -539,7 +539,7 @@ function PersonPic({ name, thumb, lookup = false, platform = 'any', color }) {
     }).catch(() => {});
     return () => { alive = false; };
   }, [name, thumb, lookup, platform]);
-  if (!src || bad) return <span className="tk-pic none" style={{ background: color || avatarColor(name) }} aria-hidden="true">{initialsOf(name)}</span>;
+  if (!src || bad) return <span className="tk-pic none" style={{ '--c': color || avatarColor(name) }} aria-hidden="true">{initialsOf(name)}</span>;
   return <img className="tk-pic" src={imgSrc(src)} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBad(true)} />;
 }
 
@@ -770,7 +770,7 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
     return out;
   })();
   const picOf = (p) => (p.key === 'profile'
-    ? (p.avatar ? <img className="tk-pic" src={p.avatar} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} /> : <span className="tk-pic none" style={{ background: p.color }} aria-hidden="true">{initialsOf(p.name)}</span>)
+    ? (p.avatar ? <img className="tk-pic" src={p.avatar} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} /> : <span className="tk-pic none" style={{ '--c': p.color }} aria-hidden="true">{initialsOf(p.name)}</span>)
     : <PersonPic name={p.name} thumb={p.thumb} lookup={!!p.lookup} platform={p.platform || 'any'} color={p.color} />);
   async function toggleFollow(target = followTarget) {
     const followTarget = target;
