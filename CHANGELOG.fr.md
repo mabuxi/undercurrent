@@ -2,6 +2,51 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.30.0 · 14 octobre 2026
+
+### Une nouvelle apparence : Spécimen
+- Une quatrième apparence, d’après le design rose que vous avez choisi : une planche de spécimen typographique et un dessin de construction. De l’encre sur une feuille anthracite avec sa grille apparente, des angles droits et des filets fins au lieu des ombres, et une seule couleur, un rose vif, pour ce qui est activé, choisi ou principal.
+- Les noms et les chiffres en Anybody, très large et très gras ; le texte en Archivo ; les mesures et les petites étiquettes en Martian Mono. Les trois sont dans l’app et marchent sans internet.
+- Les kinks ne gardent qu’une légère teinte de leur couleur, et leurs formes sont en fil de fer : le contour répété en profondeur, qui s’estompe vers l’arrière. Les grandes formes (comme sur la page d’un kink) montrent leurs lignes de construction et des repères roses aux coins.
+- Environ une fenêtre sur cinq est imprimée en rose plein avec du texte foncé. Les interrupteurs deviennent roses quand ils sont activés. Les barres sont des règles graduées avec un trait fin par-dessus.
+- La carte est un dessin de construction : une grille, les familles en pointillés, les kinks en fil de fer, les fantasmes en losanges dorés pâles, et des repères roses autour de ce que vous avez choisi.
+- Les graphiques sont un trait rose droit sur papier réglé, avec une graduation par point et un carré au bout.
+- Sa propre marque, ses icônes (écran d’accueil de l’iPhone, onglet du navigateur, Dock du Mac), son écran de chargement sur le Mac et dans l’app, et sa propre visionneuse, ses réactions et sa barre d’onglets.
+- La carte Apparence dans Réglages montre maintenant les quatre apparences deux par deux.
+
+### Des fenêtres qu’on distingue
+- Une fenêtre sur une paire de kinks montre les deux formes, avec un fondu franc entre leurs deux couleurs (un trait sous l’en-tête, ou tout l’en-tête quand la fenêtre est pleine).
+- Une fenêtre sur un créateur ou un performeur montre sa photo de profil au lieu du point.
+- Un parcours sur un kink montre sa forme. « C’était comment ? » montre une flamme.
+- La fenêtre qui devient pleine ne tombe plus jamais sur une fenêtre qui ne peut pas l’être (une fenêtre à lire) : elle passe à la plus proche qui le peut, donc chaque groupe de cinq fenêtres a de nouveau la sienne.
+- La petite fenêtre de la carte montre chaque kink par sa forme, à la taille de votre intérêt, avec son nom en dessous.
+
+### Kinks
+- L’onglet de la carte s’appelle maintenant Kinks, avec une icône de quatre formes, deux par deux.
+- Un graphique de l’évolution de vos kinks est en haut de la page des kinks : ceux qui ont le plus bougé, et la courbe de celui que vous choisissez. Il montre la dernière semaine, le dernier mois ou tout l’historique.
+- La page de chaque kink a aussi son graphique (« Son évolution »), sur la dernière semaine, le dernier mois ou tout l’historique (le mois par défaut).
+- La forme choisie par le modèle pour un kink est gardée : elle ne change qu’une fois (de la première estimation au choix du modèle), ou si vous renommez le kink ou le déplacez dans un autre groupe. Un groupe garde sa famille de formes de la même façon.
+
+### Plus rapide
+- Les tags suggérés s’affichent tout de suite. Le modèle plus intelligent prépare d’autres idées en arrière-plan, un kink à la fois, et elles apparaissent quand elles sont prêtes (une note l’indique en attendant).
+- Ajouter une communauté suggérée est instantané : elle passe tout de suite dans vos communautés et s’enregistre en arrière-plan.
+- Créer un kink répond tout de suite ; le remplir, ses tags et sa forme suivent en arrière-plan.
+- Aller et venir entre les kinks n’accumule plus de travail : le texte de l’assistant pour un kink que vous quittez est arrêté, et la carte ne se redessine plus en continu quand rien ne bouge (c’est ce qui ralentissait de plus en plus la page des kinks).
+- Le serveur note maintenant dans son journal les requêtes lentes et les moments où il était trop occupé pour répondre, pour retrouver les ralentissements plus tard.
+
+### La carte
+- La carte s’ouvre centrée et cadrée pour tout montrer.
+- Les liens sont plus forts ou plus pâles selon la fréquence à laquelle les deux choses vont ensemble.
+- La fenêtre de la carte dans les colonnes suit l’apparence.
+
+### Fil et filtres
+- Tant qu’un filtre est activé, les fenêtres ne proposent jamais d’aller plus loin (parcours, « Aller plus loin » sur un fantasme ou un kink) : seulement sur le fil sans filtre.
+- Dans la visionneuse plein écran, le bouton des tags suit directement les tags au lieu d’être tout à droite.
+
+### Corrections
+- Les communautés Reddit suggérées sont seulement celles qu’on a vues exister (dans des posts, une recherche ou une vérification). Les anciennes suggestions qui n’existent pas sont retirées.
+- Cutout : les interrupteurs sont remplis de l’accent quand ils sont activés.
+
 ## 0.29.0 · 12 octobre 2026
 
 ### Des couleurs qui vont avec chaque apparence

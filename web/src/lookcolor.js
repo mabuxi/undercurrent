@@ -1,6 +1,6 @@
 // The colour of a kink as each look shows it: the same formulas as the --cv rules in the style sheets, for places
 // that draw without CSS (the map) or set a colour inline. The original look keeps colours soft and a little glassy,
-// Cutout and Signal make them vivid on black.
+// Cutout and Signal make them vivid on black, Specimen keeps them as ink with only a faint tint of the colour.
 import { SHAPES } from './shapedata.js';
 
 function rgbOf(c) {
@@ -32,6 +32,7 @@ export function lookColor(color, theme = document.documentElement.dataset.theme 
   const [h, s, l] = toHsl(rgbOf(color));
   if (theme === 'cutout') return toHex([h, Math.min(100, s * 1.35 + 32), l * 0.42 + 33]);
   if (theme === 'signal') return toHex([h, Math.min(100, s * 1.4 + 34), l * 0.4 + 36]);
+  if (theme === 'specimen') return toHex([h, Math.min(28, s * 0.45), 82]);
   return toHex([h, Math.min(s, 58), Math.max(52, Math.min(76, l))]);
 }
 
@@ -59,6 +60,24 @@ function patternSvg(kind, fill, k) {
   }
 }
 
+// Specimen draws a shape as a wireframe: its outline repeated into depth, front line strong, the copies behind it
+// fading, and on big shapes the construction guides (a circle, axes, the square it was drawn in) and corner marks.
+// Small shapes get fewer layers and a tighter box so they stay readable. Returns the inside of an SVG and its viewBox.
+export function specimenParts(body, size) {
+  const n = size < 30 ? 3 : size < 70 ? 6 : 10;
+  const dx = size < 30 ? 6 : size >= 120 ? 3.1 : 4.2;
+  const dy = size < 30 ? -4.5 : size >= 120 ? -2.6 : -3.2;
+  const guides = size >= 60;
+  const box = guides ? [-36, -48, 168] : size < 30 ? [-5, -15, 122] : [-5, -23, 132];
+  const unit = box[2] / size;
+  const sw = unit * (size < 30 ? 1.25 : size < 70 ? 1.05 : 1.1);
+  let inner = '';
+  if (guides) inner += `<g stroke-width="${(unit * 0.7).toFixed(2)}" opacity=".55"><circle cx="50" cy="50" r="62" stroke-dasharray="2 4"/><path d="M-30 50H130M50 -30V130M-12 -12L112 112" stroke-dasharray="1 5"/><rect x="0" y="0" width="100" height="100" stroke-dasharray="4 4"/></g>`;
+  for (let i = n - 1; i >= 0; i--) inner += `<g transform="translate(${(i * dx).toFixed(1)} ${(i * dy).toFixed(1)})" opacity="${i ? (0.18 + 0.5 * (1 - i / n)).toFixed(2) : 1}" stroke-width="${(i ? sw * 0.8 : sw * 1.4).toFixed(2)}">${body}</g>`;
+  if (guides) inner += `<g class="ks-tick" stroke="none"><rect x="-3" y="-3" width="6" height="6"/><rect x="97" y="97" width="6" height="6"/><rect x="${((n - 1) * dx + 97).toFixed(1)}" y="${((n - 1) * dy - 3).toFixed(1)}" width="6" height="6"/></g>`;
+  return { inner, viewBox: box.slice(0, 2).concat(box[2], box[2]).join(' ') };
+}
+
 // One shape as an SVG document, drawn the way a look draws it (the same as <Shape> on the page).
 export function shapeSvg(shape, color, theme, pattern = 'dots', size = 32) {
   const body = SHAPES[shape] || SHAPES.circle;
@@ -70,6 +89,10 @@ export function shapeSvg(shape, color, theme, pattern = 'dots', size = 32) {
     const k = Math.max(1, Math.min(4, 36 / size));
     // A box centred on the shape, with room for its shadow on every side (so a canvas can draw it centred).
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-20 -20 146 146"><defs>${patternSvg(pattern, c, k)}</defs><g transform="translate(${off} ${off})" fill="${c}">${body}</g><g fill="url(#p)" stroke="#F3F0E4" stroke-width="${sw}" stroke-linejoin="round">${body}</g></svg>`;
+  }
+  if (theme === 'specimen') {
+    const { inner, viewBox } = specimenParts(body, size);
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" fill="none" stroke="${c}" stroke-linejoin="round"><style>.ks-tick{fill:#FF2E7E}</style>${inner}</svg>`;
   }
   if (theme === 'cutout') return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><g fill="${c}">${body}</g></svg>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${mixHex(c, '#ffffff', 0.42)}"/><stop offset="1" stop-color="${c}"/></linearGradient></defs><g fill="url(#g)">${body}</g></svg>`;

@@ -2572,7 +2572,7 @@ html.narrow .pmenu .grp.end .blockerbtn{display:flex}
 }
 
 /* The Look card in Settings */
-.looks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.looks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .lookopt{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;border-radius:16px;overflow:hidden;border:1px solid var(--line-2);background:var(--surface-2);transition:transform .15s,border-color .2s,box-shadow .2s}
 .lookopt:hover{border-color:var(--text-3)}
 .lookopt:active{transform:scale(.98)}
@@ -2593,6 +2593,11 @@ html.narrow .pmenu .grp.end .blockerbtn{display:flex}
 .look-cutout .look-title{font-family:'Unbounded',sans-serif;font-weight:800;color:#F4F4F0;font-size:19px;letter-spacing:-.02em}
 .look-signal .look-prev{background:radial-gradient(circle 1px at 1px 1px,#2A2925 98%,transparent) 0 0/12px 12px,#0B0B0B}
 .look-signal .look-title{font-family:'Big Shoulders Display',sans-serif;font-weight:900;text-transform:uppercase;color:#F3F0E4;font-size:30px;letter-spacing:.01em}
+.look-specimen .look-prev{background:linear-gradient(90deg,#1F1E1C 1px,transparent 1px) 0 0/16px 100%,linear-gradient(0deg,#1F1E1C 1px,transparent 1px) 0 0/100% 16px,#131312}
+.look-specimen .look-prev::after{content:'';position:absolute;right:12px;top:12px;width:14px;height:14px;background:#FF2E7E}
+.look-specimen .look-title{font-family:'Anybody',sans-serif;font-stretch:150%;font-weight:900;color:#ECE8E0;font-size:20px;letter-spacing:-.045em}
+:root:root .lookopt.look-specimen .look-shapes *{--cv:hsl(from var(--c) h min(28,s) 82)}
+.look-specimen .look-shapes .kshape:first-child{--kfill:#FF2E7E}
 .look-cutout .look-shapes *,.look-signal .look-shapes *{--cv:hsl(from var(--cv,var(--c)) h calc(min(100,s * 1.35 + 32)) calc(l * .42 + 33))}
 @media (max-width:760px){.looks{grid-template-columns:minmax(0,1fr)}.look-prev{height:86px}}
 .win-btns{display:flex;align-items:center;gap:0;flex-shrink:0}
@@ -2615,7 +2620,7 @@ html.narrow .pmenu .grp.end .blockerbtn{display:flex}
 /* Colours follow the look: in the original look every kink, window and mood colour is soft and a little muted, so a
    bright colour you pick still sits well in it (Cutout and Signal make them vivid instead). */
 @supports (color:hsl(from red h s l)){
-  :root:not([data-theme="cutout"]):not([data-theme="signal"]) *{--cv:hsl(from var(--c) h min(s,58) clamp(52,l,76));--tcv:hsl(from var(--tc) h min(s,58) clamp(52,l,76))}
+  :root:not([data-theme="cutout"]):not([data-theme="signal"]):not([data-theme="specimen"]) *{--cv:hsl(from var(--c) h min(s,58) clamp(52,l,76));--cv2:hsl(from var(--c2) h min(s,58) clamp(52,l,76));--tcv:hsl(from var(--tc) h min(s,58) clamp(52,l,76))}
 }
 /* The side columns are wider than their windows, so a window's glow or shadow is not cut off at the column's edge */
 body{overflow-x:clip}
@@ -2651,3 +2656,40 @@ html.narrow .brandmark{display:none}
 @media (prefers-reduced-motion: reduce){.trendg :is(.tg-line,.tg-ink){animation:none;stroke-dashoffset:0}}
 /* An open shape picker stays above the cards that come after it */
 :is(.card2,.bw,.kcard,.ksection,.profrow):has(.shapepop){position:relative;z-index:30}
+/* 0.30: what a window is about, in its title: two shapes for a pair, a picture for a person */
+.win-pair{display:inline-flex;align-items:center;flex:none}
+.win-pair .kshape+.kshape{margin-left:-7px}
+.win-pic{position:relative;width:26px;height:26px;flex:none;border-radius:50%;overflow:hidden;display:grid;background:var(--surface-3)}
+.win-pic>*{grid-area:1/1}
+.win-pic img{width:100%;height:100%;object-fit:cover;position:relative;z-index:1}
+.win-pic .avatar{width:100%;height:100%;font-size:9.5px;border-radius:inherit}
+/* A pair's window: its two colours with a hard fade between them */
+.win.pairwin{--mix:linear-gradient(110deg,var(--cv,var(--c)) 0 42%,var(--cv2,var(--c2)) 58% 100%)}
+.win.pairwin .win-head{position:relative}
+.win.pairwin .win-head::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;border-radius:2px;background:var(--mix);opacity:.9}
+/* The map window: each kink as its own shape, bigger the more it is on right now */
+.mapbubbles{gap:12px 6px;align-items:flex-end}
+.mbub{border:0;border-radius:12px;background:none;width:auto!important;height:auto!important;min-width:64px;max-width:92px;padding:4px 2px;gap:4px;justify-content:flex-end}
+.mbub .mbs{display:grid;place-items:center;min-height:30px}
+.mbub .mbn{font-size:11.5px;font-weight:600}
+/* 0.30: the button for all kinks and tags follows the last chip in the viewer instead of floating at the right */
+.tk-tags{padding-right:0;-webkit-mask-image:none;mask-image:none}
+.tk .tk-tagsbtn{position:static;width:auto;min-width:28px;height:auto;padding:0 9px;gap:4px;border-radius:999px;flex:none;font-size:12px;font-weight:700}
+.tk-tagsbtn span{opacity:.85}
+/* 0.30: how kinks moved, on your kinks page and on each kink */
+.trange{margin-left:auto}
+.trange button{font-size:11.5px;padding:3px 9px}
+.trange button.on{background:var(--cv,var(--accent));color:var(--accent-ink,#111)}
+.ktrend .bw-h,.ktrends .bw-h{display:flex;align-items:center;gap:10px}
+.trend-wait{height:120px;display:grid;place-items:center}
+.ktrends{margin:0 0 18px}
+.ktrends-in{display:grid;grid-template-columns:minmax(180px,240px) minmax(0,1fr);gap:16px;align-items:center}
+.ktrends-list{display:flex;flex-direction:column;gap:2px}
+.ktm{all:unset;cursor:pointer;display:grid;grid-template-columns:20px minmax(0,1fr) auto;align-items:center;gap:8px;padding:6px 8px;border-radius:10px;font-size:13px;color:var(--text-2)}
+.ktm span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ktm em{font-style:normal;font-size:11.5px;font-variant-numeric:tabular-nums}
+.ktm em.up{color:#7FC49B}.ktm em.down{color:#E0907A}
+.ktm:hover{background:var(--surface-2)}
+.ktm.on{background:color-mix(in srgb,var(--cv,var(--c)) 14%,transparent);color:var(--text)}
+.ktrends-graph .trendg{max-height:190px}
+@media (max-width:700px){.ktrends-in{grid-template-columns:1fr}.ktrends-list{flex-direction:row;overflow-x:auto;scrollbar-width:none}.ktm{flex:none}}

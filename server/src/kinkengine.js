@@ -482,7 +482,8 @@ export function syncGroups(aiFamilies = null) {
     } else if (g.status === 'hidden' && !locksOf(g).status) db.prepare("UPDATE kinks SET status = 'active' WHERE id = ?").run(g.id);
     for (const k of list) want.set(k.id, g.id);
   }
-  for (const k of free) if ((k.parent_id || null) !== want.get(k.id)) db.prepare('UPDATE kinks SET parent_id = ? WHERE id = ?').run(want.get(k.id), k.id);
+  // A kink that moves to another group gets a new shape from that group's family (picked again by the model).
+  for (const k of free) if ((k.parent_id || null) !== want.get(k.id)) db.prepare('UPDATE kinks SET parent_id = ?, ai_shape = NULL WHERE id = ?').run(want.get(k.id), k.id);
   for (const g of db.prepare('SELECT * FROM kinks WHERE is_group = 1').all()) {
     const n = db.prepare("SELECT COUNT(*) c FROM kinks WHERE parent_id = ? AND status != 'hidden'").get(g.id).c;
     if (!n && g.origin !== 'user' && !Object.keys(locksOf(g)).length) db.prepare('DELETE FROM kinks WHERE id = ?').run(g.id);

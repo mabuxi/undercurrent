@@ -4,12 +4,14 @@ import { Shape } from '../shapes.jsx';
 import { t } from '../i18n.js';
 
 // How the app looks. The original look, Cutout (deep black, flat saturated colours, windows with a round cut-out for
-// their button) or Signal (a club poster: outlines, hard shadows in colour, patterns inside the shapes). The Mac keeps
+// their button), Signal (a club poster: outlines, hard shadows in colour, patterns inside the shapes) or Specimen (a
+// type specimen sheet: ink and one pink on a grid, shapes as wireframes). The Mac keeps
 // the choice, so the iPhone looks the same.
 const LOOKS = [
   { id: 'original', name: t('Original'), text: t('Soft and warm, with a serif for the big titles.'), font: t('Instrument Serif and Manrope') },
   { id: 'cutout', name: t('Cutout'), text: t('Deep black, flat saturated colours and bold shapes; every window has a round cut-out for its button.'), font: t('Unbounded and Manrope') },
-  { id: 'signal', name: t('Signal'), text: t('Like a club poster: outlines, hard shadows in colour and a pattern inside every shape.'), font: t('Big Shoulders Display and Space Mono') }
+  { id: 'signal', name: t('Signal'), text: t('Like a club poster: outlines, hard shadows in colour and a pattern inside every shape.'), font: t('Big Shoulders Display and Space Mono') },
+  { id: 'specimen', name: t('Specimen'), text: t('A type specimen sheet: ink on a charcoal grid, one hot pink, and every shape drawn as a wireframe in depth.'), font: t('Anybody, Archivo and Martian Mono') }
 ];
 const SAMPLE = [['circle', '#E07A9A', 'dots'], ['arch', '#7FA7D9', 'stripes'], ['pill', '#B8D86B', 'checker']];
 

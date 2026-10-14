@@ -16,11 +16,12 @@ export const sessionId = (() => {
   }
 })();
 
-export async function api(path, { method = 'GET', body } = {}) {
+export async function api(path, { method = 'GET', body, signal } = {}) {
   const res = await fetch(`/api${path}`, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : {},
-    body: body ? JSON.stringify({ sessionId, ...body }) : undefined
+    body: body ? JSON.stringify({ sessionId, ...body }) : undefined,
+    signal
   });
   const text = await res.text();
   let data = null;

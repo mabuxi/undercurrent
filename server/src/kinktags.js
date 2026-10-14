@@ -1,5 +1,5 @@
 import { config } from './config.js';
-import { getDb, normalizeTag } from './db.js';
+import { getDb, normalizeTag, getSetting, setSetting } from './db.js';
 import { ensureKinkSchema, locksOf, modeOf, addTags } from './kinkengine.js';
 import { isBlocked } from './safety.js';
 import { chat, activeModel } from './ai/ollama.js';
@@ -100,45 +100,85 @@ async function fromModel(k, exclude, n, interactive) {
   }
 }
 
-// The ideas for one kink are kept for a while, and the refresh button pages through them before asking again.
+// The model's ideas for each kink are prepared in the background (the main model is slow) and kept, also across
+// restarts, so the list shows right away. A kink whose ideas are missing or older than half a day gets them
+// prepared again while you look at what is there; the written forms from your posts are always added right away.
 const POOL = new Map();
+const IDEAS_KEY = 'kinkIdeas';
+const FRESH_MS = 12 * 3600000;
+const QUEUE = [];
+let working = null;
+
+function poolOf(id) {
+  if (!POOL.has(id)) {
+    const saved = (getSetting(IDEAS_KEY, {}) || {})[id];
+    if (saved) POOL.set(id, saved);
+  }
+  return POOL.get(id) || null;
+}
+function savePool(id, pool) {
+  POOL.set(id, pool);
+  const all = getSetting(IDEAS_KEY, {}) || {};
+  all[id] = pool;
+  setSetting(IDEAS_KEY, all);
+}
+
+export function ideasPreparing(id) {
+  return working === Number(id) || QUEUE.some((x) => x.id === Number(id));
+}
+
+// Ask the main model for one kink's ideas, one kink at a time, in the background lane.
+export function prepareIdeas(id, { more = false } = {}) {
+  id = Number(id);
+  if (config.mock || ideasPreparing(id)) return;
+  QUEUE.push({ id, more });
+  if (!working) runQueue();
+}
+async function runQueue() {
+  while (QUEUE.length) {
+    const job = QUEUE.shift();
+    working = job.id;
+    try {
+      const k = kinkRow(job.id);
+      if (!k) continue;
+      const prev = poolOf(k.id);
+      const have = [...k.tags.map((t) => t.name), ...k.noTags];
+      const known = job.more && prev ? prev.items.map((x) => x.name) : [];
+      const ai = await fromModel(k, [...have, ...known], job.more ? 16 : 24, false);
+      if (!ai.length && !prev) continue;
+      const counts = postsWith(ai.map((x) => x.name));
+      const items = new Map((job.more && prev ? prev.items : []).map((x) => [x.name, x]));
+      for (const x of ai) if (!items.has(x.name) && x.sure >= 40) items.set(x.name, { name: x.name, posts: counts.get(x.name) || 0, why: 'ai', sure: x.sure });
+      savePool(k.id, { at: Date.now(), items: [...items.values()] });
+    } catch (e) {
+      log('warn', `Tag ideas failed: ${e.message}`);
+    } finally {
+      working = null;
+    }
+  }
+}
 
 export async function tagIdeas(id, { skip = [], count = 10 } = {}) {
   const k = kinkRow(id);
-  if (!k) return [];
+  if (!k) return { ideas: [], preparing: false };
   const have = new Set([...k.tags.map((t) => t.name), ...k.noTags].map((x) => x.toLowerCase()));
   const shown = new Set(skip.map((x) => normalizeTag(x)));
   const ok = (x) => x.name && !have.has(x.name) && !isBlocked({ title: x.name, tags: [x.name] }).blocked;
-  let pool = POOL.get(k.id);
-  // Changing the kink's tags does not ask the model again: tags it has and tags you took off are filtered out below.
-  if (!pool || Date.now() - pool.at > 30 * 60000) {
-    const byName = nameTags(k).map((x) => ({ ...x, sure: x.why === 'name' ? 90 : 80 }));
-    let ai = await fromModel(k, [...have], 24, true);
-    // The model can be busy with something else for a moment: one more try.
-    if (!ai.length && !config.mock) { await new Promise((r) => setTimeout(r, 1500)); ai = await fromModel(k, [...have], 24, true); }
-    const counts = postsWith(ai.map((x) => x.name));
-    const list = new Map();
-    for (const x of byName) list.set(x.name, x);
-    for (const x of ai) if (!list.has(x.name)) list.set(x.name, { name: x.name, posts: counts.get(x.name) || 0, why: 'ai', sure: x.sure });
-    // Without the model's ideas the list is kept only a minute, so they are asked for again soon.
-    pool = { at: Date.now() - (ai.length || config.mock ? 0 : 29 * 60000), items: [...list.values()].filter((x) => x.sure >= 40) };
-    POOL.set(k.id, pool);
-  }
+  const pool = poolOf(k.id);
+  if (!pool || Date.now() - pool.at > FRESH_MS) prepareIdeas(k.id);
+  const byName = nameTags(k).map((x) => ({ ...x, sure: x.why === 'name' ? 90 : 80 }));
+  const fromAi = (pool?.items || []).filter((x) => x.why === 'ai').filter(ok).sort((a, b) => (b.sure >= 80) - (a.sure >= 80) || b.posts - a.posts || b.sure - a.sure);
+  const fromTags = byName.filter((x) => !fromAi.some((y) => y.name === x.name)).filter(ok).sort((a, b) => (a.why === 'name' ? 0 : 1) - (b.why === 'name' ? 0 : 1) || b.posts - a.posts);
   // The model's ideas and the written forms take turns, the surest and most used first in each.
-  const fromAi = pool.items.filter((x) => x.why === 'ai').filter(ok).sort((a, b) => (b.sure >= 80) - (a.sure >= 80) || b.posts - a.posts || b.sure - a.sure);
-  const fromTags = pool.items.filter((x) => x.why !== 'ai').filter(ok).sort((a, b) => (a.why === 'name' ? 0 : 1) - (b.why === 'name' ? 0 : 1) || b.posts - a.posts);
   const ranked = [];
   for (let i = 0; i < Math.max(fromAi.length, fromTags.length); i++) { if (fromAi[i]) ranked.push(fromAi[i]); if (fromTags[i]) ranked.push(fromTags[i]); }
   let next = ranked.filter((x) => !shown.has(x.name));
   if (!next.length && ranked.length) {
-    // Everything was shown: ask for more, then start over.
-    const more = await fromModel(k, [...have, ...ranked.map((x) => x.name)], 16, true);
-    const counts = postsWith(more.map((x) => x.name));
-    for (const x of more) if (!pool.items.some((y) => y.name === x.name) && x.sure >= 40) pool.items.push({ name: x.name, posts: counts.get(x.name) || 0, why: 'ai', sure: x.sure });
-    next = pool.items.filter(ok).filter((x) => !shown.has(x.name));
-    if (!next.length) next = ranked;
+    // Everything was shown: the model prepares more in the background, and the list starts over meanwhile.
+    if (pool) prepareIdeas(k.id, { more: true });
+    next = ranked;
   }
-  return next.slice(0, count);
+  return { ideas: next.slice(0, count), preparing: ideasPreparing(k.id) };
 }
 
 // For kinks that may grow: the tags the app is sure about join by themselves (the kink's name in them, used in
@@ -146,11 +186,15 @@ export async function tagIdeas(id, { skip = [], count = 10 } = {}) {
 export async function growKinkTags(id) {
   const k = kinkRow(id);
   if (!k || modeOf(k) !== 'grow') return 0;
-  POOL.delete(k.id);
-  const ideas = await tagIdeas(id, { count: 40 });
+  const pool = poolOf(k.id);
+  if (!pool || Date.now() - pool.at > FRESH_MS) {
+    prepareIdeas(k.id);
+    for (let i = 0; i < 400 && ideasPreparing(k.id); i++) await new Promise((r) => setTimeout(r, 1500));
+  }
+  const { ideas } = await tagIdeas(id, { count: 40 });
   const sure = ideas.filter((x) => (x.why === 'name' && x.posts >= 3) || (x.sure >= 85 && x.posts >= 2)).slice(0, 12);
   const n = addTags(k.id, sure.map((x) => ({ name: x.name, weight: 0.9 })), k.noTags);
-  if (n) { POOL.delete(k.id); log('info', `Tags for ${k.name}: added ${sure.map((x) => x.name).join(', ')}`); }
+  if (n) log('info', `Tags for ${k.name}: added ${sure.map((x) => x.name).join(', ')}`);
   return n;
 }
 
@@ -161,9 +205,14 @@ export function growSoon(id) {
 
 // From the hourly round: one kink that may grow and was not looked at for two weeks.
 export async function growRound() {
-  const { getSetting, setSetting } = await import('./db.js');
   const runs = getSetting('kinkTagsAt', {}) || {};
   const db = getDb();
+  // Kinks without the model's tag ideas get them prepared, a couple each round, so the list is ready when you look.
+  let prepared = 0;
+  for (const r of db.prepare("SELECT id FROM kinks WHERE is_group = 0 AND status != 'hidden' ORDER BY id DESC").all()) {
+    if (prepared >= 2) break;
+    if (!poolOf(r.id)) { prepareIdeas(r.id); prepared++; }
+  }
   const next = db.prepare("SELECT * FROM kinks WHERE is_group = 0 AND status != 'hidden'").all().filter((k) => modeOf(k) === 'grow').find((k) => !runs[k.id] || Date.now() - runs[k.id] > 14 * 86400000);
   if (!next) return null;
   runs[next.id] = Date.now();

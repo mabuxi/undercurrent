@@ -511,7 +511,7 @@ const REPEAT_MS = 12 * 3600000;
 const BY_ITEMS = new Set(['hotThread', 'trending', 'gifs', 'shortsRail', 'stories', 'recentSaved', 'followLatest', 'following', 'discovery', 'rateRecent', 'topWatched']);
 const sigOf = (w) => `${w.type}|${w.title}|${w.variant || ''}${BY_ITEMS.has(w.type) || [tr('Photo posts'), tr('Keep reading'), tr('From your saves')].includes(w.title) ? `|${(w.items || []).slice(0, 2).map((x) => x.id).join(',')}` : ''}`.toLowerCase();
 
-export function windows({ cursor = 0, count = 4, side = 0, sessionId = null, seed = 0, exclude = [] } = {}) {
+export function windows({ cursor = 0, count = 4, side = 0, sessionId = null, seed = 0, exclude = [], filtered = false } = {}) {
   const allKinks = listKinks();
   const kinks = allKinks.filter((k) => !k.isGroup && k.status !== 'hidden');
   const groups = allKinks.filter((k) => k.isGroup);
@@ -545,6 +545,8 @@ export function windows({ cursor = 0, count = 4, side = 0, sessionId = null, see
     }
     for (let tries = 0; tries < 24 && !w; tries++) {
       const t = pickFrom(tries < 16 ? (other ? OTHER_W : CONTENT_W) : [...CONTENT_W, ...OTHER_W], r);
+      // Going deeper (journeys, a story to continue, deeper into one kink) is only offered on the main feed.
+      if (filtered && ['journey', 'fantasyDeep', 'kinkDeep'].includes(t)) continue;
       if ((RARE.has(t) || ['tagNow', 'nearby', 'hotThread', 'stories', 'journey', 'creator', 'performer'].includes(t)) && usedTypes.has(t)) continue;
       // Your saves come back now and then, not all the time: never in the first 20 windows, at most one in every
       // 60 windows and at most once every two hours, also across sessions.

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, sessionId } from '../api.js';
-import { Window } from './Windows.jsx';
+import { Window, solidSet } from './Windows.jsx';
 import ErrorBoundary from './ErrorBoundary.jsx';
+import { useApp } from '../context.jsx';
 import { t } from '../i18n.js';
 
 const REDUCED = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -18,7 +19,16 @@ export function refreshWindows() {
   window.dispatchEvent(new Event('uc-refresh-windows'));
 }
 
+// Windows that take you deeper (journeys, a story to continue, going deeper into one kink) only show on the main
+// feed, never while it is filtered in any way.
+export const DEEPER = new Set(['journeyOne', 'fantasyDeep', 'kinkDeep']);
+export const isFiltered = (filters) => Object.entries(filters || {}).some(([k, v]) => !/Label$/.test(k) && v != null && v !== false && v !== '' && !(Array.isArray(v) && !v.length));
+
 export default function SideColumn({ side }) {
+  const { filters } = useApp();
+  const filtered = isFiltered(filters);
+  const filteredRef = useRef(filtered);
+  filteredRef.current = filtered;
   const [wins, setWins] = useState([]);
   const [swap, setSwap] = useState(0);
   const asideRef = useRef(null);
@@ -34,7 +44,7 @@ export default function SideColumn({ side }) {
   const visible = () => asideRef.current && getComputedStyle(asideRef.current).display !== 'none';
 
   const fetchWindows = async (from, n, seed) => {
-    const r = await api(`/windows?cursor=${from}&count=${n}&side=${side}&session=${sessionId}&seed=${seed}&exclude=${seenIds()}`);
+    const r = await api(`/windows?cursor=${from}&count=${n}&side=${side}&session=${sessionId}&seed=${seed}&exclude=${seenIds()}${filteredRef.current ? '&filtered=1' : ''}`);
     for (const w of r.windows) for (const it of w.items || []) if (it?.id) WINDOW_SEEN.add(String(it.id));
     return r.windows;
   };
@@ -125,10 +135,12 @@ export default function SideColumn({ side }) {
     return () => clearInterval(timer);
   }, [side]);
 
+  const shown = useMemo(() => (filtered ? wins.filter((w) => !DEEPER.has(w.type)) : wins), [wins, filtered]);
+  const solids = useMemo(() => solidSet(shown), [shown]);
   return (
     <aside ref={asideRef} className={`side ${side === 0 ? 'left' : 'right'}`} aria-label={side === 0 ? t('Windows') : t('More windows')}>
       <div className="track fadein" data-swap={swap} ref={trackRef}>
-        {wins.map((w) => <ErrorBoundary key={w.uid} name="Window" quiet><Window w={w} /></ErrorBoundary>)}
+        {shown.map((w) => <ErrorBoundary key={w.uid} name="Window" quiet><Window w={w} solid={solids.has(w.uid)} /></ErrorBoundary>)}
       </div>
     </aside>
   );

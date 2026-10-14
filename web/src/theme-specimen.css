@@ -1,0 +1,398 @@
+/* ===== The Specimen look =====
+   A type specimen sheet and a construction drawing: ink on a charcoal sheet with its grid showing, and one colour, hot
+   pink, for what is on, picked or printed solid. Kinks keep only a faint tint of their colour and their shapes are
+   wireframes extruded into depth. Square corners and hairline rules instead of shadows. Anybody, very wide and heavy,
+   for names and numbers; Archivo for reading; Martian Mono for measurements. */
+
+:root[data-theme="specimen"]{
+  --bg:#131312;--surface:#141413;--surface-2:#1B1B19;--surface-3:#252421;
+  --line:#2A2927;--line-2:#4A4844;
+  --text:#ECE8E0;--text-2:#A6A29A;--text-3:#77736B;
+  --accent:#FF2E7E;--accent-ink:#131312;--pop:#FF2E7E;--ink:#ECE8E0;--pink:#FF2E7E;
+  --following:#C4CEDB;--foryou:#FF2E7E;--discovery:#E2D7B4;--short:#BFDCC9;--long:#E3C4AE;--gif:#D2C6E4;--flame:#FF2E7E;--flame-2:#FF7AAE;--ok:#BFDCC9;
+  --display:'Anybody','Archivo',sans-serif;--ui:'Archivo',system-ui,sans-serif;--mono:'Martian Mono',ui-monospace,Menlo,monospace;
+  --wide:150%;--grid:#1E1D1B;--grid-2:#181816;
+}
+@supports (color:hsl(from red h s l)){
+  :root[data-theme="specimen"] *{--cv:hsl(from var(--c) h calc(min(28,s * .45)) 82);--cv2:hsl(from var(--c2) h calc(min(28,s * .45)) 82);--tcv:hsl(from var(--tc) h calc(min(28,s * .45)) 82)}
+}
+:root[data-theme="specimen"] body{font-family:var(--ui);font-stretch:100%;font-weight:420;font-size:13.5px;
+  background:linear-gradient(90deg,var(--grid) 1px,transparent 1px) 0 0/120px 100%,linear-gradient(0deg,var(--grid) 1px,transparent 1px) 0 0/100% 120px,
+    linear-gradient(90deg,var(--grid-2) 1px,transparent 1px) 0 0/24px 100%,linear-gradient(0deg,var(--grid-2) 1px,transparent 1px) 0 0/100% 24px,var(--bg);background-attachment:fixed}
+:root[data-theme="specimen"] ::selection{background:var(--pink);color:#131312}
+:root[data-theme="specimen"] svg.i{stroke-width:1.5;stroke-linecap:square;stroke-linejoin:miter}
+:root[data-theme="specimen"] .kshape.t-specimen .ks-tick{fill:var(--pink)}
+:root[data-theme="specimen"] .kshape.t-specimen{overflow:visible}
+
+/* Titles: Anybody, stretched wide and black */
+:root[data-theme="specimen"] :is(.sechead h3,.jhead h2,.hello h2,.kb-head h2,.kh-name,.story h3,.thread h3,.fant h4,.jend h3,.jreveal h3,.uphead h3,.ob-h,.ob-title,.pc-main strong,.dp-question,.dp-final h3,.jplan h2,.fc-head strong,.memtile b,.catn,.kh-match b,.ob-sum b,.card2 h3,.win-title strong,.ptitle,.ks-head .ks-name,.kc-name strong,.catcard-h h3,.kimprove-h b,.sp-t,.brand h1,.heatword,.kc-match,.readbadge b){font-family:var(--display);font-style:normal;font-stretch:var(--wide);font-weight:900;letter-spacing:-.045em;text-transform:none}
+:root[data-theme="specimen"] :is(.hello-sum,.fh-answer,.aitext,.memquote,.dnote,.dq,.serif,.scenario,.pv-fallback,.ptile .ptxt,.dp-scn,.hello-ans){font-family:var(--ui);font-style:normal;font-weight:420;letter-spacing:0}
+/* Measurements and small labels: Martian Mono */
+:root[data-theme="specimen"] :is(.wnote,.count,.chip,.gtag,.pill,.badge,.dur,.res,.provider,.tb,.kc-mode,.kc-bars>div,.kc-why,.kh-why,.kh-note,.ks-fam,.tg-axis,.ph .names span,.evtype,.ktm em,.barrow .bt,.memcat,.catchip,.kmode-text,.kh-match>span,.sbar input,.kb-search input,.fb-label,.tlabel,code,.toast,.mono){font-family:var(--mono);letter-spacing:-.02em}
+:root[data-theme="specimen"] .aitext{font-size:13.5px;line-height:1.55}
+:root[data-theme="specimen"] .serif{font-size:14.5px;line-height:1.45}
+:root[data-theme="specimen"] .fant h4{font-size:19px;line-height:.98}
+:root[data-theme="specimen"] .story h3,:root[data-theme="specimen"] .thread h3{font-size:26px;line-height:.95}
+:root[data-theme="specimen"] .jhead h2{font-size:48px;line-height:.88}
+:root[data-theme="specimen"] .hello h2{font-size:40px;line-height:.9}
+:root[data-theme="specimen"] .ob-title{background:none;color:var(--pink);-webkit-text-fill-color:var(--pink)}
+:root[data-theme="specimen"] .wnote{font-size:10px;color:var(--text-3)}
+
+/* Top bar: a ruled strip, the views as one row of joined boxes */
+:root[data-theme="specimen"] .top{border-bottom:1px solid var(--line-2);box-shadow:none;background:var(--bg)}
+:root[data-theme="specimen"] .brand h1{font-size:22px;line-height:1.04}
+:root[data-theme="specimen"].narrow .brand h1{font-size:17px;background:none;color:var(--text);-webkit-text-fill-color:var(--text)}
+:root[data-theme="specimen"] .brandmark{border-radius:0}
+:root[data-theme="specimen"] .sbar{background:var(--bg);border:1px solid var(--line-2);border-radius:0}
+:root[data-theme="specimen"] .sbar:focus-within{border-color:var(--ink);box-shadow:none}
+:root[data-theme="specimen"] .sbar input{font-size:11px}
+:root[data-theme="specimen"] .sbar:has(.sb-field.has-chips){border-radius:0}
+:root[data-theme="specimen"] :is(.btn-accent,.btn-clear){border-radius:0;font-family:var(--display);font-stretch:118%;font-weight:800;font-size:12px;letter-spacing:-.01em;box-shadow:none}
+:root[data-theme="specimen"] .btn-clear{background:var(--bg);border:1px solid var(--line-2)}
+:root[data-theme="specimen"] .nav{background:none;border:1px solid var(--line-2);border-radius:0;padding:0;gap:0}
+:root[data-theme="specimen"] .nav button{width:auto;min-width:42px;height:40px;border-radius:0;border-left:1px solid var(--line-2);color:var(--text-2);box-sizing:border-box;padding:0;transition:padding .25s,background .15s}
+:root[data-theme="specimen"] .nav button:first-child{border-left:0}
+:root[data-theme="specimen"] .nav button:hover{background:var(--surface-2);color:var(--text)}
+:root[data-theme="specimen"] .nav button.on{background:var(--pink);color:#131312;padding:0 14px 0 12px}
+:root[data-theme="specimen"] .navlbl{display:inline-block;max-width:0;overflow:hidden;white-space:nowrap;opacity:0;font-family:var(--display);font-stretch:118%;font-weight:800;font-size:13px;letter-spacing:-.01em;line-height:1;transition:max-width .3s,opacity .15s,margin .3s}
+:root[data-theme="specimen"] .nav button.on .navlbl{max-width:150px;opacity:1;margin-left:8px}
+:root[data-theme="specimen"] .phonebtn{border:1px solid var(--line-2);border-radius:0}
+:root[data-theme="specimen"] .deepbtn{border-radius:0}
+:root[data-theme="specimen"] .schip{border:1px solid var(--line-2);border-radius:0;background:var(--surface-2);font-family:var(--mono);font-size:10.5px}
+:root[data-theme="specimen"] .schip-tag,:root[data-theme="specimen"] .schip-filter.schip-tag{border-color:var(--ink)}
+:root[data-theme="specimen"] :is(.sb-steps,.statuspop){background:var(--bg);border:1px solid var(--ink);border-radius:0;box-shadow:none}
+:root[data-theme="specimen"] .mockbar{border-radius:0;border:1px dashed var(--line-2);background:none}
+:root[data-theme="specimen"] .uppill{border-radius:0;background:var(--pink);color:#131312;font-family:var(--display);font-stretch:118%;font-weight:800;font-size:12px}
+:root[data-theme="specimen"] .uppill svg{color:#131312}
+
+/* Buttons, chips, inputs: square, ruled, ink; pink only for what matters */
+:root[data-theme="specimen"] :is(.ghost-btn,.kback,.khero .kact-x,.tunebtn){border:1px solid var(--line-2);border-radius:0;background:var(--bg);color:var(--text);font-family:var(--display);font-stretch:118%;font-weight:800;font-size:12px;letter-spacing:-.01em;box-shadow:none}
+:root[data-theme="specimen"] .ghost-btn{padding:7px 12px}
+:root[data-theme="specimen"] .ghost-btn.small{font-size:11px;padding:5px 10px}
+:root[data-theme="specimen"] .ghost-btn:hover{background:var(--surface-2);border-color:var(--ink)}
+:root[data-theme="specimen"] :is(.ghost-btn.accent,.kb-head .ghost-btn.main,.khero .kact-main){background:var(--pink);color:#131312;border-color:var(--pink);font-family:var(--display);font-stretch:118%;font-weight:800;border-radius:0;box-shadow:none}
+:root[data-theme="specimen"] .khero .kact-main{font-size:14px}
+:root[data-theme="specimen"] .ghost-btn.danger{color:var(--pink);border-color:var(--pink)}
+:root[data-theme="specimen"] .icon-btn{border-radius:0}
+:root[data-theme="specimen"] .chip{border-radius:0;font-size:10.5px}
+:root[data-theme="specimen"] :is(.chip.ghost,button.chip.ghost.link){border:1px solid var(--line-2);background:transparent;color:var(--text-2)}
+:root[data-theme="specimen"] .chip.btn{border:1px solid var(--line-2);border-radius:0}
+:root[data-theme="specimen"] .chip.btn:hover{border-color:var(--ink);background:none}
+:root[data-theme="specimen"] .chip.btn.on{background:var(--ink);border-color:var(--ink);color:#131312;--kfill:#131312}
+:root[data-theme="specimen"] .chip.btn.accent{border-color:var(--pink);color:var(--pink)}
+:root[data-theme="specimen"] .chip:not(.ghost):not(.btn):not(.kchip){background:transparent;border:1px solid var(--line-2);color:var(--text)}
+:root[data-theme="specimen"] button.chip.more{border:1px dashed var(--line-2);border-radius:0}
+:root[data-theme="specimen"] .chip.kchip{background:transparent;color:var(--text);border:1px solid var(--ink);border-radius:0;font-family:var(--mono);font-size:10.5px;font-weight:400}
+:root[data-theme="specimen"] .chip.kchip:first-child{background:var(--ink);color:#131312;--kfill:#131312}
+:root[data-theme="specimen"] .chip.mine{border-color:var(--pink);color:var(--pink)}
+:root[data-theme="specimen"] :is(input:not([type=range]):not([type=checkbox]):not([type=color]):not(.sb-field input,.kb-search input,.ksub-add input,.tp-row input),textarea,select){background:var(--bg);border:1px solid var(--line-2);border-radius:0;font-family:var(--ui);font-size:13px}
+:root[data-theme="specimen"] :is(input:not([type=range]):not([type=checkbox]),textarea):focus{border-color:var(--ink);outline:none;box-shadow:none}
+:root[data-theme="specimen"] .seg{border:1px solid var(--line-2);border-radius:0;padding:0;gap:0}
+:root[data-theme="specimen"] .seg button{border-radius:0;border-left:1px solid var(--line-2);font-family:var(--display);font-stretch:118%;font-weight:800;font-size:11.5px;padding:5px 12px}
+:root[data-theme="specimen"] .seg button:first-child{border-left:0}
+:root[data-theme="specimen"] .seg button.on{background:var(--ink);color:#131312}
+:root[data-theme="specimen"] .trange button.on{background:var(--pink);color:#131312}
+/* Switches: a square track; on, it turns pink with an ink knob */
+:root[data-theme="specimen"] .toggle .tbox{border:1px solid var(--line-2);border-radius:0;background:var(--bg);width:40px;height:22px;box-sizing:border-box}
+:root[data-theme="specimen"] .toggle .tbox::after{border-radius:0;background:var(--text-3);top:3px;left:3px;width:14px;height:14px}
+:root[data-theme="specimen"] .toggle input:checked+.tbox{background:var(--pink);border-color:var(--pink)}
+:root[data-theme="specimen"] .toggle input:checked+.tbox::after{background:#131312;transform:translateX(18px)}
+:root[data-theme="specimen"] .langswitch{border:1px solid var(--line-2);border-radius:0;background:none;padding:0}
+:root[data-theme="specimen"] .langswitch button{border-radius:0;font-family:var(--display);font-stretch:118%;font-weight:800;font-size:12px}
+:root[data-theme="specimen"] .langswitch button.on{background:var(--pink);color:#131312}
+/* Bars are rulers: tick marks every tenth, the value a thin line on top */
+:root[data-theme="specimen"] :is(.track2,.lbar,.meter){height:9px;border-radius:0;background:repeating-linear-gradient(90deg,var(--line-2) 0 1px,transparent 1px 10%);overflow:visible;position:relative}
+:root[data-theme="specimen"] :is(.track2,.lbar,.meter) i{position:absolute;left:0;top:3px;height:3px;border-radius:0;background:var(--ink);opacity:1}
+:root[data-theme="specimen"] .meter{width:40px}
+:root[data-theme="specimen"] .sugg{border-radius:0;background:var(--pink);color:#131312;font-family:var(--mono);box-shadow:none}
+:root[data-theme="specimen"] .sugg.pin{background:var(--ink)}
+:root[data-theme="specimen"] .sugg.ask{background:transparent;color:var(--pink);border:1px solid var(--pink)}
+:root[data-theme="specimen"] .toast{background:var(--ink);color:#131312;border-radius:0;font-size:11px;box-shadow:none}
+:root[data-theme="specimen"] .linkbtn{color:var(--pink);text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
+:root[data-theme="specimen"] :is(.fb-label,.blockhead h3,.tlabel,.panel-in .pt){font-size:10px;font-weight:400;letter-spacing:.02em;color:var(--text-3);text-transform:none}
+:root[data-theme="specimen"] .spin{border-radius:0}
+
+/* Panels: ruled boxes on the sheet */
+:root[data-theme="specimen"] :is(.card2,.bw,.tuner,.filterbar,.searchcard,.jopt,.jend,.mapwrap,.memtile,.fantcard,.pcard,.provcard,.mc-card,.jintro,.upcard,.kcombine,.catcard){background:var(--surface);border:1px solid var(--line-2);border-radius:0;box-shadow:none}
+:root[data-theme="specimen"] .card2 h3{font-size:19px;line-height:1}
+:root[data-theme="specimen"] .bw-h{border-bottom:1px solid var(--line-2);padding-bottom:10px;font-family:var(--display);font-stretch:var(--wide);font-weight:900;letter-spacing:-.045em;font-size:16px;color:var(--text);text-transform:none}
+:root[data-theme="specimen"] .panel-in{background:var(--bg);border:1px dashed var(--line-2);border-radius:0}
+:root[data-theme="specimen"] .empty{border:1px dashed var(--line-2);border-radius:0}
+
+/* Side windows: ruled boxes; about one in five is printed solid pink */
+:root[data-theme="specimen"] .win{background:var(--surface);border:1px solid var(--line-2);border-radius:0;box-shadow:none}
+:root[data-theme="specimen"] .win.active{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+:root[data-theme="specimen"] .win-head{padding:10px 8px 10px 14px;border-bottom:1px solid var(--line-2)}
+:root[data-theme="specimen"] .win.min .win-head{border-bottom:0}
+:root[data-theme="specimen"] .win-title strong{font-size:15px;line-height:1.02}
+:root[data-theme="specimen"] .win-title span{font-family:var(--mono);font-size:9.5px;color:var(--text-3)}
+:root[data-theme="specimen"] .win-btns .icon-btn{width:28px;height:28px;border:1px solid var(--line-2);border-radius:0;background:none;color:var(--text-2);box-sizing:border-box}
+:root[data-theme="specimen"] .win-btns .icon-btn:hover{border-color:var(--ink);color:var(--text)}
+:root[data-theme="specimen"] .win-dot{width:9px;height:9px;border-radius:0;background:var(--cv,var(--c))}
+:root[data-theme="specimen"] .win-body{padding:12px 14px 14px;gap:10px}
+:root[data-theme="specimen"] .win.solid{background:var(--pink);border-color:var(--pink);color:#131312;--text:#131312;--text-2:rgba(19,19,18,.82);--text-3:rgba(19,19,18,.66);--line:rgba(19,19,18,.25);--line-2:rgba(19,19,18,.45);--surface:var(--pink);--surface-2:rgba(19,19,18,.08);--surface-3:rgba(19,19,18,.14);--ink:#131312;--kfill:#131312;--accent:#131312;--accent-ink:#FF2E7E}
+:root[data-theme="specimen"] .win.solid .win-head{border-bottom-color:#131312}
+:root[data-theme="specimen"] .win.solid .win-btns .icon-btn{border-color:#131312;color:#131312}
+:root[data-theme="specimen"] .win.solid .win-dot{background:#131312}
+:root[data-theme="specimen"] .win.solid :is(.ghost-btn,.chip){border-color:#131312;color:#131312;background:none}
+:root[data-theme="specimen"] .win.solid .ghost-btn.accent{background:#131312;color:var(--pink)}
+:root[data-theme="specimen"] .incenter{border-radius:0;background:var(--ink);color:#131312;font-family:var(--mono)}
+:root[data-theme="specimen"] :is(.wgrid .tile,.pv,.spot .sm,.ptile,.mnthumb .thumb,.dp-tile){border:1px solid var(--line-2);border-radius:0}
+:root[data-theme="specimen"] .thumb{border-radius:0}
+:root[data-theme="specimen"] :is(.tile .tb,.pv .tb,.ptile .tb,.dur,.res,.provider){background:var(--ink);color:#131312;border-radius:0;font-size:9.5px;font-weight:400}
+:root[data-theme="specimen"] .mini{border-radius:0}
+:root[data-theme="specimen"] .car-dots i{border-radius:0}
+:root[data-theme="specimen"] .car-dots i.on{background:var(--pink)}
+:root[data-theme="specimen"] .win-pic{border-radius:0;box-shadow:0 0 0 1px var(--line-2)}
+:root[data-theme="specimen"] .win.pairwin .win-head::after{height:2px;border-radius:0;bottom:-1px;opacity:1}
+/* A pair printed solid: pink, and its header fades hard from pink into the second kink's tint */
+:root[data-theme="specimen"] .win.solid.pairwin .win-head{background:linear-gradient(110deg,var(--pink) 0 46%,var(--cv2,#ECE8E0) 54% 100%)}
+:root[data-theme="specimen"] .win.solid.pairwin .win-head::after{display:none}
+:root[data-theme="specimen"] .win.solid .win-pair .kshape{--kfill:#131312}
+:root[data-theme="specimen"] .mbub .mbn{font-family:var(--ui);font-weight:500}
+
+/* Feed */
+:root[data-theme="specimen"] .hello-sum{font-size:13.5px;line-height:1.55;color:var(--text-2)}
+:root[data-theme="specimen"] .tunebtn.on{background:var(--ink);color:#131312;border-color:var(--ink)}
+:root[data-theme="specimen"] .tunebtn .tunecount{border-radius:0;background:var(--pink);color:#131312}
+:root[data-theme="specimen"] :is(.nowchip,.tchip,.moodcard){border:1px solid var(--line-2);border-radius:0;background:var(--bg)}
+:root[data-theme="specimen"] .nowchip .nk{font-family:var(--mono);font-size:10px;font-weight:400;color:var(--text-3)}
+:root[data-theme="specimen"] :is(.nowchip,.tchip) svg.i{color:var(--text-2)}
+:root[data-theme="specimen"] :is(.nowchip,.tchip,.moodcard).on{background:var(--pink);border-color:var(--pink);color:#131312;box-shadow:none}
+:root[data-theme="specimen"] :is(.nowchip,.tchip,.moodcard).on :is(.nk,small,svg.i,.i){color:#131312}
+:root[data-theme="specimen"] .moodcard strong{font-family:var(--display);font-stretch:118%;font-weight:800;font-size:12.5px}
+:root[data-theme="specimen"] .moodcard .mc-ic{border-radius:0;background:var(--surface-3);color:var(--text)}
+:root[data-theme="specimen"] .moodcard.on .mc-ic{background:#131312;color:var(--pink)}
+:root[data-theme="specimen"] .fsel .i{color:var(--pink)}
+:root[data-theme="specimen"] .uslider{height:9px;border-radius:0;background:repeating-linear-gradient(90deg,var(--line-2) 0 1px,transparent 1px 10%),linear-gradient(0deg,transparent 3px,var(--pink) 3px 6px,transparent 6px)}
+:root[data-theme="specimen"] .uslider.gender{background:repeating-linear-gradient(90deg,var(--line-2) 0 1px,transparent 1px 10%),linear-gradient(90deg,#FF2E7E,#ECE8E0 50%,#9FB3CF)}
+:root[data-theme="specimen"] .uslider::-webkit-slider-thumb{width:14px;height:22px;border-radius:0;background:var(--ink);border:2px solid #131312;box-shadow:none}
+:root[data-theme="specimen"] .uslider::-moz-range-thumb{width:14px;height:22px;border-radius:0;background:var(--ink);border:2px solid #131312}
+:root[data-theme="specimen"] .gband{border:1px dashed var(--ink);border-radius:0;background:rgba(236,232,224,.05)}
+:root[data-theme="specimen"] .feed>.post{background:var(--surface);border:1px solid var(--line-2);border-radius:0;box-shadow:none;padding:16px 16px 12px}
+:root[data-theme="specimen"] .post.focus{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+:root[data-theme="specimen"] .ptitle{font-size:24px;line-height:1}
+:root[data-theme="specimen"] .ptext,:root[data-theme="specimen"] .story .more-text{font-size:13.5px;line-height:1.6}
+:root[data-theme="specimen"] .ph .names strong{font-size:13px;font-weight:600}
+:root[data-theme="specimen"] .pill{border-radius:0;background:transparent;font-size:9.5px;font-weight:400;text-transform:none;letter-spacing:-.02em}
+:root[data-theme="specimen"] .pill-foryou{color:var(--pink);border-color:var(--pink)}
+:root[data-theme="specimen"] .pill-following{color:var(--following);border-color:var(--line-2)}
+:root[data-theme="specimen"] :is(.pill-discovery,.pill-deeper){color:#131312;background:var(--ink);border-color:var(--ink)}
+:root[data-theme="specimen"] .pill-popular{color:var(--text);border-color:var(--ink)}
+:root[data-theme="specimen"] .meter i{background:var(--cv,var(--ink))}
+:root[data-theme="specimen"] :is(.media,.imgbtn,.media-sleep,.viewer img,.viewer video){border-radius:0}
+:root[data-theme="specimen"] :is(.media,.imgbtn){outline:1px solid var(--line-2);outline-offset:-1px}
+:root[data-theme="specimen"] .gallery .gtile,:root[data-theme="specimen"] .gallery .media{border-radius:0}
+:root[data-theme="specimen"] .badge{border-radius:0;background:var(--pink);color:#131312;font-size:9.5px;box-shadow:none}
+:root[data-theme="specimen"] :is(.fsbtn,.mutebtn){border-radius:0!important;background:var(--ink);color:#131312}
+:root[data-theme="specimen"] button.play{border-radius:0;background:var(--ink);color:#131312}
+:root[data-theme="specimen"] .avatar{border-radius:0}
+:root[data-theme="specimen"] .avatar:not(img){background:var(--ink)!important;color:#131312;font-family:var(--display);font-stretch:118%;font-weight:800;letter-spacing:-.02em}
+:root[data-theme="specimen"] :is(.avimg,.pcard-main img){border-radius:0}
+:root[data-theme="specimen"] .perf{border:1px solid var(--line-2);border-radius:0;background:transparent}
+:root[data-theme="specimen"] .pbar{border-top:1px solid var(--line-2)}
+:root[data-theme="specimen"] .vote{background:none;border:1px solid var(--line-2);border-radius:0;padding:0;gap:0}
+:root[data-theme="specimen"] .vote button{border-radius:0}
+:root[data-theme="specimen"] .vote button.on{background:var(--pink);color:#131312}
+:root[data-theme="specimen"] .vote button.vdown.on{background:var(--ink);color:#131312}
+:root[data-theme="specimen"] .vote span{font-family:var(--display);font-stretch:var(--wide);font-weight:900;letter-spacing:-.045em;font-size:14px;padding:0 6px}
+:root[data-theme="specimen"] .likebar{display:none}
+:root[data-theme="specimen"] .heat{background:none;border:1px solid var(--line-2);border-radius:0;padding:0 12px 0 4px}
+:root[data-theme="specimen"] .heat.on{background:none;border-color:var(--pink)}
+:root[data-theme="specimen"] .heatword{font-size:14px;color:var(--pink)}
+:root[data-theme="specimen"] .pb{border-radius:0}
+:root[data-theme="specimen"] .pb.icon{border:1px solid var(--line-2);width:36px;height:36px;box-sizing:border-box}
+:root[data-theme="specimen"] .pb.icon:hover{border-color:var(--ink);background:none}
+:root[data-theme="specimen"] :is(.pb.on,.pb.icon.on){color:var(--pink);border-color:var(--pink)}
+:root[data-theme="specimen"] .chipwrap.hov>.chiprow{border:1px solid var(--ink);border-radius:0;box-shadow:none;background:var(--bg)}
+:root[data-theme="specimen"] .dchip{border:1px solid var(--pink);border-radius:0;background:none}
+:root[data-theme="specimen"] .dislike.ask{border:1px dashed var(--line-2);border-radius:0}
+:root[data-theme="specimen"] .freshbar{border-radius:0;background:var(--pink);color:#131312;box-shadow:none;font-family:var(--display);font-stretch:118%;font-weight:800;font-size:12.5px}
+:root[data-theme="specimen"].narrow .feed>.post{padding:12px 10px 8px}
+:root[data-theme="specimen"].narrow .ptitle{font-size:20px}
+
+/* Map and the kinks page */
+:root[data-theme="specimen"] .brainwrap{border:1px solid var(--line-2);border-radius:0;box-shadow:none;background:#131312}
+:root[data-theme="specimen"] :is(.braintools select,.brainfind input){border:1px solid var(--line-2);border-radius:0}
+:root[data-theme="specimen"] .kb-head h2{font-size:clamp(36px,5.5cqi,56px);line-height:.9}
+:root[data-theme="specimen"] .kb-head h2 .count{font-size:10px;align-self:center;border:1px solid var(--line-2);padding:2px 6px;color:var(--text-2);font-weight:400;letter-spacing:-.02em}
+:root[data-theme="specimen"] .kb-search{background:var(--bg);border:1px solid var(--line-2);border-radius:0}
+:root[data-theme="specimen"] .kb-form{border:1px dashed var(--line-2);border-radius:0;background:none}
+:root[data-theme="specimen"] .ks-head{color:var(--text);border-top:1px solid var(--ink);padding-top:8px}
+:root[data-theme="specimen"] .ks-head .ks-name{font-size:22px;line-height:1}
+:root[data-theme="specimen"] .ks-head .count{border:1px solid var(--line-2);border-radius:0;background:none;color:var(--text-2);font-size:10px;padding:2px 6px}
+:root[data-theme="specimen"] .ks-line{display:none}
+:root[data-theme="specimen"] .ks-fam{font-size:9.5px;color:var(--text-3)}
+:root[data-theme="specimen"] :is(.kcard,button.kcard){background:var(--surface);border:1px solid var(--line-2);border-radius:0;box-shadow:none;padding:12px}
+:root[data-theme="specimen"] .kcard.clickable:hover{border-color:var(--ink);transform:none}
+:root[data-theme="specimen"] .kc-name strong{font-size:17px;line-height:1}
+:root[data-theme="specimen"] .kc-name .kc-mode{font-size:9px;color:var(--text-3)}
+:root[data-theme="specimen"] .kc-match{font-size:19px;line-height:.9;color:var(--text);background:none;border:0;padding:0}
+:root[data-theme="specimen"] .kc-match.ok{color:var(--pink);background:none}
+:root[data-theme="specimen"] .kcard .kc-edit{border:1px solid var(--line-2);border-radius:0;background:none;width:28px;height:28px;box-sizing:border-box}
+:root[data-theme="specimen"] .kcard .kc-edit:hover{border-color:var(--ink);color:var(--text)}
+:root[data-theme="specimen"] .kc-bars>div{font-size:9px;color:var(--text-3)}
+:root[data-theme="specimen"] .kc-bars em{color:var(--text);font-style:normal}
+:root[data-theme="specimen"] :is(.kc-bars,.kw-bars) .kb-lately i{background:var(--pink)}
+:root[data-theme="specimen"] :is(.kc-bars,.kw-bars) .kb-all i{background:var(--ink)}
+:root[data-theme="specimen"] .kw-bars .kb-now i{background:var(--flame-2)}
+:root[data-theme="specimen"] .kc-tags .chip{font-size:9.5px;padding:2px 6px}
+:root[data-theme="specimen"] .chip.ghost.rising{border:1px dashed var(--line-2);border-radius:0;font-size:12px}
+:root[data-theme="specimen"] .chip.rising em{font-family:var(--display);font-stretch:var(--wide);font-weight:900;letter-spacing:-.04em;font-size:14px;color:var(--text)}
+:root[data-theme="specimen"] .chipx.keep{border-radius:0;background:var(--pink);color:#131312}
+:root[data-theme="specimen"] .shapepop{background:var(--bg);border:1px solid var(--ink);border-radius:0;box-shadow:none}
+:root[data-theme="specimen"] .sp-t{font-size:17px}
+:root[data-theme="specimen"] .sp-opt{border-radius:0}
+:root[data-theme="specimen"] .sp-opt.on{border:1px solid var(--pink);background:none;--kfill:var(--pink)}
+:root[data-theme="specimen"] .cdot{border-radius:0;box-shadow:0 0 0 1px var(--line-2)}
+:root[data-theme="specimen"] .hovercard{background:var(--bg);border:1px solid var(--ink);border-radius:0;box-shadow:none}
+
+/* The kink page: the shape as a construction drawing in its own grid box */
+:root[data-theme="specimen"] .khero{border:1px solid var(--ink);border-radius:0;box-shadow:none;background:var(--surface);overflow:hidden}
+:root[data-theme="specimen"] .kh-shape{align-self:stretch;margin:-60px 0 -24px -24px;padding:24px;border-right:1px solid var(--line-2);background:linear-gradient(90deg,#222120 1px,transparent 1px) 0 0/20px 100%,linear-gradient(0deg,#222120 1px,transparent 1px) 0 0/100% 20px;--kfill:var(--pink)}
+:root[data-theme="specimen"] .kh-name{font-size:clamp(40px,7.4cqi,92px);line-height:.88;letter-spacing:-.05em}
+:root[data-theme="specimen"] .kh-why{font-size:10.5px;line-height:1.7;color:var(--text-2)}
+:root[data-theme="specimen"] .gtag{border:1px solid var(--line-2);border-radius:0;background:none;color:var(--text-2);font-size:10px}
+:root[data-theme="specimen"] .gtag:first-child{background:var(--ink);color:#131312;--kfill:#131312}
+:root[data-theme="specimen"] .gtag.mode svg.i{color:var(--text-2)}
+:root[data-theme="specimen"] .khero .kact-x svg{color:var(--text)}
+:root[data-theme="specimen"] .kh-match b{font-size:clamp(56px,8cqi,96px);line-height:.85;letter-spacing:-.05em;color:var(--text)}
+:root[data-theme="specimen"] .kh-match b small{font-size:.4em;color:var(--pink)}
+:root[data-theme="specimen"] .kh-match>span{color:var(--text-3);font-size:10px}
+:root[data-theme="specimen"] .kpage .gauge{height:22px;border-radius:0;background:repeating-linear-gradient(90deg,var(--line-2) 0 1px,transparent 1px 5%),linear-gradient(0deg,var(--ink) 1px,transparent 1px)}
+:root[data-theme="specimen"] .kpage .gauge i{top:8px;bottom:6px;border-radius:0;background:var(--pink)}
+:root[data-theme="specimen"] .kpage .gauge em{width:1px;background:var(--ink);top:-6px;bottom:-6px;border-radius:0}
+:root[data-theme="specimen"] .kh-note{font-size:10px}
+:root[data-theme="specimen"] .kmodes{background:none;gap:0;padding:0;border:1px solid var(--line-2)}
+:root[data-theme="specimen"] .kmode{border:0;border-left:1px solid var(--line-2);border-radius:0;font-size:11px;color:var(--text-2)}
+:root[data-theme="specimen"] .kmode:first-child{border-left:0}
+:root[data-theme="specimen"] .kmode.on{background:var(--ink);color:#131312;box-shadow:none}
+:root[data-theme="specimen"] .kmode-text{font-size:10.5px;color:var(--text-3)}
+:root[data-theme="specimen"] .kmode-text svg{color:var(--text-2)}
+:root[data-theme="specimen"] .kw-bars .barrow .track2{height:13px}
+:root[data-theme="specimen"] .kw-bars .barrow .track2 i{top:4px;height:5px}
+:root[data-theme="specimen"] .barrow .bt em{font-size:10.5px;color:var(--text);font-style:normal}
+:root[data-theme="specimen"] .kimprove{border:1px solid var(--pink);border-radius:0;background:none;box-shadow:none}
+:root[data-theme="specimen"] .kimprove-h b{font-size:16px;line-height:1}
+:root[data-theme="specimen"] .kimprove .kimprove-h svg{color:var(--pink)}
+:root[data-theme="specimen"] .kimprove .chip.btn{border-color:var(--pink);color:var(--pink);background:none;font-family:var(--mono)}
+:root[data-theme="specimen"] .kimprove .chip em{color:var(--text-2)}
+:root[data-theme="specimen"] .kimprove-refresh{border-radius:0;background:none;color:var(--pink);border:1px solid var(--line-2)}
+:root[data-theme="specimen"] .ksub{border:1px solid var(--ink);border-radius:0;background:none;font-family:var(--mono);font-size:11px}
+:root[data-theme="specimen"] .ksub-add{border:1px dashed var(--line-2);border-radius:0}
+:root[data-theme="specimen"] .ksubs-sugg{border:1px solid var(--line-2);border-radius:0;background:none}
+:root[data-theme="specimen"] .ksugg{border-top:1px solid var(--line-2)}
+:root[data-theme="specimen"] .tagadd{border:1px dashed var(--line-2);border-radius:0}
+:root[data-theme="specimen"] :is(.postcard img,.postcard .histph,.evthumb){border:1px solid var(--line-2);border-radius:0}
+:root[data-theme="specimen"] .evtype{border-radius:0;border:1px solid currentColor;background:none}
+
+/* The trend graph: a hard pink line on a ruled sheet, square marks */
+:root[data-theme="specimen"] .trendg .tg-line{stroke:var(--pink);stroke-width:1.8;stroke-linejoin:miter;stroke-linecap:square}
+:root[data-theme="specimen"] .trendg .tg-base{stroke:var(--ink);stroke-width:1}
+:root[data-theme="specimen"] .trendg .tg-rule{stroke:var(--line);stroke-width:1}
+:root[data-theme="specimen"] .trendg .tg-tick{stroke:var(--line-2);stroke-width:1}
+:root[data-theme="specimen"] .trendg .tg-peak{stroke:var(--text-3);stroke-width:1;stroke-dasharray:1 3}
+:root[data-theme="specimen"] .trendg .tg-dot{fill:var(--pink);filter:none}
+:root[data-theme="specimen"] .win.solid .trendg .tg-line{stroke:#131312}
+:root[data-theme="specimen"] .win.solid .trendg .tg-dot{fill:#131312}
+:root[data-theme="specimen"] .tg-axis{font-size:9.5px;color:var(--text-3)}
+:root[data-theme="specimen"] .ktm{border-radius:0;font-size:12.5px}
+:root[data-theme="specimen"] .ktm.on{background:var(--surface-2);color:var(--text);box-shadow:inset 2px 0 0 var(--pink);--kfill:var(--pink)}
+:root[data-theme="specimen"] .ktm em{font-size:10px}
+:root[data-theme="specimen"] .ktm em.up,:root[data-theme="specimen"] .mbub em.up{color:var(--pink)}
+:root[data-theme="specimen"] .ktm em.down,:root[data-theme="specimen"] .mbub em.down{color:var(--text-3)}
+
+/* Memory */
+:root[data-theme="specimen"] .memtile b{font-size:30px;line-height:.9}
+:root[data-theme="specimen"] .memtile svg{color:var(--text-2)}
+:root[data-theme="specimen"] .memtile.hot{background:var(--pink);color:#131312;--text-2:#131312;--text-3:rgba(19,19,18,.7);border-color:var(--pink)}
+:root[data-theme="specimen"] .memtile.hot :is(svg,b){color:#131312}
+:root[data-theme="specimen"] .memnav{background:var(--bg);border:1px solid var(--line-2);border-radius:0}
+:root[data-theme="specimen"] .memnav-b{border-radius:0;font-size:11.5px}
+:root[data-theme="specimen"] .memnav-b:hover{background:var(--surface-2)}
+:root[data-theme="specimen"] .catcard-h h3{font-size:19px;line-height:1}
+:root[data-theme="specimen"] .catic{border:1px solid var(--line-2);border-radius:0;background:none;color:var(--text)}
+:root[data-theme="specimen"] .catcard:nth-of-type(4n+2) .catic{background:var(--pink);border-color:var(--pink);color:#131312}
+:root[data-theme="specimen"] .catn{font-size:22px;color:var(--text)}
+:root[data-theme="specimen"] .catcard .memitem{border-top:0;border-left:2px solid var(--line-2);padding:4px 0 4px 12px;margin-top:8px}
+:root[data-theme="specimen"] .memtext p{font-size:14px;line-height:1.4}
+:root[data-theme="specimen"] .catchip{border:1px solid var(--line-2);border-radius:0;font-size:10.5px}
+:root[data-theme="specimen"] .catchip.on{background:var(--ink);border-color:var(--ink);color:#131312}
+:root[data-theme="specimen"] .catchip.on svg{color:#131312}
+:root[data-theme="specimen"] .memcat{border:1px solid var(--line-2);border-radius:0;font-size:9.5px}
+:root[data-theme="specimen"] .memitem.proposed{background:none;border:1px dashed var(--pink)}
+:root[data-theme="specimen"] .fc-pct{border-radius:0;background:var(--pink);color:#131312;font-family:var(--mono)}
+:root[data-theme="specimen"] .secic{color:var(--text-2)}
+
+/* Settings and the rest */
+:root[data-theme="specimen"] .profrow{border:1px solid var(--line-2);border-radius:0;background:none}
+:root[data-theme="specimen"] .profrow.current{border-color:var(--pink);box-shadow:inset 3px 0 0 var(--pink)}
+:root[data-theme="specimen"] .okpill{border-radius:0}
+:root[data-theme="specimen"] .diag{border:1px dashed currentColor;border-radius:0}
+:root[data-theme="specimen"] .lookopt{border:1px solid var(--line-2);border-radius:0}
+:root[data-theme="specimen"] .lookopt.on{border-color:var(--pink);box-shadow:inset 0 0 0 1px var(--pink)}
+:root[data-theme="specimen"] :is(.folrow,.memitem,.personrow){border-top:1px solid var(--line)}
+:root[data-theme="specimen"] code{border:1px solid var(--line-2);border-radius:0}
+:root[data-theme="specimen"] .sechead h3{font-size:20px}
+:root[data-theme="specimen"] .readbadge{background:none;border:1px solid var(--line-2);color:var(--pink);border-radius:0}
+:root[data-theme="specimen"] .readbadge b{font-size:16px}
+
+/* The phone's tab bar: a ruled strip, the view you are on printed pink */
+:root[data-theme="specimen"] .tabbar-in{background:#131312;border:1px solid var(--line-2);border-radius:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+:root[data-theme="specimen"] .tabpill{background:var(--pink);border-radius:0;box-shadow:none}
+:root[data-theme="specimen"] .tab{color:var(--text-2);border-radius:0}
+:root[data-theme="specimen"] .tab.on,:root[data-theme="specimen"] .tab.on .tab-ic svg{color:#131312}
+:root[data-theme="specimen"] .tab-l{font-family:var(--display);font-stretch:118%;font-weight:800;font-size:10.5px;letter-spacing:-.01em}
+
+/* Full screen viewer and the reactions: ink squares, pink when on */
+:root[data-theme="specimen"] .tk :is(.tk-b svg,.tk-tb,.tk-ctl button,.tk-fast,.tk-tagsbtn){background:#131312;border-radius:0;box-shadow:inset 0 0 0 1px #4A4844;-webkit-backdrop-filter:none;backdrop-filter:none;filter:none}
+:root[data-theme="specimen"] .tk :is(.tk-b.up.on svg,.tk-hot.on .tk-b.hot svg){background:#FF2E7E;color:#131312;box-shadow:none}
+:root[data-theme="specimen"] .tk :is(.tk-b.down.on,.tk-b.save.on) svg{background:#ECE8E0;color:#131312;box-shadow:none}
+:root[data-theme="specimen"] .tk .tk-chip{border-radius:0;font-family:var(--mono);font-size:10.5px}
+:root[data-theme="specimen"] .tk .tk-chip.kink{background:#ECE8E0;color:#131312;--kfill:#131312}
+:root[data-theme="specimen"] .tk-follow{background:var(--pink);color:#131312;border-radius:0}
+:root[data-theme="specimen"] .tk-hottrack{background:#131312;border:1px solid #4A4844;border-radius:0;-webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:none}
+:root[data-theme="specimen"] .tk-hotfill{border-radius:0;clip-path:inset(calc((1 - var(--h)) * 100%) 0 0 0);box-shadow:none;background:repeating-linear-gradient(0deg,rgba(19,19,18,.35) 0 1px,transparent 1px 10%),#FF2E7E}
+:root[data-theme="specimen"] .tk-hotword{font-family:var(--display);font-stretch:118%;font-weight:800;font-size:11px}
+:root[data-theme="specimen"] .tk .tk-modes{background:#131312;border-radius:0;box-shadow:inset 0 0 0 1px #4A4844;-webkit-backdrop-filter:none;backdrop-filter:none}
+:root[data-theme="specimen"] .tk-modes button{border-radius:0;font-family:var(--display);font-stretch:118%;font-weight:800;font-size:12px;color:rgba(236,232,224,.7)}
+:root[data-theme="specimen"] .tk-modes button.on{background:var(--ink);color:#131312}
+:root[data-theme="specimen"] :is(.tk-av,.tk-avi,.tk-person-pic){background:#ECE8E0;border-radius:0;box-shadow:none}
+:root[data-theme="specimen"] .tk-av :is(.avatar,img),:root[data-theme="specimen"] .tk-avi .tk-pic,:root[data-theme="specimen"] .tk-person-pic .tk-pic,:root[data-theme="specimen"] .tk-pic{border:0;border-radius:0}
+:root[data-theme="specimen"] .postfx{--fxc:#252421}
+:root[data-theme="specimen"] .fx-up{--fxc:#FF2E7E}
+:root[data-theme="specimen"] :is(.fx-down,.fx-save){--fxc:#ECE8E0}
+:root[data-theme="specimen"] .heatfx{--fxc:#FF2E7E}
+:root[data-theme="specimen"] .fxdisc{border-radius:0;background:var(--fxc);color:#131312;border:0;-webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:none}
+:root[data-theme="specimen"] :is(.fx-hide,.fx-undo,.heatfx.out) .fxdisc{background:#131312;color:var(--text-2);box-shadow:inset 0 0 0 1px #4A4844}
+:root[data-theme="specimen"] .heatfx .fxdisc{color:#131312}
+:root[data-theme="specimen"] .fxglyph,:root[data-theme="specimen"] .heatfx .hfflame{filter:none}
+:root[data-theme="specimen"] .fxring,:root[data-theme="specimen"] .heatfx.burst .fxring{border-radius:0;border:1px solid var(--fxc)}
+:root[data-theme="specimen"] .fxline{stroke-width:1.5;stroke-linecap:square;stroke-linejoin:miter}
+:root[data-theme="specimen"] .profshape .shapebtn .kshape{--kfill:var(--pink)}
+
+/* Loading: the mark is drawn in from the left, the bar is a ruler with a pink line running across */
+:root[data-theme="specimen"] .bootmark{border-radius:0;box-shadow:none;filter:none;animation:sdraw 1.6s steps(6) infinite}
+:root[data-theme="specimen"] .bootbar,:root[data-theme="specimen"] .feedwait::after{width:96px;height:9px;border-radius:0;background:linear-gradient(0deg,transparent 3px,#FF2E7E 3px 6px,transparent 6px) 0 0/30% 100% no-repeat,repeating-linear-gradient(90deg,#4A4844 0 1px,transparent 1px 10%);animation:sruler 1.1s steps(10) infinite}
+:root[data-theme="specimen"] .spinner{border-radius:0;border:1px solid var(--line-2);border-top-color:var(--pink);animation:spin 1.2s steps(8) infinite}
+@keyframes sdraw{0%{clip-path:inset(0 100% 0 0)}60%,100%{clip-path:inset(0 0 0 0)}}
+@keyframes sruler{to{background-position:140% 0,0 0}}
+
+/* Nothing is rounded on a specimen sheet */
+:root[data-theme="specimen"] *,:root[data-theme="specimen"] *::before,:root[data-theme="specimen"] *::after{border-radius:0!important}
+:root[data-theme="specimen"] .dp-opt{background:var(--bg);border-color:var(--line-2)}
+:root[data-theme="specimen"] .dp-opt:hover{border-color:var(--pink);background:none}
+:root[data-theme="specimen"] .dp-opt b{font-family:var(--display);font-stretch:118%;font-weight:800;font-size:12.5px}
+:root[data-theme="specimen"] .dp-opt.ai{border-color:var(--pink)}
+:root[data-theme="specimen"] .dp-opt.ai svg{color:var(--pink)}
+:root[data-theme="specimen"] .dp-wq{font-family:var(--mono);font-weight:400;font-size:11px;color:var(--pink)}
+:root[data-theme="specimen"] .win.solid :is(.dp-opt,.jopt){border-color:#131312;background:none}
+:root[data-theme="specimen"] .win.solid .dp-wq{color:#131312}
+:root[data-theme="specimen"] .win.solid :is(.tile .tb,.pv .tb,.ptile .tb,.dur,.res,.provider){background:#131312;color:#ECE8E0}
+:root[data-theme="specimen"] .brainlegend{font-family:var(--mono);font-size:9.5px;letter-spacing:-.02em}
+:root[data-theme="specimen"] .lg.kink{background:none;border:1px solid var(--ink)}
+:root[data-theme="specimen"] .lg.tag{border:1px dashed var(--text-3)}
+:root[data-theme="specimen"] .lg.fant{background:var(--discovery)}
+:root[data-theme="specimen"] .lg.link{background:var(--ink);height:1px}
+:root[data-theme="specimen"] .lg.pulse{background:var(--pink)}
+:root[data-theme="specimen"] .kh-name{font-size:clamp(36px,6cqi,72px)}

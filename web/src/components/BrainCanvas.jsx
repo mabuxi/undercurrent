@@ -8,8 +8,9 @@ let BG = '#1A1420';
 
 // How the map looks in each look. Original: soft glassy blobs and gradient shapes. Cutout: flat dark panels behind each
 // family, vivid shapes with a glow, rounded label pills. Signal: dashed family outlines on a dotted board, outlined
-// shapes with a hard shadow, condensed uppercase labels in boxes. Links stay thin and quiet in every look, so a busy
-// map stays readable.
+// shapes with a hard shadow, condensed uppercase labels in boxes. Specimen: a construction drawing on a grid, families
+// as dotted outlines, kinks as wireframes, pink only for what you picked. Links stay thin and quiet in every look, so a
+// busy map stays readable.
 const LOOKS = {
   original: {
     bg: '#1A1420', edge: '#CFC2C9', text: '#EFE6EA', tagFill: '#231B29', tagLine: '#B6A8B0', fantasy: '#F6C35B', sel: '#EFE6EA', recent: '#FFFFFF',
@@ -25,6 +26,11 @@ const LOOKS = {
     bg: '#0E0E0D', edge: '#F3F0E4', text: '#F3F0E4', tagFill: '#141414', tagLine: '#8A8578', fantasy: '#FFD23A', sel: '#D4FF3A', recent: '#D4FF3A',
     kinkFont: '800 15px "Big Shoulders Display", "Arial Narrow", sans-serif', tagFont: '400 10.5px "Space Mono", monospace', fantFont: '800 14px "Big Shoulders Display", "Arial Narrow", sans-serif', groupFont: (sub) => `900 ${sub ? 13 : 15}px "Big Shoulders Display", "Arial Narrow", sans-serif`,
     numFont: '700 10.5px "Space Mono", monospace', up: '#2EF29A', down: '#FF5CA8', labelR: 3, upper: true, boxed: true
+  },
+  specimen: {
+    bg: '#131312', edge: '#ECE8E0', text: '#ECE8E0', tagFill: '#131312', tagLine: '#77736B', fantasy: '#E2D7B4', sel: '#FF2E7E', recent: '#FF2E7E',
+    kinkFont: '500 12px Archivo, sans-serif', tagFont: '400 9.5px "Martian Mono", monospace', fantFont: '500 12px Archivo, sans-serif', groupFont: (sub) => `900 ${sub ? 10.5 : 12}px Anybody, Archivo, sans-serif`,
+    numFont: '400 9.5px "Martian Mono", monospace', up: '#FF2E7E', down: '#77736B', labelR: 0, upper: false, wide: 'extra-expanded'
   }
 };
 
@@ -127,7 +133,8 @@ export default function BrainCanvas({ data, view, selected, onSelect, onHover, h
     for (const [, list] of per) list.sort((x, y) => y.w - x.w).slice(0, v.allLinks ? 6 : 2).forEach((e) => kept.add(e));
     S.edges = all.filter((e) => kept.has(e) || e.fantasy || e.manual);
     S.alpha = keep.size ? Math.max(S.alpha, 0.3) : 1;
-    if (!keep.size) S.cam = { x: 0, y: 0, k: 0.8 };
+    if (!keep.size) { S.cam = { x: 0, y: 0, k: 0.8 }; S.fitted = false; }
+    S.dirty = (S.dirty || 0) + 1;
   }, [data, view]);
 
   useEffect(() => {
@@ -198,10 +205,31 @@ export default function BrainCanvas({ data, view, selected, onSelect, onHover, h
         }
         S.alpha *= 0.975;
         if (S.alpha < 0.012) S.alpha = 0;
+        S.t = (S.t || 0) + 16;
       }
-      draw();
+      // The map opens centred on everything in it: once the layout has mostly settled after loading, the view fits
+      // all kinks.
+      if (!S.fitted && S.nodes.size && S.alpha < 0.35) { fit(); S.fitted = true; }
+      // Only draw when something changed (the layout moving, hovering, dragging, zooming, a shape image arriving, a
+      // new look) and when the map is on screen: a still map costs nothing.
+      const sig = `${S.cam.x.toFixed(1)}|${S.cam.y.toFixed(1)}|${S.cam.k.toFixed(3)}|${S.hover}|${selRef.current}|${themeRef.current}|${S.w}|${S.h}|${S.dirty || 0}`;
+      if (S.visible !== false && !document.hidden && (a0 > 0.01 || S.pending || sig !== S.drawn)) {
+        S.pending = false;
+        draw();
+        S.drawn = sig;
+      }
       raf = requestAnimationFrame(step);
     };
+    const fit = () => {
+      const ns = [...S.nodes.values()];
+      const xs = ns.map((n) => n.x);
+      const ys = ns.map((n) => n.y);
+      const minX = Math.min(...xs); const maxX = Math.max(...xs); const minY = Math.min(...ys); const maxY = Math.max(...ys);
+      const k = Math.max(0.42, Math.min(1.1, Math.min(S.w / (maxX - minX + 220), S.h / (maxY - minY + 200))));
+      S.cam = { x: -((minX + maxX) / 2 - S.w / 2) * k, y: -((minY + maxY) / 2 - S.h / 2) * k, k };
+    };
+    const io = new IntersectionObserver((es) => { S.visible = es.some((e) => e.isIntersecting); });
+    io.observe(canvas);
 
     // Zooming spreads the map out (positions scale), while circles and labels stay about the same size.
     const toScreen = (n) => {
@@ -212,6 +240,7 @@ export default function BrainCanvas({ data, view, selected, onSelect, onHover, h
     };
 
     let dots = null;
+    let grid = null;
     const draw = () => {
       const ctx = canvas.getContext('2d');
       const now = performance.now();
@@ -226,6 +255,15 @@ export default function BrainCanvas({ data, view, selected, onSelect, onHover, h
         // A dotted board, like the page behind it.
         if (!dots) { const c = document.createElement('canvas'); c.width = 16; c.height = 16; const x = c.getContext('2d'); x.fillStyle = '#2A2925'; x.fillRect(0, 0, 1.6, 1.6); dots = ctx.createPattern(c, 'repeat'); }
         ctx.fillStyle = dots; ctx.fillRect(0, 0, S.w, S.h);
+      } else if (look === 'specimen') {
+        // The construction grid of the sheet: a fine one every 24 px, a stronger one every 120 px.
+        if (!grid) {
+          const c = document.createElement('canvas'); c.width = 120; c.height = 120; const x = c.getContext('2d');
+          x.fillStyle = '#191917'; for (let i = 0; i < 120; i += 24) { x.fillRect(i, 0, 1, 120); x.fillRect(0, i, 120, 1); }
+          x.fillStyle = '#21201E'; x.fillRect(0, 0, 1, 120); x.fillRect(0, 0, 120, 1);
+          grid = ctx.createPattern(c, 'repeat');
+        }
+        ctx.fillStyle = grid; ctx.fillRect(0, 0, S.w, S.h);
       }
       const nodes = [...S.nodes.values()];
       for (const n of nodes) toScreen(n);
@@ -246,12 +284,18 @@ export default function BrainCanvas({ data, view, selected, onSelect, onHover, h
         if (!g || !members.length) continue;
         const sub = !!g.parentId;
         const gc = lookColor(g.color || '#888888', look);
-        const h = blobPath(ctx, members, sub ? 26 : look === 'cutout' ? 50 : 44, look === 'signal' ? 0 : now);
+        const h = blobPath(ctx, members, sub ? 26 : look === 'cutout' ? 50 : 44, look === 'signal' || look === 'specimen' ? 0 : S.t || 0);
         if (!h) continue;
         const dimG = focus && !members.some((m) => m.key === focus || neighbors.has(m.key));
         if (look === 'cutout') {
           ctx.fillStyle = alpha(gc, dimG ? 0.04 : sub ? 0.1 : 0.12);
           ctx.fill();
+        } else if (look === 'specimen') {
+          ctx.fillStyle = alpha(gc, dimG ? 0.015 : 0.035);
+          ctx.fill();
+          ctx.setLineDash([2, 4]); ctx.lineWidth = 1;
+          ctx.strokeStyle = alpha(gc, dimG ? 0.2 : 0.6);
+          ctx.stroke(); ctx.setLineDash([]);
         } else if (look === 'signal') {
           ctx.fillStyle = alpha(gc, dimG ? 0.03 : 0.07);
           ctx.fill();
@@ -266,7 +310,7 @@ export default function BrainCanvas({ data, view, selected, onSelect, onHover, h
           ctx.stroke();
         }
         const top = h.reduce((m, p) => (p[1] < m[1] ? p : m), h[0]);
-        labels.push({ text: g.name.toUpperCase(), x: top[0], y: top[1] - 6, color: look === 'original' ? mix(gc, 0.05, '#ffffff') : look === 'signal' ? '#0B0B0B' : gc, fill: look === 'signal' ? gc : null, font: L.groupFont(sub), prio: sub ? 2 : 3, group: true, dim: dimG });
+        labels.push({ text: g.name.toUpperCase(), x: top[0], y: top[1] - 6, color: look === 'original' ? mix(gc, 0.05, '#ffffff') : look === 'signal' ? '#0B0B0B' : gc, fill: look === 'signal' ? gc : null, font: L.groupFont(sub), wide: L.wide, prio: sub ? 2 : 3, group: true, dim: dimG });
       }
 
       for (const e of S.edges) {
@@ -276,10 +320,12 @@ export default function BrainCanvas({ data, view, selected, onSelect, onHover, h
         const lit = focus && (e.a === focus || e.b === focus);
         const dim = focus && !lit;
         const base = e.fantasy ? L.fantasy : L.edge;
-        if (look === 'original') ctx.strokeStyle = mix(base, dim ? 0.92 : lit ? 0.05 : 0.74 - e.w * 0.3);
-        else ctx.strokeStyle = alpha(base, dim ? 0.06 : lit ? 0.9 : 0.16 + e.w * 0.22);
+        // How often two things go together sets how strong their line is: rare pairs are faint, close ones solid.
+        const strength = Math.pow(Math.max(0, Math.min(1, e.w)), 1.2);
+        if (look === 'original') ctx.strokeStyle = mix(base, dim ? 0.93 : lit ? 0.05 + (1 - strength) * 0.35 : 0.93 - strength * 0.72);
+        else ctx.strokeStyle = alpha(base, dim ? 0.05 : lit ? 0.45 + strength * 0.5 : 0.05 + strength * 0.6);
         ctx.lineWidth = lit ? 1.4 + e.w * 2.6 : 0.8 + e.w * 1.4;
-        if (look === 'signal' && e.fantasy) ctx.setLineDash([4, 4]);
+        if ((look === 'signal' || look === 'specimen') && e.fantasy) ctx.setLineDash(look === 'specimen' ? [2, 3] : [4, 4]);
         ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy); ctx.stroke();
         ctx.setLineDash([]);
       }
@@ -293,8 +339,9 @@ export default function BrainCanvas({ data, view, selected, onSelect, onHover, h
         if (n.type === 'kink') {
           // Each kink is drawn as its own shape, in its colour as the look shows it.
           const sh = shapes?.get(Number(n.id)) || { shape: 'circle', pattern: 'dots' };
-          const box = r * (look === 'signal' ? 2.5 : 2.3);
+          const box = r * (look === 'signal' ? 2.5 : look === 'specimen' ? 2.6 : 2.3);
           const img = shapeImage(sh.shape, n.color, look, sh.pattern, box);
+          if (!img) S.pending = true;
           const c = lookColor(n.color, look);
           ctx.globalAlpha = dim ? 0.26 : n.status === 'proposed' ? 0.55 : 1;
           if (L.glow && !dim) { ctx.shadowColor = alpha(c, 0.55); ctx.shadowBlur = 18; }
@@ -310,16 +357,26 @@ export default function BrainCanvas({ data, view, selected, onSelect, onHover, h
         } else if (n.type === 'tag') {
           // Tags: small hollow marks, dashed like tags that are almost a kink everywhere else in the app.
           ctx.fillStyle = L.tagFill;
-          if (look === 'signal') { ctx.beginPath(); ctx.rect(n.sx - r, n.sy - r, r * 2, r * 2); } else { ctx.beginPath(); ctx.arc(n.sx, n.sy, r, 0, TWO_PI); }
+          if (look === 'signal' || look === 'specimen') { ctx.beginPath(); ctx.rect(n.sx - r, n.sy - r, r * 2, r * 2); } else { ctx.beginPath(); ctx.arc(n.sx, n.sy, r, 0, TWO_PI); }
           ctx.fill();
           ctx.strokeStyle = look === 'original' ? mix(L.tagLine, fade) : alpha(L.tagLine, dim ? 0.3 : 1);
-          ctx.lineWidth = look === 'signal' ? 1.6 : 1.4;
+          ctx.lineWidth = look === 'signal' ? 1.6 : look === 'specimen' ? 1 : 1.4;
           if (look !== 'original') ctx.setLineDash([2.5, 2.5]);
           ctx.stroke(); ctx.setLineDash([]);
           if (n.promote) { ctx.strokeStyle = alpha(L.fantasy, dim ? 0.3 : 1); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(n.sx, n.sy, r + 3.5, 0, TWO_PI); ctx.stroke(); }
         } else {
           if (look === 'original') { ctx.fillStyle = mix(L.fantasy, n.saved ? fade : Math.max(fade, 0.35)); drawDiamond(ctx, n.sx, n.sy, r * 1.15); ctx.fill(); ctx.strokeStyle = mix(L.fantasy, 0.4, '#000000'); ctx.lineWidth = 1.2; ctx.stroke(); }
-          else {
+          else if (look === 'specimen') {
+            // A fantasy: a pale gold diamond drawn as a wireframe, solid when you saved it.
+            ctx.globalAlpha = dim ? 0.3 : 1;
+            ctx.strokeStyle = L.fantasy; ctx.lineWidth = 1;
+            for (let i = 2; i >= 1; i--) { drawDiamond(ctx, n.sx + i * 2.5, n.sy - i * 2, r * 1.1); ctx.globalAlpha = (dim ? 0.3 : 1) * (0.5 - i * 0.12); ctx.stroke(); }
+            ctx.globalAlpha = dim ? 0.3 : 1;
+            drawDiamond(ctx, n.sx, n.sy, r * 1.1);
+            if (n.saved) { ctx.fillStyle = L.fantasy; ctx.fill(); }
+            ctx.lineWidth = 1.5; ctx.stroke();
+            ctx.globalAlpha = 1;
+          } else {
             ctx.globalAlpha = dim ? 0.3 : n.saved ? 1 : 0.7;
             if (look === 'signal') { ctx.fillStyle = '#F3F0E4'; drawDiamond(ctx, n.sx + 4, n.sy + 4, r * 1.15); ctx.fill(); }
             if (L.glow) { ctx.shadowColor = alpha(L.fantasy, 0.5); ctx.shadowBlur = 14; }
@@ -329,8 +386,15 @@ export default function BrainCanvas({ data, view, selected, onSelect, onHover, h
             ctx.globalAlpha = 1;
           }
         }
-        if (recent && !dim) { ctx.fillStyle = L.recent; ctx.beginPath(); ctx.arc(n.sx + r * 0.85, n.sy - r * 0.85, 3.2, 0, TWO_PI); ctx.fill(); }
-        if (selRef.current === n.key) {
+        if (recent && !dim) { ctx.fillStyle = L.recent; ctx.beginPath(); if (look === 'specimen') ctx.rect(n.sx + r * 0.85 - 3, n.sy - r * 0.85 - 3, 6, 6); else ctx.arc(n.sx + r * 0.85, n.sy - r * 0.85, 3.2, 0, TWO_PI); ctx.fill(); }
+        if (selRef.current === n.key && look === 'specimen') {
+          // Picked: pink corner marks around it, like a crop on a drawing.
+          const q = r + 10;
+          const k = Math.max(5, q * 0.4);
+          ctx.strokeStyle = L.sel; ctx.lineWidth = 1.5; ctx.beginPath();
+          for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { ctx.moveTo(n.sx + sx * q, n.sy + sy * (q - k)); ctx.lineTo(n.sx + sx * q, n.sy + sy * q); ctx.lineTo(n.sx + sx * (q - k), n.sy + sy * q); }
+          ctx.stroke();
+        } else if (selRef.current === n.key) {
           ctx.strokeStyle = L.sel; ctx.lineWidth = look === 'signal' ? 3 : 2.5;
           if (look === 'signal') ctx.setLineDash([6, 4]);
           ctx.beginPath(); ctx.arc(n.sx, n.sy, r + 9, 0, TWO_PI); ctx.stroke(); ctx.setLineDash([]);
@@ -341,7 +405,7 @@ export default function BrainCanvas({ data, view, selected, onSelect, onHover, h
         const base = n.type === 'fantasy' ? L.fantasy : n.type === 'tag' ? L.tagLine : L.text;
         const color = look === 'original' ? mix(base, fade) : alpha(base, dim ? 0.35 : 1);
         const text = L.upper && n.type !== 'tag' ? n.name.toUpperCase() : n.name;
-        labels.push({ text, x: n.sx, y: n.sy + r + (look === 'signal' ? 19 : 16), color, font, prio: important ? 10 : n.type === 'kink' ? 4 + n.sr / 20 : n.type === 'fantasy' ? 4 : 1, force: important || v.labelsAll, delta: n.type === 'kink' && focus === n.key ? n.lately - n.allTime : null, boxed: L.boxed && n.type === 'kink' && important });
+        labels.push({ text, x: n.sx, y: n.sy + r + (look === 'signal' ? 19 : look === 'specimen' ? 18 : 16), color, font, prio: important ? 10 : n.type === 'kink' ? 4 + n.sr / 20 : n.type === 'fantasy' ? 4 : 1, force: important || v.labelsAll, delta: n.type === 'kink' && focus === n.key ? n.lately - n.allTime : null, boxed: L.boxed && n.type === 'kink' && important });
       }
 
       // Labels last, biggest first; a label that would sit on top of another one waits until you zoom or hover.
@@ -349,6 +413,7 @@ export default function BrainCanvas({ data, view, selected, onSelect, onHover, h
       const placed = [];
       for (const l of labels) {
         ctx.font = l.font;
+        if ('fontStretch' in ctx) ctx.fontStretch = l.wide || 'normal';
         const w = ctx.measureText(l.text).width + (look === 'original' ? 10 : 14);
         const hgt = look === 'signal' ? 20 : look === 'cutout' ? 19 : 17;
         const box = { x1: l.x - w / 2, y1: l.y - hgt + 4, x2: l.x + w / 2, y2: l.y + 4 };
@@ -367,6 +432,7 @@ export default function BrainCanvas({ data, view, selected, onSelect, onHover, h
         ctx.globalAlpha = 1;
         if (l.delta !== null && l.delta !== undefined) {
           ctx.font = L.numFont;
+          if ('fontStretch' in ctx) ctx.fontStretch = 'normal';
           ctx.fillStyle = l.delta >= 0 ? L.up : L.down;
           ctx.fillText(`${l.delta >= 0 ? '▲' : '▼'} ${Math.abs(l.delta)}`, l.x, l.y + 15);
         }
@@ -374,7 +440,7 @@ export default function BrainCanvas({ data, view, selected, onSelect, onHover, h
     };
 
     raf = requestAnimationFrame(step);
-    return () => { cancelAnimationFrame(raf); ro.disconnect(); };
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); io.disconnect(); };
   }, [height, data, app?.shapes]);
 
   function toWorld(e) {

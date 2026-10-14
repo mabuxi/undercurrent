@@ -228,7 +228,7 @@ export default function TopBar() {
         <nav className="nav" aria-label={t('Views')}>
           <button type="button" className={mode === 'feed' && !filters.saved ? 'on' : ''} onClick={() => { if (filters.saved) setFilters({}); openMode('feed'); }} title={t('Feed')} aria-label={t('Feed')}><Icon name="home" /><span className="navlbl" aria-hidden="true">{t('Feed')}</span></button>
           <button type="button" className={mode === 'feed' && filters.saved ? 'on' : ''} onClick={() => { openMode('feed'); setFilters({ saved: true }); }} title={t('Saved posts')} aria-label={t('Saved posts')}><Icon name="save" /><span className="navlbl" aria-hidden="true">{t('Saved')}</span></button>
-          <button type="button" className={mode === 'map' ? 'on' : ''} onClick={() => openMode('map')} title={t('Your map')} aria-label={t('Your map')}><Icon name="map" /><span className="navlbl" aria-hidden="true">{t('Map')}</span></button>
+          <button type="button" className={mode === 'map' ? 'on' : ''} onClick={() => openMode('map')} title={t('Your kinks and map')} aria-label={t('Kinks')}><Icon name="kinks" /><span className="navlbl" aria-hidden="true">{t('Kinks')}</span></button>
           <button type="button" className={mode === 'memory' ? 'on' : ''} onClick={() => openMode('memory')} title={t('Memory, kinks and fantasies')} aria-label={t('Memory')}><Icon name="brain" /><span className="navlbl" aria-hidden="true">{t('Memory')}</span></button>
           <button type="button" className={mode === 'settings' ? 'on' : ''} onClick={() => openMode('settings')} title={t('Settings')} aria-label={t('Settings')}><Icon name="gear" /><span className="navlbl" aria-hidden="true">{t('Settings')}</span></button>
         </nav>

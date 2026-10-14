@@ -177,7 +177,7 @@ export async function chat(opts) {
     if (!background) {
       lane.interactive++;
       for (const c of lane.background) c.abort();
-      try { return await chatNow({ ...opts, model }, null); } finally { lane.interactive--; }
+      try { return await chatNow({ ...opts, model }, opts.signal || null); } finally { lane.interactive--; }
     }
     const max = opts.kind === 'tag' ? Math.max(1, opts.parallel || 1) : Infinity;
     // Quick looks decide who is in the posts you are about to see, so other background jobs wait for them.

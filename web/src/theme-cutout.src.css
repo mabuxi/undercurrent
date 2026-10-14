@@ -16,7 +16,7 @@
 }
 /* Every colour that comes from a kink, a window or a mood is made more vivid. */
 @supports (color:hsl(from red h s l)){
-  :root[data-theme="cutout"] *{--cv:hsl(from var(--c) h calc(min(100,s * 1.35 + 32)) calc(l * .42 + 33));--tcv:hsl(from var(--tc) h calc(min(100,s * 1.35 + 32)) calc(l * .42 + 33))}
+  :root[data-theme="cutout"] *{--cv:hsl(from var(--c) h calc(min(100,s * 1.35 + 32)) calc(l * .42 + 33));--cv2:hsl(from var(--c2) h calc(min(100,s * 1.35 + 32)) calc(l * .42 + 33));--tcv:hsl(from var(--tc) h calc(min(100,s * 1.35 + 32)) calc(l * .42 + 33))}
 }
 :root[data-theme="cutout"] body{font-weight:500;font-variant-numeric:tabular-nums}
 :root[data-theme="cutout"] ::selection{background:var(--accent);color:#0B0B0B}
@@ -407,3 +407,9 @@
 :root[data-theme="cutout"] .trendg .tg-peak{stroke:#2A2A2A;stroke-dasharray:none;stroke-width:2;stroke-linecap:round}
 :root[data-theme="cutout"] .tg-axis{font-weight:700}
 :root[data-theme="cutout"] .bootmark{box-shadow:none}
+/* Pairs, people and what a window is about */
+:root[data-theme="cutout"] .win.solid.pairwin::before{background:var(--mix)}
+:root[data-theme="cutout"] .win.solid.pairwin .win-head::after{display:none}
+:root[data-theme="cutout"] .win-pic{border-radius:9px}
+:root[data-theme="cutout"] .win.solid .win-pair .kshape{--kfill:#0B0B0B}
+:root[data-theme="cutout"] .toggle input:checked+.tbox{background:var(--accent);box-shadow:0 6px 16px -6px var(--accent)}

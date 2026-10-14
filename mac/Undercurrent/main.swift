@@ -168,7 +168,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.appearance = NSAppearance(named: .darkAqua)
-        window.backgroundColor = look == "cutout" ? NSColor(red: 0.02, green: 0.02, blue: 0.02, alpha: 1) : look == "signal" ? NSColor(red: 0.043, green: 0.043, blue: 0.043, alpha: 1) : NSColor(red: 0.067, green: 0.051, blue: 0.071, alpha: 1)
+        window.backgroundColor = look == "cutout" ? NSColor(red: 0.02, green: 0.02, blue: 0.02, alpha: 1) : look == "signal" ? NSColor(red: 0.043, green: 0.043, blue: 0.043, alpha: 1) : look == "specimen" ? NSColor(red: 0.075, green: 0.075, blue: 0.071, alpha: 1) : NSColor(red: 0.067, green: 0.051, blue: 0.071, alpha: 1)
         window.minSize = NSSize(width: 760, height: 560)
         window.contentView = web
         window.center()
@@ -488,9 +488,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { webView.reload() }
 
-    // ---------- The look (original, Cutout or Signal) ----------
+    // ---------- The look (original, Cutout, Signal or Specimen) ----------
 
-    let LOOKS = ["original", "cutout", "signal"]
+    let LOOKS = ["original", "cutout", "signal", "specimen"]
     var look: String { let l = UserDefaults.standard.string(forKey: "look") ?? "original"; return LOOKS.contains(l) ? l : "original" }
 
     // The Dock icon of the look (the original look keeps the app's own icon).
@@ -501,15 +501,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 
     // The fonts of the looks, from the built app, so the loading screen uses the same type as the page.
-    func fontFace(_ family: String, _ prefix: String, _ weight: Int) -> String {
+    // extra adds to the face, for a variable font (its range of weights and widths).
+    func fontFace(_ family: String, _ prefix: String, _ weight: Int, _ extra: String = "") -> String {
         let dir = installPath + "/web/dist/assets"
         guard let name = (try? FileManager.default.contentsOfDirectory(atPath: dir))?.first(where: { $0.hasPrefix(prefix) && $0.hasSuffix(".woff2") }),
               let data = FileManager.default.contents(atPath: dir + "/" + name) else { return "" }
-        return "@font-face{font-family:'\(family)';font-weight:\(weight);src:url(data:font/woff2;base64,\(data.base64EncodedString())) format('woff2')}"
+        return "@font-face{font-family:'\(family)';font-weight:\(weight);\(extra)src:url(data:font/woff2;base64,\(data.base64EncodedString())) format('woff2')}"
     }
     lazy var lookFonts: [String: String] = [
         "cutout": fontFace("Unbounded", "unbounded-latin-800-normal", 800) + fontFace("Manrope", "manrope-latin-600-normal", 600) + fontFace("Manrope", "manrope-latin-700-normal", 700),
-        "signal": fontFace("Big Shoulders Display", "big-shoulders-display-latin-900-normal", 900) + fontFace("Space Mono", "space-mono-latin-400-normal", 400) + fontFace("Space Mono", "space-mono-latin-700-normal", 700)
+        "signal": fontFace("Big Shoulders Display", "big-shoulders-display-latin-900-normal", 900) + fontFace("Space Mono", "space-mono-latin-400-normal", 400) + fontFace("Space Mono", "space-mono-latin-700-normal", 700),
+        "specimen": fontFace("Anybody", "anybody-latin-wdth-normal", 900, "font-weight:100 900;font-stretch:50% 150%;") + fontFace("Archivo", "archivo-latin-wdth-normal", 400, "font-weight:100 900;font-stretch:62% 125%;") + fontFace("Martian Mono", "martian-mono-latin-400-normal", 400)
     ]
 
     // The mark of each look (the same drawings as web/src/logo.js).
@@ -522,6 +524,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 """,
         "signal": """
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="sd" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#0B0B0B"/><circle cx="1" cy="1" r=".9" fill="#34332D"/></pattern><pattern id="ss" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#D4FF3A"/><rect width="2.2" height="6" fill="#0B0B0B" opacity=".9"/></pattern></defs><rect width="100" height="100" rx="20" fill="url(#sd)"/><g transform="rotate(-7 50 50)" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M17 42q11-10 22 0t22 0t22 0" stroke="#FF5CA8" stroke-width="15" transform="translate(4 4)"/><path d="M17 42q11-10 22 0t22 0t22 0" stroke="#F3F0E4" stroke-width="15"/><path d="M17 42q11-10 22 0t22 0t22 0" stroke="url(#ss)" stroke-width="9"/><path d="M17 66q11-10 22 0t22 0t22 0" stroke="#3B82FF" stroke-width="15" transform="translate(4 4)"/><path d="M17 66q11-10 22 0t22 0t22 0" stroke="#F3F0E4" stroke-width="15"/><path d="M17 66q11-10 22 0t22 0t22 0" stroke="#FF5CA8" stroke-width="9"/></g></svg>
+""",
+        "specimen": """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="#131312"/><path d="M20 0V100M0 20H100" stroke="#1F1E1C" stroke-width="1"/><path d="M40 0V100M0 40H100" stroke="#1F1E1C" stroke-width="1"/><path d="M60 0V100M0 60H100" stroke="#1F1E1C" stroke-width="1"/><path d="M80 0V100M0 80H100" stroke="#1F1E1C" stroke-width="1"/><g fill="none" stroke-linecap="round" stroke-linejoin="round" transform="translate(-4 4)"><path d="M16 44q10.5-9 21 0t21 0t21 0" transform="translate(10.4 -8.8)" stroke="#ECE8E0" stroke-width="1.43" opacity="0.3"/><path d="M16 44q10.5-9 21 0t21 0t21 0" transform="translate(7.8 -6.6)" stroke="#ECE8E0" stroke-width="1.43" opacity="0.4"/><path d="M16 44q10.5-9 21 0t21 0t21 0" transform="translate(5.2 -4.4)" stroke="#ECE8E0" stroke-width="1.43" opacity="0.5"/><path d="M16 44q10.5-9 21 0t21 0t21 0" transform="translate(2.6 -2.2)" stroke="#ECE8E0" stroke-width="1.43" opacity="0.6"/><path d="M16 44q10.5-9 21 0t21 0t21 0" transform="translate(0.0 -0.0)" stroke="#ECE8E0" stroke-width="2.60" opacity="1"/><path d="M16 66q10.5-9 21 0t21 0t21 0" transform="translate(15.6 -13.2)" stroke="#FF2E7E" stroke-width="1.87" opacity="0.27"/><path d="M16 66q10.5-9 21 0t21 0t21 0" transform="translate(13.0 -11.0)" stroke="#FF2E7E" stroke-width="1.87" opacity="0.34"/><path d="M16 66q10.5-9 21 0t21 0t21 0" transform="translate(10.4 -8.8)" stroke="#FF2E7E" stroke-width="1.87" opacity="0.41"/><path d="M16 66q10.5-9 21 0t21 0t21 0" transform="translate(7.8 -6.6)" stroke="#FF2E7E" stroke-width="1.87" opacity="0.49"/><path d="M16 66q10.5-9 21 0t21 0t21 0" transform="translate(5.2 -4.4)" stroke="#FF2E7E" stroke-width="1.87" opacity="0.56"/><path d="M16 66q10.5-9 21 0t21 0t21 0" transform="translate(2.6 -2.2)" stroke="#FF2E7E" stroke-width="1.87" opacity="0.63"/><path d="M16 66q10.5-9 21 0t21 0t21 0" transform="translate(0.0 -0.0)" stroke="#FF2E7E" stroke-width="3.40" opacity="1"/></g><rect x="13" y="76" width="6" height="6" fill="#FF2E7E"/><rect x="83" y="22" width="5" height="5" fill="#ECE8E0"/></svg>
 """
     ]
 
@@ -559,6 +564,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         .s{width:96px;height:12px;border:2px solid #F3F0E4;border-radius:3px;background:repeating-linear-gradient(-45deg,#D4FF3A 0 6px,#0B0B0B 6px 10px);background-size:28px 100%;animation:ss .6s linear infinite}
         @keyframes ss{to{background-position:28px 0}}
         button{padding:9px 18px;border-radius:10px;background:#D4FF3A;color:#0B0B0B;border:2px solid #0B0B0B;box-shadow:4px 4px 0 #FF5CA8;font:900 18px 'Big Shoulders Display','Arial Narrow',sans-serif;text-transform:uppercase}
+        """,
+        "specimen": """
+        html,body{background:#131312;color:#ECE8E0;font:420 14px 'Archivo',-apple-system,sans-serif}
+        body{background:linear-gradient(90deg,#1E1D1B 1px,transparent 1px) 0 0/120px 100%,linear-gradient(0deg,#1E1D1B 1px,transparent 1px) 0 0/100% 120px,linear-gradient(90deg,#181816 1px,transparent 1px) 0 0/24px 100%,linear-gradient(0deg,#181816 1px,transparent 1px) 0 0/100% 24px,#131312}
+        .t{font:400 10.5px 'Martian Mono',Menlo,monospace;color:#FF2E7E;border:1px solid #FF2E7E;padding:4px 10px}
+        h1{font-family:'Anybody',-apple-system,sans-serif;font-weight:900;font-stretch:150%;font-size:48px;letter-spacing:-.045em;line-height:.95;margin:0;color:#ECE8E0}
+        p{color:#A6A29A;font-size:13px}
+        .m{animation:sd 1.6s steps(6) infinite}
+        @keyframes sd{0%{clip-path:inset(0 100% 0 0)}60%,100%{clip-path:inset(0 0 0 0)}}
+        .s{width:96px;height:9px;background:linear-gradient(0deg,transparent 3px,#FF2E7E 3px 6px,transparent 6px) 0 0/30% 100% no-repeat,repeating-linear-gradient(90deg,#4A4844 0 1px,transparent 1px 10%);animation:sr 1.1s steps(10) infinite}
+        @keyframes sr{to{background-position:140% 0,0 0}}
+        button{padding:10px 18px;background:#FF2E7E;color:#131312;font-family:'Anybody',-apple-system,sans-serif;font-weight:800;font-stretch:118%;font-size:13px}
         """
     ]
 

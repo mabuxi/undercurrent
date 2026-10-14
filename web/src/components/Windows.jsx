@@ -7,7 +7,7 @@ import { TopReplies } from './Media.jsx';
 import { drawMap } from '../mapdraw.js';
 import { FantasyTools } from './FantasyEdit.jsx';
 import { t, tn } from '../i18n.js';
-import { KShape } from '../shapes.jsx';
+import { KShape, Shape } from '../shapes.jsx';
 import { lookColor } from '../lookcolor.js';
 import { TrendBody } from './TrendGraph.jsx';
 
@@ -268,9 +268,10 @@ function MapNow({ w }) {
       <div className="mapbubbles">
         {w.now.map((k) => {
           const f = max === min ? 0.5 : (k.now - min) / (max - min);
-          const size = Math.round(58 + f * 46);
+          const size = Math.round(30 + f * 34);
           return (
-            <button type="button" key={k.id} className="mbub" style={{ '--c': k.color, '--c2': rgba(k.color || '#999', 0.14 + f * 0.2), width: size, height: size }} onClick={() => setFilters({ kink: k.id })} title={t('{n}% right now', { n: k.now })}>
+            <button type="button" key={k.id} className="mbub" style={{ '--c': k.color }} onClick={() => setFilters({ kink: k.id })} title={t('{n}% right now', { n: k.now })}>
+              <span className="mbs"><KShape id={k.id} color={k.color} size={size} /></span>
               <span className="mbn">{k.name}</span>
               {Math.abs(k.delta) >= 3 ? <em className={k.delta > 0 ? 'up' : 'down'}>{k.delta > 0 ? '▲' : '▼'} {Math.abs(k.delta)}</em> : null}
             </button>
@@ -744,21 +745,49 @@ function winHash(s) {
   return h;
 }
 
-export function Window({ w }) {
-  const { setFilters, openMode, opts, mode } = useApp();
+const canBeSolid = (w) => SOLIDABLE.has(w.type) && !(w.type === 'kinkList' && w.layout === 'list');
+// Which windows of a column are solid: one in every five, at a random place in each run of five; when that one is a
+// window to read, the nearest picture window of the same five takes it (the one before first).
+export function solidSet(wins) {
+  const out = new Set();
+  for (let b = 0; b < wins.length; b += 5) {
+    const block = wins.slice(b, b + 5);
+    if (block.length < 5 && b > 0 && block.length < 3) break;
+    const at = winHash(`${block[0].uid}`) % 5;
+    const order = [at, at - 1, at + 1, at - 2, at + 2, at - 3, at + 3, at - 4, at + 4].filter((i) => i >= 0 && i < block.length);
+    const pick = order.find((i) => canBeSolid(block[i]));
+    if (pick !== undefined) out.add(block[pick].uid);
+  }
+  return out;
+}
+
+export function Window({ w, solid: solidProp }) {
+  const { setFilters, openMode, opts, mode, kinks } = useApp();
   const [min, setMin] = useState(false);
   const active = (w.type === 'map' && mode === 'map') || (mode === 'feed' && opts.activeWin === w.uid);
   const canExpand = w.type === 'map' || !!w.filter;
   const open = (it) => setFilters(w.filter || {}, { win: w.filter ? w.uid : null, focus: it.id });
   // A window about one kink shows that kink's shape.
-  const kinkId = w.kink?.id || (w.filter && Object.keys(w.filter).length === 1 ? w.filter.kink : null);
+  const kinkId = w.kink?.id || (w.subject?.kind === 'kink' ? w.subject.id : null) || (w.filter && Object.keys(w.filter).length === 1 ? w.filter.kink : null);
+  // A window about two kinks shows both shapes, and its colour is the two colours with a hard fade between them.
+  const pair = (w.pair?.length === 2 ? w.pair : w.filter?.pair?.length === 2 ? w.filter.pair.map((id) => (kinks || []).find((k) => k.id === Number(id))) : null)?.filter(Boolean);
+  const two = pair?.length === 2 ? pair : null;
+  // A window about one person (a creator, a performer, someone you follow) shows their picture.
+  const person = w.creator?.name || w.performer || (w.filter?.author && Object.keys(w.filter).length === 1 ? w.filter.author : null);
+  const pic = w.performerThumb || (person ? (w.items || []).find((it) => it.media?.avatar && String(it.author || '').toLowerCase() === String(person).toLowerCase())?.media?.avatar : null);
+  let mark;
+  if (two) mark = <span className="win-pair">{two.map((k) => <KShape key={k.id} id={k.id} color={k.color} size={20} />)}</span>;
+  else if (kinkId) mark = <KShape id={kinkId} color={w.color} size={24} className="win-shape" />;
+  else if (person) mark = <span className="win-pic">{pic ? <img src={imgSrc(pic)} alt="" referrerPolicy="no-referrer" loading="lazy" onError={(e) => { e.currentTarget.style.display = 'none'; }} /> : null}<Avatar name={person} size="s" /></span>;
+  else if (w.type === 'rateRecent') mark = <Shape shape="flame" color={w.color} size={24} className="win-shape" pattern="stripes" />;
+  else mark = <span className="win-dot" style={{ '--c': w.color }} />;
   // In the Cutout and Signal looks about one window in five is a solid block of its colour: only windows of pictures
   // and videos, never ones to read (stories, threads, memories, fantasies, limits).
-  const solid = SOLIDABLE.has(w.type) && !(w.type === 'kinkList' && w.layout === 'list') && winHash(`${w.uid}${w.title}`) % 5 === 0;
+  const solid = solidProp ?? (canBeSolid(w) && winHash(`${w.uid}${w.title}`) % 5 === 0);
   return (
-    <section className={`win${active ? ' active' : ''}${min ? ' min' : ''}${solid ? ' solid' : ''}`} data-type={w.type} style={{ '--c': w.color }}>
+    <section className={`win${active ? ' active' : ''}${min ? ' min' : ''}${solid ? ' solid' : ''}${two ? ' pairwin' : ''}`} data-type={w.type} style={{ '--c': two ? two[0].color : w.color, ...(two ? { '--c2': two[1].color } : {}) }}>
       <header className="win-head">
-        {kinkId ? <KShape id={kinkId} color={w.color} size={24} className="win-shape" /> : <span className="win-dot" style={{ '--c': w.color }} />}
+        {mark}
         <div className="win-title"><strong>{w.title}</strong><span>{w.meta}</span></div>
         {active ? <span className="incenter">{t('In center')}</span> : null}
         <span className={`win-btns n${canExpand ? 2 : 1}`}>

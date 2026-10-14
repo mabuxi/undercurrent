@@ -153,6 +153,26 @@ app.post('/api/client-log', (req, res) => {
   res.json({ ok: true });
 });
 
+// Slow answers and moments the server was too busy to answer anything go to the log, so lag can be traced.
+const SLOW_MS = 1500;
+app.use('/api', (req, res, next) => {
+  const t0 = performance.now();
+  res.on('finish', () => {
+    const ms = Math.round(performance.now() - t0);
+    if (ms >= SLOW_MS && !/^\/(brain\/insight|ask|search|feed\/more|journey)/.test(req.path)) log('warn', `Slow: ${req.method} /api${req.path} took ${ms} ms`);
+  });
+  next();
+});
+{
+  let last = performance.now();
+  let told = 0;
+  setInterval(() => {
+    const now = performance.now();
+    const late = now - last - 500;
+    last = now;
+    if (late >= SLOW_MS && Date.now() - told > 60000) { told = Date.now(); log('warn', `The server was busy for ${Math.round(late)} ms without answering`); }
+  }, 500).unref();
+}
 app.use('/api', api);
 
 if (fs.existsSync(config.webDist)) {

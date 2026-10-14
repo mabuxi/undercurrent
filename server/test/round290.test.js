@@ -45,14 +45,14 @@ test('a shape the model picked is used across families, but never over the one y
   const kinks = [
     { id: 1, isGroup: true, name: 'Places', family: 'places' },
     { id: 2, isGroup: false, name: 'Shower', family: 'places', parentId: 1, aiShape: 'drop' },
-    { id: 3, isGroup: false, name: 'Locker room', family: 'places', parentId: 1, aiShape: 'drop' },
+    { id: 3, isGroup: false, name: 'Locker room', family: 'places', parentId: 1 },
     { id: 4, isGroup: false, name: 'Kissing', aiShape: 'lips', shape: 'heart' },
     { id: 5, isGroup: false, name: 'Rope', aiShape: 'cuffs' }
   ];
   const m = assignShapes(kinks);
   assert.equal(m.get(2).shape, 'drop');
   assert.equal(m.get(2).fam, 'drop');
-  assert.notEqual(m.get(3).shape, 'drop', 'two kinks in a group never share a shape');
+  assert.notEqual(m.get(3).shape, 'drop', 'a kink without a picked shape never takes one already used in its group');
   assert.equal(m.get(4).shape, 'heart');
   assert.equal(m.get(5).shape, 'cuffs');
 });

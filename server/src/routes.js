@@ -13,6 +13,7 @@ import { queueLook } from './ai/looker.js';
 import { listSuggestions, setSuggestion, suggestCombos, suggestFantasies, refreshFantasyIdeas } from './suggest.js';
 import { touchSession } from './sessions.js';
 import { tagIdeas } from './kinktags.js';
+import { kinkSeries, kinkMovers } from './kinkstats.js';
 import { kinkSubs, addKinkSub, removeKinkSub, dismissKinkSub, searchKinkSubs, maybeSearch } from './kinksubs.js';
 import { listKinks, createKink, updateKink, deleteKink, mergeKinks, unlockKink, listFantasies, saveFantasy, deleteFantasy, setLink, removeLink, kinkIdsForTagNames } from './kinks.js';
 import { writeFantasy, tagsForText, conceptsFor } from './fantasywrite.js';
@@ -521,7 +522,7 @@ export function cleanTune(b = {}) {
   return out;
 }
 // How the app looks: the original look, Cutout or Signal. Kept on the Mac, so the iPhone looks the same.
-export const THEMES = ['original', 'cutout', 'signal'];
+export const THEMES = ['original', 'cutout', 'signal', 'specimen'];
 api.get('/settings/theme', wrap((req, res) => res.json({ theme: THEMES.includes(getSetting('theme', 'original')) ? getSetting('theme', 'original') : 'original', themes: THEMES })));
 api.put('/settings/theme', wrap((req, res) => {
   const v = String(req.body?.theme || '');
@@ -674,7 +675,7 @@ api.post('/ingest', wrap(async (req, res) => {
 }));
 
 api.get('/windows', wrap((req, res) => {
-  const wr = windows({ cursor: Number(req.query.cursor) || 0, count: Math.min(8, Number(req.query.count) || 4), side: Number(req.query.side) || 0, sessionId: req.query.session || null, seed: Number(req.query.seed) || 0, exclude: String(req.query.exclude || '').split(',').map(Number).filter(Boolean).slice(-400) });
+  const wr = windows({ cursor: Number(req.query.cursor) || 0, count: Math.min(8, Number(req.query.count) || 4), side: Number(req.query.side) || 0, sessionId: req.query.session || null, seed: Number(req.query.seed) || 0, filtered: req.query.filtered === '1', exclude: String(req.query.exclude || '').split(',').map(Number).filter(Boolean).slice(-400) });
   try { queueLook(wr.flatMap((w) => (w.items || []).map((x) => x.id)).slice(0, 40)); } catch {}
   res.json({ windows: wr });
 }));
@@ -756,7 +757,7 @@ api.get('/session/summary', wrap(async (req, res) => res.json(await summarizeSes
 api.get('/session/stats', wrap((req, res) => res.json(sessionStats(req.query.session || null))));
 
 api.get('/kinks', wrap((req, res) => res.json({ kinks: listKinks({ includeHidden: true }).map((k) => ({ ...k, name: k.label || k.name, baseName: k.name })) })));
-api.post('/kinks', wrap((req, res) => { const id = createKink({ ...req.body, origin: 'user' }); if (!req.body?.isGroup) searchKinkSubs(id); res.json({ id }); }));
+api.post('/kinks', wrap((req, res) => { const id = createKink({ ...req.body, origin: 'user' }); if (!req.body?.isGroup) setTimeout(() => searchKinkSubs(id), 60); res.json({ id }); }));
 api.patch('/kinks/:id', wrap((req, res) => res.json({ ok: updateKink(Number(req.params.id), req.body || {}) })));
 api.delete('/kinks/:id', wrap((req, res) => { deleteKink(Number(req.params.id)); res.json({ ok: true }); }));
 api.post('/kinks/refresh', wrap(async (req, res) => res.json(await refreshKinks())));
@@ -768,7 +769,17 @@ api.post('/kinks/groups', wrap((req, res) => {
   for (const k of req.body?.kinks || []) updateKink(Number(k), { parentId: id });
   res.json({ id });
 }));
-api.get('/kinks/:id/tag-ideas', wrap(async (req, res) => res.json({ ideas: await tagIdeas(Number(req.params.id), { skip: String(req.query.skip || '').split('|').filter(Boolean).slice(0, 200) }) })));
+// How kinks moved: one kink's line, or the ones that moved the most, over the last week, month or all time.
+api.get('/kinks/trends', wrap((req, res) => {
+  const range = ['week', 'month', 'all'].includes(req.query.range) ? req.query.range : 'all';
+  res.json({ range, movers: kinkMovers(listKinks().filter((k) => !k.isGroup && k.status !== 'hidden'), range) });
+}));
+api.get('/kinks/:id/trend', wrap((req, res) => {
+  const range = ['week', 'month', 'all'].includes(req.query.range) ? req.query.range : 'all';
+  const kinks = listKinks({ includeHidden: true }).filter((k) => !k.isGroup);
+  res.json({ range, series: kinkSeries(kinks, range).get(Number(req.params.id)) || [] });
+}));
+api.get('/kinks/:id/tag-ideas', wrap(async (req, res) => res.json(await tagIdeas(Number(req.params.id), { skip: String(req.query.skip || '').split('|').filter(Boolean).slice(0, 200) }))));
 api.get('/kinks/:id/subs', wrap((req, res) => { if (req.query.auto !== '0') maybeSearch(Number(req.params.id)); res.json(kinkSubs(Number(req.params.id))); }));
 api.post('/kinks/:id/subs', wrap((req, res) => { const name = addKinkSub(Number(req.params.id), String(req.body?.name || ''), { origin: 'user', why: req.body?.why || null }); invalidatePool(); res.json({ name, ...kinkSubs(Number(req.params.id)) }); }));
 api.delete('/kinks/:id/subs/:name', wrap((req, res) => { removeKinkSub(Number(req.params.id), req.params.name); invalidatePool(); res.json(kinkSubs(Number(req.params.id))); }));
@@ -810,8 +821,11 @@ api.get('/brain/insight/:key', wrap(async (req, res) => {
     links.length ? `Most linked with: ${links.join(', ')}` : '',
     d.relatedTags?.length ? `Tags that come with it: ${d.relatedTags.join(', ')}` : ''
   ].filter(Boolean).join('\n');
+  // When the page asking goes away (you opened another kink), the model stops working on this answer.
+  const gone = new AbortController();
+  res.on('close', () => { if (!res.writableEnded) gone.abort(); });
   try {
-    const text = await chat({ kind: 'summary', model: fastModel(), numPredict: 170, temperature: 0.4,
+    const text = await chat({ kind: 'summary', model: fastModel(), numPredict: 170, temperature: 0.4, signal: gone.signal,
       system: `You are the private, local assistant of one adult using an adult-content browser. In 2 or 3 short sentences, second person, no judgement, say what this kink means for his taste right now: how strong it is, whether it is rising or fading, what it pairs with, and one specific thing worth exploring next. Plain words, no lists. ${replyIn()}`,
       user: facts });
     insightCache.set(cacheKey, { text, at: Date.now() });

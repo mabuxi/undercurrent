@@ -45,7 +45,7 @@ test('tag ideas are other ways of writing the kink, never things that only come 
   const { tagIdeas } = await import('../src/kinktags.js');
   for (let i = 0; i < 4; i++) upsertItem({ source: 'reddit', ext_id: `bd${i}`, title: `Post ${i}`, format: 'image', tags: ['gay bondage', 'gay-bondage', 'male bondage', 'bondage gear', 'handcuffs', 'shower'], media: { kind: 'image', src: 'x' } });
   const id = createKink({ name: 'Bondage', tags: ['bondage'], origin: 'user' });
-  const ideas = (await tagIdeas(id, { count: 20 })).map((x) => x.name);
+  const ideas = (await tagIdeas(id, { count: 20 })).ideas.map((x) => x.name);
   for (const n of ['gay bondage', 'gay-bondage', 'male bondage']) assert.ok(ideas.includes(n) || listKinks({ includeHidden: true }).find((k) => k.id === id).tags.some((t) => t.name === n), n);
   assert.ok(!ideas.includes('handcuffs') && !ideas.includes('shower'));
 });

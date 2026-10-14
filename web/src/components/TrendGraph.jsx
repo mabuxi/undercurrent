@@ -1,11 +1,14 @@
-import { useId } from 'react';
+import { useEffect, useId, useState } from 'react';
+import { api } from '../api.js';
+import { KShape } from '../shapes.jsx';
 import { useApp } from '../context.jsx';
 import { lookColor } from '../lookcolor.js';
 import { t, tn } from '../i18n.js';
 
 // How one kink rose or dropped over all the weeks you have used the app: its share of your points, week by week.
 // Each look draws it its own way: a soft glowing curve over a fading area (original), a thick vivid line over a flat
-// tint with a glowing dot (Cutout), a stepped cream-outlined line over a hatched area with square marks (Signal).
+// tint with a glowing dot (Cutout), a stepped cream-outlined line over a hatched area with square marks (Signal), a hard
+// straight pink line on ruled paper with a tick for every point and a square at the end (Specimen).
 const W = 300;
 const H = 116;
 const PAD = { l: 6, r: 10, t: 12, b: 10 };
@@ -41,6 +44,19 @@ export function TrendGraph({ series, color }) {
   const base = H - PAD.b;
   const line = theme === 'signal' ? steps(pts) : smooth(pts);
   const area = `${line}L${last[0]} ${base}L${pts[0][0]} ${base}Z`;
+  if (theme === 'specimen') {
+    const rules = [0.25, 0.5, 0.75].map((f) => PAD.t + f * (base - PAD.t));
+    return (
+      <svg className={`trendg t-${theme}`} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={t('How it went, week by week')}>
+        {rules.map((ry) => <line key={ry} x1={PAD.l} x2={W - PAD.r} y1={ry} y2={ry} className="tg-rule" />)}
+        {pts.map((p, i) => <line key={i} x1={p[0]} x2={p[0]} y1={base} y2={base - (i % 5 === 0 ? 7 : 4)} className="tg-tick" />)}
+        <line x1={PAD.l} x2={W - PAD.r} y1={base} y2={base} className="tg-base" />
+        <line x1={pts[peak][0]} x2={pts[peak][0]} y1={pts[peak][1] + 6} y2={base} className="tg-peak" />
+        <path d={`M${pts.map((p) => p.join(' ')).join('L')}`} fill="none" className="tg-line" />
+        <rect x={last[0] - 4} y={last[1] - 4} width="8" height="8" className="tg-dot" />
+      </svg>
+    );
+  }
   return (
     <svg className={`trendg t-${theme}`} viewBox={`0 0 ${W} ${H}`} style={{ '--c': color }} role="img" aria-label={t('How it went, week by week')}>
       <defs>
@@ -73,5 +89,84 @@ export function TrendBody({ w, onShow }) {
       <p className="wnote">{t('From {a}% to {b}% of your points, week by week.', { a: fmt(from), b: fmt(to) })}</p>
       <div className="wbtns"><button type="button" className="ghost-btn small" onClick={onShow}>{t('Show in center')}</button></div>
     </div>
+  );
+}
+
+const RANGE_LABEL = () => ({ week: t('Week'), month: t('Month'), all: t('All time') });
+function axis(range, n) {
+  if (range === 'week') return [t('7 days ago'), t('today')];
+  if (range === 'month') return [t('30 days ago'), t('today')];
+  return [tn(n - 1, '{n} week ago', '{n} weeks ago'), t('this week')];
+}
+
+export function RangeSwitch({ value, onChange }) {
+  const L = RANGE_LABEL();
+  return (
+    <div className="seg trange" role="tablist">
+      {['week', 'month', 'all'].map((r) => <button type="button" key={r} role="tab" aria-selected={value === r} className={value === r ? 'on' : ''} onClick={() => onChange(r)}>{L[r]}</button>)}
+    </div>
+  );
+}
+
+// On a kink's page: how it moved over the last week, month or all time.
+export function KinkTrend({ kinkId, color }) {
+  const [range, setRange] = useState('month');
+  const [series, setSeries] = useState(null);
+  useEffect(() => {
+    let live = true;
+    setSeries(null);
+    api(`/kinks/${kinkId}/trend?range=${range}`).then((r) => { if (live) setSeries(r.series || []); }).catch(() => { if (live) setSeries([]); });
+    return () => { live = false; };
+  }, [kinkId, range]);
+  const [a, b] = axis(range, series?.length || 0);
+  return (
+    <div className="bw ktrend">
+      <div className="bw-h"><span>{t('How it moved')}</span><RangeSwitch value={range} onChange={setRange} /></div>
+      {series == null ? <div className="trend-wait"><span className="spin" /></div> : series.length >= 2 && Math.max(...series) > 0 ? (
+        <>
+          <TrendGraph series={series} color={color} />
+          <div className="tg-axis"><span>{a}</span><span>{b}</span></div>
+          <p className="wnote">{t('Its share of your points, {range}.', { range: { week: t('day by day this week'), month: t('day by day this month'), all: t('week by week since you started') }[range] })}</p>
+        </>
+      ) : <p className="wnote">{t('Not enough to draw yet for this stretch.')}</p>}
+    </div>
+  );
+}
+
+// On your kinks page: the kinks that moved the most, one line at a time.
+export function KinksTrend() {
+  const [range, setRange] = useState('month');
+  const [movers, setMovers] = useState(null);
+  const [pick, setPick] = useState(null);
+  useEffect(() => {
+    let live = true;
+    api(`/kinks/trends?range=${range}`).then((r) => { if (live) setMovers(r.movers || []); }).catch(() => { if (live) setMovers([]); });
+    return () => { live = false; };
+  }, [range]);
+  if (movers && !movers.length) return null;
+  const cur = movers?.find((m) => m.id === pick) || movers?.[0];
+  const [a, b] = axis(range, cur?.series.length || 0);
+  const fmt = (n) => `${n > 0 ? '+' : ''}${String(n).replace('.', ',')}`;
+  return (
+    <section className="bw ktrends">
+      <div className="bw-h"><span>{t('How your kinks moved')}</span><RangeSwitch value={range} onChange={setRange} /></div>
+      {!movers ? <div className="trend-wait"><span className="spin" /></div> : (
+        <div className="ktrends-in">
+          <div className="ktrends-list">
+            {movers.map((m) => (
+              <button type="button" key={m.id} className={`ktm${cur?.id === m.id ? ' on' : ''}`} style={{ '--c': m.color }} onClick={() => setPick(m.id)}>
+                <KShape id={m.id} color={m.color} size={18} /><span>{m.name}</span><em className={m.change >= 0 ? 'up' : 'down'}>{fmt(m.change)}</em>
+              </button>
+            ))}
+          </div>
+          {cur ? (
+            <div className="ktrends-graph" key={`${cur.id}-${range}`}>
+              <TrendGraph series={cur.series} color={cur.color} />
+              <div className="tg-axis"><span>{a}</span><span>{b}</span></div>
+            </div>
+          ) : null}
+        </div>
+      )}
+    </section>
   );
 }

@@ -9,6 +9,7 @@ import { Icon } from '../icons.jsx';
 import { t, tn } from '../i18n.js';
 import { EVENT_LABEL, secs, Thumb } from './History.jsx';
 import { lookColor } from '../lookcolor.js';
+import { KinkTrend } from './TrendGraph.jsx';
 
 const TYPE_LABEL = { kink: t('Kink'), tag: t('Hot tag'), fantasy: t('Fantasy') };
 function HoverCard({ hover, brain }) {
@@ -33,11 +34,17 @@ function HoverCard({ hover, brain }) {
 function AiWidget({ nodeKey }) {
   const [text, setText] = useState(null);
   const [busy, setBusy] = useState(false);
+  const ctl = useRef(null);
+  // Leaving the kink (or opening another one) cancels its question to the model, so jumping between kinks never
+  // piles up work for the model.
   const load = (fresh = false) => {
+    ctl.current?.abort();
+    const c = new AbortController();
+    ctl.current = c;
     setBusy(true);
-    api(`/brain/insight/${nodeKey}${fresh ? '?fresh=1' : ''}`).then((r) => setText(r.text || r.error || t('The local model had nothing to say yet.'))).catch((e) => setText(e.message)).finally(() => setBusy(false));
+    api(`/brain/insight/${nodeKey}${fresh ? '?fresh=1' : ''}`, { signal: c.signal }).then((r) => setText(r.text || r.error || t('The local model had nothing to say yet.'))).catch((e) => { if (e.name !== 'AbortError') setText(e.message); }).finally(() => { if (ctl.current === c) setBusy(false); });
   };
-  useEffect(() => { setText(null); load(); }, [nodeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setText(null); load(); return () => ctl.current?.abort(); }, [nodeKey]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="bw ai wide">
       <div className="bw-h"><span>{t('What the assistant thinks')}</span><button type="button" className="linkbtn" onClick={() => load(true)} disabled={busy}>{busy ? t('thinking…') : t('refresh')}</button></div>
@@ -52,20 +59,29 @@ function AiWidget({ nodeKey }) {
 function KinkTagIdeas({ kinkId, name, tagCount, onAdd }) {
   const { toast } = useApp();
   const [ideas, setIdeas] = useState(null);
+  const [preparing, setPreparing] = useState(false);
   const [busy, setBusy] = useState(false);
   const seen = useRef([]);
-  const load = async (more = false) => {
-    setBusy(true);
+  const load = async (more = false, quiet = false) => {
+    if (!quiet) setBusy(true);
     try {
       if (more) seen.current = [...new Set([...seen.current, ...(ideas || []).map((x) => x.name)])];
-      const r = await api(`/kinks/${kinkId}/tag-ideas${more && seen.current.length ? `?skip=${encodeURIComponent(seen.current.join('|'))}` : ''}`);
+      const r = await api(`/kinks/${kinkId}/tag-ideas${seen.current.length ? `?skip=${encodeURIComponent(seen.current.join('|'))}` : ''}`);
       if (more && r.ideas.some((x) => seen.current.includes(x.name))) seen.current = [];
       setIdeas(r.ideas);
-    } catch (e) { toast(e.message); }
-    setBusy(false);
+      setPreparing(!!r.preparing);
+    } catch (e) { if (!quiet) toast(e.message); }
+    if (!quiet) setBusy(false);
   };
-  useEffect(() => { seen.current = []; load(); }, [kinkId, tagCount]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (ideas && !ideas.length && !busy) return null;
+  useEffect(() => { seen.current = []; setIdeas(null); load(); }, [kinkId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (ideas) load(false, true); }, [tagCount]); // eslint-disable-line react-hooks/exhaustive-deps
+  // While the model prepares more ideas in the background, the list fills in by itself.
+  useEffect(() => {
+    if (!preparing) return undefined;
+    const tm = setInterval(() => load(false, true), 6000);
+    return () => clearInterval(tm);
+  }, [preparing, kinkId]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (ideas && !ideas.length && !busy && !preparing) return null;
   return (
     <div className="kimprove">
       <div className="kimprove-h"><Icon name="why" /><b>{t('Suggested tags to improve this kink')}</b>
@@ -78,7 +94,8 @@ function KinkTagIdeas({ kinkId, name, tagCount, onAdd }) {
             + {x.name}{x.posts ? <em className="dim"> {x.posts}</em> : null}
           </button>
         ))}</div>
-      ) : <p className="wnote"><span className="spin" /> {t('Thinking of tags… (the model can take up to half a minute)')}</p>}
+      ) : <p className="wnote"><span className="spin" /> {t('Loading…')}</p>}
+      {preparing ? <p className="wnote kidea-prep"><span className="spin" /> {t('The model is preparing more ideas in the background.')}</p> : null}
     </div>
   );
 }
@@ -97,8 +114,13 @@ function KinkSubs({ kinkId, name }) {
     const tm = setInterval(() => load(false), 4000);
     return () => clearInterval(tm);
   }, [d?.searching, kinkId]); // eslint-disable-line react-hooks/exhaustive-deps
-  const act = async (fn, msg) => { try { const r = await fn(); setD(r); if (msg) toast(msg); } catch (e) { toast(e.message); } };
-  const add = async (n, msg) => act(() => api(`/kinks/${kinkId}/subs`, { method: 'POST', body: { name: n } }), msg);
+  const act = async (fn, msg) => { try { const r = await fn(); setD(r); if (msg) toast(msg); } catch (e) { toast(e.message); load(false); } };
+  // Shown as added right away; the server catches up in the background.
+  const add = async (n, msg) => {
+    const name = String(n).replace(/^\/?r\//i, '');
+    setD((cur) => (cur ? { ...cur, added: [...cur.added.filter((x) => x.name.toLowerCase() !== name.toLowerCase()), { name, origin: 'user' }], suggested: cur.suggested.filter((x) => x.name.toLowerCase() !== name.toLowerCase()) } : cur));
+    return act(() => api(`/kinks/${kinkId}/subs`, { method: 'POST', body: { name } }), msg);
+  };
   const open = (n) => setFilters({ community: `r/${n}` });
   const members = (m) => (m ? tn(m, '{n} member', '{n} members', { n: m >= 10000 ? `${Math.round(m / 1000)}k` : m }) : null);
   return (
@@ -302,6 +324,7 @@ function Detail({ nodeKey, brain, reload, onSelect, startEdit = false }) {
           ) : node.type === 'tag' && d?.relatedTags?.length ? (
             <div className="bw ktags"><div className="bw-h"><span>{t('Often comes with')}</span></div><div className="chiprow">{d.relatedTags.map((x) => <button type="button" key={x} className="chip btn" onClick={() => setFilters({ tags: [node.name, x] })}>{x}</button>)}</div></div>
           ) : null}
+          {node.type === 'kink' ? <KinkTrend kinkId={node.id} color={node.color} /> : null}
           <AiWidget nodeKey={nodeKey} />
           <div className="bw">
             <div className="bw-h"><span>{t('Recent interactions with this')}</span></div>

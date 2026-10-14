@@ -93,21 +93,23 @@ export function engagement(since = 0, { limit = 2500, minPoints = 0.5 } = {}) {
   return out.sort((a, b) => b.last - a.last).slice(0, limit);
 }
 
-// The points each post got week by week (week 0 is the last 7 days, 1 the 7 days before…), for the trend graphs.
-export function weeklyEngagement(weeks = 52) {
+// The points each post got per stretch of time (bucket 0 is the latest: the last day, week…), for the trend graphs.
+export function bucketEngagement(bucketMs, buckets) {
   const t = now();
-  const W = 7 * 86400000;
   const rows = getDb().prepare(`SELECT e.item_id, e.type, e.value, e.ts, i.format, i.title, i.body FROM events e JOIN items i ON i.id = e.item_id
-    WHERE e.ts > ? AND e.type != 'impression' ORDER BY e.ts, e.id`).all(t - weeks * W);
+    WHERE e.ts > ? AND e.type != 'impression' ORDER BY e.ts, e.id`).all(t - buckets * bucketMs);
   const per = new Map();
   for (const r of rows) {
     let x = per.get(r.item_id);
-    if (!x) { x = { st: { vote: 0, saved: 0, rating: 0, dwell_ms: 0 }, weeks: new Map() }; per.set(r.item_id, x); }
-    const wk = Math.max(0, Math.min(weeks - 1, Math.floor((t - r.ts) / W)));
-    for (const c of changePoints(r.type, r.value, r, x.st)) x.weeks.set(wk, (x.weeks.get(wk) || 0) + c.p);
+    if (!x) { x = { st: { vote: 0, saved: 0, rating: 0, dwell_ms: 0 }, b: new Map() }; per.set(r.item_id, x); }
+    const at = Math.max(0, Math.min(buckets - 1, Math.floor((t - r.ts) / bucketMs)));
+    for (const c of changePoints(r.type, r.value, r, x.st)) x.b.set(at, (x.b.get(at) || 0) + c.p);
     x.st = nextState(x.st, r.type, r.value);
   }
-  return new Map([...per].map(([id, x]) => [id, x.weeks]));
+  return new Map([...per].map(([id, x]) => [id, x.b]));
+}
+export function weeklyEngagement(weeks = 52) {
+  return bucketEngagement(7 * 86400000, weeks);
 }
 
 // All the points one post got from a list of its events, in the order they happened.

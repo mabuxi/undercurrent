@@ -3,10 +3,10 @@ import { api, FORMATS, flushNow, imgSrc } from '../api.js';
 import { useApp, MOODS, crumbList } from '../context.jsx';
 import { Icon } from '../icons.jsx';
 import Post from './Post.jsx';
-import { Window } from './Windows.jsx';
+import { Window, solidSet } from './Windows.jsx';
 import Immersive, { inViewer, TK_MODES, tkModeOf } from './Immersive.jsx';
 import ErrorBoundary from './ErrorBoundary.jsx';
-import { refreshWindows } from './SideColumn.jsx';
+import { refreshWindows, DEEPER, isFiltered } from './SideColumn.jsx';
 import { begin, end } from '../activity.js';
 import { Avatar } from './Panels.jsx';
 import { t, tn, getLang } from '../i18n.js';
@@ -390,7 +390,7 @@ export default function FeedView() {
       setError(null);
       if (narrow && next.length) {
         const n = Math.ceil(next.length / 3);
-        const w = await api(`/windows?cursor=${winCursor.current}&count=${n}&side=2`);
+        const w = await api(`/windows?cursor=${winCursor.current}&count=${n}&side=2${isFiltered(filters) ? '&filtered=1' : ''}`);
         winCursor.current += n;
         setWins((cur) => [...cur, ...w.windows]);
       }
@@ -532,6 +532,8 @@ export default function FeedView() {
   const imm = openTk;
   const list = [];
   const flat = [];
+  const phoneWins = isFiltered(filters) ? wins.filter((w) => !DEEPER.has(w.type)) : wins;
+  const phoneSolids = narrow ? solidSet(phoneWins) : new Set();
   items.forEach((it, i) => {
     flat.push(it);
     list.push(<ErrorBoundary key={it.id} name="Post"><Post item={it} focus={opts.focus === it.id} onStrong={onStrong} onWeak={onWeak} onImmersive={imm} /></ErrorBoundary>);
@@ -542,9 +544,9 @@ export default function FeedView() {
     }
     // On a phone a window comes after every 3 to 5 posts.
     const slot = WIN_AFTER.indexOf(i + 1);
-    if (narrow && slot >= 0 && wins[slot]) {
-      const w = wins[slot];
-      list.push(<ErrorBoundary key={w.uid} name="Window" quiet><Window w={w} /></ErrorBoundary>);
+    if (narrow && slot >= 0 && phoneWins[slot]) {
+      const w = phoneWins[slot];
+      list.push(<ErrorBoundary key={w.uid} name="Window" quiet><Window w={w} solid={phoneSolids.has(w.uid)} /></ErrorBoundary>);
     }
   });
 

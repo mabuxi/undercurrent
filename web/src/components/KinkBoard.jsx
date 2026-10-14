@@ -4,6 +4,7 @@ import { useApp } from '../context.jsx';
 import { Icon } from '../icons.jsx';
 import { t, tn, getLang } from '../i18n.js';
 import { KShape, Shape, SHAPES, SHAPE_FAMILIES, PATTERNS, useKinkShape } from '../shapes.jsx';
+import { KinksTrend } from './TrendGraph.jsx';
 
 const DAY = 86400000;
 const dec = (x) => (getLang() === 'fr' ? String(x).replace('.', ',') : x);
@@ -279,6 +280,7 @@ export default function KinkBoard({ onOpen, onChange }) {
           ))}</div> : <p className="wnote">{t('No kink has that in its name, tags or communities.')}</p>}
         </div>
       ) : null}
+      {found ? null : <KinksTrend />}
       {found ? null : (
         <div className="ksections">
           {sections.map(({ g, members }) => (

@@ -4,6 +4,7 @@ import './fonts/fonts.css';
 import './styles.css';
 import './theme-cutout.css';
 import './theme-signal.css';
+import './theme-specimen.css';
 import { setLang, guessLang } from './i18n.js';
 import { applyTheme } from './theme.js';
 import { logoUrl } from './logo.js';

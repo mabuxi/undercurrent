@@ -52,11 +52,12 @@ export function assignShapes(kinks = []) {
   const out = new Map();
   const groups = kinks.filter((k) => k.isGroup).sort((a, b) => a.id - b.id);
   const plain = kinks.filter((k) => !k.isGroup).sort((a, b) => a.id - b.id);
-  const usedFams = new Set();
+  const usedFams = new Set(groups.map((g) => (SHAPE_FAMILIES[g.shape] ? g.shape : SHAPE_FAMILIES[g.aiShape] ? g.aiShape : null)).filter(Boolean));
   const famFor = (k) => FAMILY_SHAPES[k.family] || familyOfShape(keywordShape(k.name)) || null;
   for (const g of groups) {
     const kids = plain.filter((k) => k.parentId === g.id);
-    let fam = SHAPE_FAMILIES[g.shape] ? g.shape : null;
+    // Your pick first, then the family the app keeps for the group (picked once, so it never changes by itself).
+    let fam = SHAPE_FAMILIES[g.shape] ? g.shape : SHAPE_FAMILIES[g.aiShape] ? g.aiShape : null;
     if (!fam) {
       const counts = new Map();
       for (const k of kids) { const f = famFor(k); if (f) counts.set(f, (counts.get(f) || 0) + 1); }
@@ -71,11 +72,11 @@ export function assignShapes(kinks = []) {
     usedFams.add(fam);
     out.set(g.id, { shape: SHAPE_FAMILIES[fam][0], fam, pattern: PATTERNS[fam], group: true });
     // Each kink in the group gets its own variation: the one its name calls for, else the next one free.
-    const taken = new Set(kids.filter((k) => SHAPES[k.shape]).map((k) => k.shape));
+    const taken = new Set(kids.map((k) => (SHAPES[k.shape] ? k.shape : SHAPES[k.aiShape] ? k.aiShape : null)).filter(Boolean));
     for (const k of kids) {
       if (SHAPES[k.shape]) { out.set(k.id, { shape: k.shape, fam: familyOfShape(k.shape), pattern: PATTERNS[familyOfShape(k.shape)] }); continue; }
       // The shape the model picked for this kink, from any family, when no other kink in the group has it.
-      if (SHAPES[k.aiShape] && !taken.has(k.aiShape)) { taken.add(k.aiShape); const f = familyOfShape(k.aiShape); out.set(k.id, { shape: k.aiShape, fam: f, pattern: PATTERNS[f] }); continue; }
+      if (SHAPES[k.aiShape]) { const f = familyOfShape(k.aiShape); out.set(k.id, { shape: k.aiShape, fam: f, pattern: PATTERNS[f] }); continue; }
       const list = SHAPE_FAMILIES[fam];
       const kw = keywordShape(k.name);
       let s = kw && list.includes(kw) && !taken.has(kw) ? kw : list.find((x) => !taken.has(x));

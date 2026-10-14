@@ -959,9 +959,10 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
         <div className="tk-tags">
           {(item.performers || []).slice(0, 3).map((p) => <button type="button" key={`p${p}`} className="tk-chip perf" onClick={tapOnly(() => { setSheet(`performer:${p}`); strong('performer'); })}><PersonPic name={p} thumb={thumbOf(p)} />{String(p).replace(/^@+/, '')}</button>)}
           {(item.kinks || []).map((k) => <button type="button" key={`k${k.id}`} className="tk-chip kink" style={{ '--c': k.color }} onClick={tapOnly(() => leaveTo(() => setFilters({ kink: k.id })))}><KShape id={k.id} color={k.color} size={13} className="kchip-sh" />{k.name}</button>)}
-          {tags.slice(0, 30).map((tag) => <button type="button" key={tag} className="tk-chip" onClick={tapOnly(() => leaveTo(() => runSearch(tag).catch(() => setFilters({ tags: [tag] }))))}>#{tag}</button>)}
+          {tags.slice(0, 4).map((tag) => <button type="button" key={tag} className="tk-chip" onClick={tapOnly(() => leaveTo(() => runSearch(tag).catch(() => setFilters({ tags: [tag] }))))}>#{tag}</button>)}
+          {/* The button for every kink and tag sits right after the last one shown. */}
+          <button type="button" className="tk-chip tk-tagsbtn" onClick={() => setSheet('tags')} aria-label={t('Show all kinks and tags')}><Icon name="tag" />{tags.length > 4 ? <span>+{tags.length - 4}</span> : null}</button>
         </div>
-        <button type="button" className="tk-tagsbtn" onClick={() => setSheet('tags')} aria-label={t('Show all kinks and tags')}><Icon name="tag" /></button>
       </div>
       {isVideo ? <TkProgress vref={vref} active={active} slideRef={slideRef} onMeta={setVmeta} /> : null}
       {hidden ? (

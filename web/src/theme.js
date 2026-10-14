@@ -1,7 +1,7 @@
-// The look of the app: the original one, Cutout or Signal. It is an attribute on the page (the styles follow it), it is
+// The look of the app: the original one, Cutout, Signal or Specimen. It is an attribute on the page (the styles follow it), it is
 // remembered on this device so the next start shows it straight away, and it is kept on the Mac so the iPhone matches.
-export const THEMES = ['original', 'cutout', 'signal'];
-const BG = { original: '#110D12', cutout: '#050505', signal: '#0B0B0B' };
+export const THEMES = ['original', 'cutout', 'signal', 'specimen'];
+const BG = { original: '#110D12', cutout: '#050505', signal: '#0B0B0B', specimen: '#131312' };
 
 export function applyTheme(theme, { save = true, remember = true } = {}) {
   const v = THEMES.includes(theme) ? theme : 'original';

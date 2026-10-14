@@ -116,7 +116,7 @@ export function createKink({ name, tags = [], description = '', color, origin = 
     // Bringing back a kink that faded: it is yours now.
     db.prepare("UPDATE kinks SET status = ?, origin = ?, locks = ?, parent_id = ?, updated = ? WHERE id = ?").run(status, origin, JSON.stringify(origin === 'user' ? { mode: 'grow', name: 1 } : {}), parentId || null, now(), taken.id);
     if (tags.length) setKinkTags(taken.id, tags);
-    if (origin === 'user') fillKink(taken.id);
+    if (origin === 'user') setTimeout(() => { try { fillKink(taken.id); } catch {} }, 30);
     return taken.id;
   }
   const locks = origin === 'user' ? { mode: 'grow', name: 1, color: color ? 1 : 0, parent: parentId ? 1 : 0 } : {};
@@ -130,7 +130,9 @@ export function createKink({ name, tags = [], description = '', color, origin = 
   }
   if (!isGroup) forgetRemovedAll(conceptsForUser(clean, tags));
   // A kink you make starts in "grows": the app adds the tags it knows for it, your own stay.
-  if (!isGroup && origin === 'user') { fillKink(id); growSoon(id); shapeSoon(); }
+  // Filling it in takes a moment on a big library, so it happens right after the kink is made, not while you wait.
+  if (!isGroup && origin === 'user') setTimeout(() => { try { fillKink(id); } catch {} growSoon(id); shapeSoon(); }, 30);
+  if (isGroup && origin === 'user') shapeSoon();
   return id;
 }
 
@@ -192,8 +194,8 @@ export function updateKink(id, patch, { byUser = true } = {}) {
   if (name !== cur.name && db.prepare('SELECT id FROM kinks WHERE name = ? COLLATE NOCASE AND id != ?').get(name, id)) throw Object.assign(new Error(tr('There is already a kink or group called {name}.', { name })), { status: 400 });
   // The shape you picked for a kink (or the family of shapes for a group); null goes back to the one the app picks.
   if ('shape' in patch) db.prepare('UPDATE kinks SET shape = ? WHERE id = ?').run(typeof patch.shape === 'string' && /^[a-zA-Z][a-zA-Z0-9]{1,23}$/.test(patch.shape) ? patch.shape : null, id);
-  // A new name lets the model pick a shape again.
-  if (name !== cur.name) { db.prepare('UPDATE kinks SET ai_shape = NULL WHERE id = ?').run(id); if (!cur.is_group) shapeSoon(); }
+  // A new name, or a move to another group, lets the model pick a shape again.
+  if (name !== cur.name || (parent || null) !== (cur.parent_id || null)) { if (!cur.is_group) db.prepare('UPDATE kinks SET ai_shape = NULL WHERE id = ?').run(id); if (!cur.is_group) shapeSoon(); }
   db.prepare('UPDATE kinks SET name = ?, color = ?, description = ?, status = ?, parent_id = ?, is_group = ?, locks = ?, faded_at = ?, updated = ? WHERE id = ?')
     .run(name, patch.color ?? cur.color, patch.description ?? cur.description, patch.status ?? cur.status, parent, 'isGroup' in patch ? (patch.isGroup ? 1 : 0) : cur.is_group, JSON.stringify(locks), patch.status === 'hidden' && cur.status !== 'hidden' ? now() : cur.faded_at, now(), id);
   if (patch.tags) {

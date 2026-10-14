@@ -1,13 +1,15 @@
 import { useId } from 'react';
 import { SHAPES, SHAPE_FAMILIES } from './shapedata.js';
 import { useApp } from './context.jsx';
+import { specimenParts } from './lookcolor.js';
 
 export { SHAPES, SHAPE_FAMILIES };
 
 // Every kink has a shape. A group has a family of shapes that fits what it is about (round shapes for the body, arches
 // for places, capsules for clothing, stars for sex…) and each kink in it gets its own variation of that family. Kinks
 // on their own get a family that fits them too. The look decides how a shape is drawn: soft in the original look, flat
-// with a glow in its own colour in Cutout, filled with the family's pattern, outlined, with a hard shadow in Signal.
+// with a glow in its own colour in Cutout, filled with the family's pattern, outlined, with a hard shadow in Signal, and
+// as a wireframe extruded into depth in Specimen.
 
 export { FAMILY_SHAPES, PATTERNS, familyOfShape, assignShapes } from './shapeassign.js';
 
@@ -63,6 +65,10 @@ export function Shape({ shape = 'circle', color, pattern = 'dots', size = 24, cl
         <g className="ks-main" fill={`url(#${uid}p)`} stroke="var(--kst)" strokeWidth={sw} strokeLinejoin="round" dangerouslySetInnerHTML={body} />
       </svg>
     );
+  }
+  if (theme === 'specimen') {
+    const { inner, viewBox } = specimenParts(SHAPES[shape] || SHAPES.circle, size);
+    return <svg className={cls} viewBox={viewBox} style={style} fill="none" stroke="var(--kf)" strokeLinejoin="round" {...label} dangerouslySetInnerHTML={{ __html: inner }} />;
   }
   if (theme === 'cutout') {
     return <svg className={cls} viewBox="0 0 100 100" style={style} {...label}><g className="ks-main" dangerouslySetInnerHTML={body} /></svg>;

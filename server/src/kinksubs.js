@@ -36,8 +36,30 @@ function safeName(name, extra = '') {
   return !isBlocked({ title: `${name.replace(/_/g, ' ')} ${extra}`, tags: [] }).blocked;
 }
 
+// Whether a community really exists (and has posts), remembered: a month for ones that do, two weeks for missing
+// ones. Only communities seen to exist are ever suggested or added.
+const EXISTS_KEY = 'subExists';
+function existsKnown(name) {
+  const x = (getSetting(EXISTS_KEY, {}) || {})[String(name).toLowerCase()];
+  if (!x) return undefined;
+  if (Date.now() - x.at > (x.ok ? 30 : 14) * 86400000) return undefined;
+  return x.ok;
+}
+function rememberExists(name, ok) {
+  const all = getSetting(EXISTS_KEY, {}) || {};
+  all[String(name).toLowerCase()] = { ok, at: Date.now() };
+  const keys = Object.keys(all);
+  if (keys.length > 3000) for (const k of keys.sort((a, b) => all[a].at - all[b].at).slice(0, keys.length - 3000)) delete all[k];
+  setSetting(EXISTS_KEY, all);
+}
+
 function kinkOf(id) {
   return listKinks({ includeHidden: true }).find((k) => k.id === Number(id)) || null;
+}
+// Just whether it is a kink (not a group), without working out every kink's points.
+function kinkRowOf(id) {
+  const r = getDb().prepare('SELECT id, is_group FROM kinks WHERE id = ?').get(Number(id));
+  return r ? { id: r.id, isGroup: !!r.is_group } : null;
 }
 
 // What the kink is about, strongest first: its name, then its tags by weight.
@@ -53,7 +75,7 @@ export function kinkSubs(id) {
   const runs = getSetting('kinkSubsAt', {}) || {};
   return {
     added: rows.filter((r) => r.status === 'added').map(map),
-    suggested: rows.filter((r) => r.status === 'suggested').map(map),
+    suggested: rows.filter((r) => r.status === 'suggested' && existsKnown(r.name) !== false).map(map),
     searching: RUNNING.has(Number(id)) || QUEUE.includes(Number(id)),
     searchedAt: runs[id] || null,
     slow: !rss.feedToken()
@@ -81,7 +103,7 @@ export function addKinkSub(id, raw, { origin = 'user', why = null, score = null,
   const name = clean(raw);
   if (!NAME_RE.test(name)) throw Object.assign(new Error(tr('That is not a subreddit name.')), { status: 400 });
   if (!safeName(name)) throw Object.assign(new Error(tr('That community is blocked by your limits or the safety filter.')), { status: 400 });
-  const k = kinkOf(id);
+  const k = kinkRowOf(id);
   if (!k || k.isGroup) throw Object.assign(new Error(tr('Pick a kink first.')), { status: 400 });
   const db = getDb();
   db.prepare(`INSERT INTO kink_subs(kink_id, name, status, origin, score, why, members, created) VALUES(?, ?, 'added', ?, ?, ?, ?, ?)
@@ -197,6 +219,7 @@ async function checkSub(name, terms) {
     queueRedditCheck(name, (l) => { if (!done) { done = true; clearTimeout(t); resolve(l || []); } });
   });
   if (!list) return null;
+  rememberExists(name, list.length > 0);
   const names = terms.map((n) => n.replace(/[^\p{L}\p{N}]+/gu, ' ').trim()).filter((n) => n.length >= 3);
   const hits = list.filter((p) => { const text = words(`${p.title} ${(p.tags || []).join(' ')} ${String(p.body || '').slice(0, 300)}`); return names.some((n) => text.includes(` ${n} `)); }).length;
   return { posts: list.length, ratio: list.length ? hits / list.length : 0 };
@@ -234,6 +257,7 @@ async function findFor(id) {
       const c = get(x.name);
       if (c.search) return;
       c.search = true;
+      rememberExists(x.name, true);
       c.members = x.subscribers || c.members;
       c.about = `${x.title || ''} ${x.about || ''}`;
       c.s += (qi === 0 ? 0.24 : 0.14) / (1 + rank * 0.35);
@@ -255,15 +279,26 @@ async function findFor(id) {
     if (c.members && c.members > 1500000 && !nf) c.s -= 0.15;
   }
 
-  const pool = [...cand.values()].filter((c) => !known.has(c.name.toLowerCase()) && safeName(c.name, c.about || '')).sort((a, b) => b.s - a.s);
-  // Only the promising ones are read, the strongest first (each read is one Reddit request).
-  const reads = config.mock ? 6 : rss.feedToken() ? 8 : 4;
+  // Suggestions from before that were never seen to exist are checked now; missing ones are taken off.
+  let reads = config.mock ? 6 : rss.feedToken() ? 8 : 4;
+  for (const r of db.prepare("SELECT name FROM kink_subs WHERE kink_id = ? AND status = 'suggested'").all(k.id)) {
+    if (existsKnown(r.name) !== undefined || reads <= 0) continue;
+    reads--;
+    const check = await checkSub(r.name, terms);
+    if (check && check.posts < 1) db.prepare("UPDATE kink_subs SET status = 'removed' WHERE kink_id = ? AND name = ? AND status = 'suggested'").run(k.id, r.name);
+  }
+
+  const pool = [...cand.values()].filter((c) => !known.has(c.name.toLowerCase()) && existsKnown(c.name) !== false && safeName(c.name, c.about || '')).sort((a, b) => b.s - a.s);
+  // Only the promising ones are read, the strongest first (each read is one Reddit request). A community the app
+  // has not seen exist (only the model or the list knows it) is always read first, or left for next time.
   let added = 0;
   let suggested = 0;
   for (const c of pool.slice(0, 14)) {
     if (c.s < SUGGEST_AT - 0.12) break;
     let check = null;
-    if (reads > 0 && pool.indexOf(c) < reads && !(c.own && c.own.hit >= 5)) {
+    const seen = !!(c.own || c.search || existsKnown(c.name) === true);
+    if (reads > 0 && !(c.own && c.own.hit >= 5)) {
+      reads--;
       check = await checkSub(c.name, terms);
       if (check && check.posts < 5) continue;
       if (check) {
@@ -271,6 +306,7 @@ async function findFor(id) {
         if (check.ratio >= 0.2) c.why.push(tr('{p}% of its newest posts say it', { p: Math.round(check.ratio * 100) }));
       }
     }
+    if (!seen && !check) continue;
     const proven = (c.own && c.own.hit >= 5) || (check && check.ratio >= 0.2) || (c.list && check);
     // A locked kink only gets suggestions: the app adds nothing to it by itself.
     const status = c.s >= ADD_AT && proven && added < AUTO_MAX && k.mode !== 'lock' ? 'added' : c.s >= SUGGEST_AT && suggested < SUGGEST_MAX ? 'suggested' : null;

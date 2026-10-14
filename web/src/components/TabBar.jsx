@@ -10,7 +10,7 @@ export default function TabBar() {
   const tabs = [
     { id: 'feed', icon: 'home', label: t('Feed'), on: mode === 'feed' && !saved, go: () => { if (filters.saved || mode === 'feed') setFilters({}); else openMode('feed'); } },
     { id: 'saved', icon: 'save', label: t('Saved'), on: saved, go: () => { openMode('feed'); setFilters({ saved: true }); } },
-    { id: 'map', icon: 'map', label: t('Your map'), on: mode === 'map', go: () => openMode('map') },
+    { id: 'map', icon: 'kinks', label: t('Kinks'), on: mode === 'map', go: () => openMode('map') },
     { id: 'memory', icon: 'brain', label: t('Memory'), on: mode === 'memory', go: () => openMode('memory') },
     { id: 'settings', icon: 'gear', label: t('Settings'), on: mode === 'settings', go: () => openMode('settings'), dot: !!update?.available }
   ];

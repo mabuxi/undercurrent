@@ -3,6 +3,51 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.30.0 · 14 October 2026
+
+### A new look: Specimen
+- A fourth look, from the pink design you picked: a type specimen sheet and a construction drawing. Ink on a charcoal sheet with its grid showing, square corners and hairline rules instead of shadows, and one colour, hot pink, for what is on, picked or primary.
+- Names and numbers in Anybody, stretched very wide and black; reading text in Archivo; measurements and small labels in Martian Mono. All three are kept in the app, so they work offline.
+- Kinks keep only a faint tint of their colour, and their shapes are wireframes: the outline repeated into depth, fading towards the back. Big shapes (like on a kink's page) show their construction guides and pink corner marks.
+- About one window in five is printed solid pink with dark text. Switches turn pink when on. Bars are rulers with tick marks and a thin line on top.
+- The map is a construction drawing: a grid, families as dotted outlines, kinks as wireframes, fantasies as pale gold diamonds, and pink corner marks around what you picked.
+- The graphs are a hard straight pink line on ruled paper, with a tick for every point and a square at the end.
+- Its own mark, app icons (iPhone home screen, browser tab, Mac Dock), loading screen on the Mac and in the app, and its own viewer, reactions and tab bar.
+- The Look card in Settings now shows the four looks two by two.
+
+### Windows you can tell apart
+- A window about a pair of kinks shows both shapes, with a hard fade between their two colours (a line under the header, or the whole header when the window is solid).
+- A window about a creator or performer shows their profile picture instead of the dot.
+- A journey about one kink shows its shape. "How was this?" shows a flame.
+- The window that turns solid now never lands on one that cannot be solid (a window you read): it moves to the nearest window that can, so every run of five windows has its coloured one again.
+- The small map window shows each kink as its shape, sized by how much you are into it, with its name below.
+
+### Kinks
+- The map tab is now called Kinks, with an icon of four shapes, two by two.
+- A graph of how your kinks moved sits at the top of your kinks page: the kinks that moved the most, and the line of the one you pick. It shows the last week, month or all time.
+- Each kink's page has its own graph too ("How it moved"), for the last week, month or all time (month by default).
+- A shape the model picked for a kink is kept: it only changes once (from the first guess to the model's pick), or when you rename the kink or move it into another group. A group keeps its family of shapes the same way.
+
+### Faster
+- Suggested tags show up at once. The smarter model prepares more ideas in the background, one kink at a time, and they appear when ready (a note says so meanwhile).
+- Adding a suggested community is instant: it moves to your communities right away and saves in the background.
+- Making a new kink returns at once; filling it in, its tags and its shape follow in the background.
+- Going back and forth between kinks no longer piles up work: the assistant's text for a kink you left is stopped, and the map no longer redraws itself all the time when nothing moves (that was what made the kinks page get slower and slower).
+- The server now writes slow requests and moments it was too busy to answer into its log, so slowdowns can be found later.
+
+### The map
+- The map opens centred and zoomed to fit.
+- Lines are stronger or fainter depending on how often the two things go together.
+- The map window in the side columns matches the look.
+
+### Feed and filters
+- While any filter is on, the windows never offer to go deeper (journeys, "Go deeper" on a fantasy or a kink): only on the plain feed.
+- In the full screen viewer, the tags button sits right after the tags instead of on the far right.
+
+### Fixes
+- Suggested Reddit communities are only ones seen to exist (in posts, in search, or checked). Older suggestions that turn out not to exist are removed.
+- Cutout: switches are filled with the accent when on.
+
 ## 0.29.0 · 12 October 2026
 
 ### Colours that fit each look
