@@ -15,7 +15,8 @@ import r260 from './r260.js';
 import r280 from './r280.js';
 import r290 from './r290.js';
 import r300 from './r300.js';
+import r310 from './r310.js';
 
 // Every part of the interface has its own file of French texts; they are merged here.
-const fr = Object.assign({}, core, settings, feed, post, map, r18, r19, r20, r201, r203, r220, r230, r250, r260, r280, r290, r300);
+const fr = Object.assign({}, core, settings, feed, post, map, r18, r19, r20, r201, r203, r220, r230, r250, r260, r280, r290, r300, r310);
 export default fr;

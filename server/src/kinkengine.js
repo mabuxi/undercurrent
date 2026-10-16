@@ -1,3 +1,4 @@
+import { whenIdle } from './priority.js';
 import { getDb, now, getSetting, setSetting, tagId } from './db.js';
 import { lang } from './i18n.js';
 import { conceptLabel } from './vocab.js';
@@ -139,8 +140,14 @@ function conceptTagsOf(ids, minWeight = 0.45) {
 
 // How strongly each concept stands out in what you loved compared with everything you've seen.
 let evCache = { at: 0, v: null };
+// Reading every like, save and heat and the tags of those posts takes about a second on a big library: it is kept
+// for three minutes, then worked out again in a quiet moment while the last one is still used.
 export function conceptEvidence({ fresh = false } = {}) {
-  if (!fresh && evCache.v && now() - evCache.at < 60000) return evCache.v;
+  if (!fresh && evCache.v && now() - evCache.at < 3 * 60000) return evCache.v;
+  if (!fresh && evCache.v && now() - evCache.at < 60 * 60000) {
+    whenIdle('conceptEvidence', () => { evCache = { at: now(), v: computeEvidence() }; });
+    return evCache.v;
+  }
   evCache = { at: now(), v: computeEvidence() };
   return evCache.v;
 }

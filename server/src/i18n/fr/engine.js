@@ -258,5 +258,7 @@ export default {
   "no list of videos came back": "aucune liste de vidéos n’est revenue",
   "Unknown look.": "Apparence inconnue.",
   "rising over all time": "en hausse depuis le début",
-  "dropping over all time": "en baisse depuis le début"
+  "dropping over all time": "en baisse depuis le début",
+  "One of your kinks you have not seen for a while: {name}.": "Un de vos kinks que vous n’avez pas vu depuis un moment : {name}.",
+  "You are into {name} right now.": "Vous êtes à fond dans {name} en ce moment."
 };

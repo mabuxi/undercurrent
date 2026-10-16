@@ -1,3 +1,4 @@
+import { whenIdle, memo } from './priority.js';
 import { getDb, now, tagId, normalizeTag, getSetting, setSetting } from './db.js';
 import { isBlockedCreator } from './blocks.js';
 import { postLangs } from './langdetect.js';
@@ -212,13 +213,9 @@ export function recheckBlocks() {
   return { blocked, restored };
 }
 
-let specCache = { at: 0, map: new Map(), n: 1, overused: [] };
-export function tagSpecificity(force = false) {
+let specCache = { at: 0, map: new Map(), n: 1, overused: [], checked: 0 };
+function computeSpec(n) {
   const db = getDb();
-  if (!force && specCache.map.size && Date.now() - (specCache.checked || 0) < 10000 && Date.now() - specCache.at < 5 * 60000) return specCache;
-  const n = db.prepare('SELECT COUNT(*) c FROM items WHERE blocked = 0').get().c || 1;
-  specCache.checked = Date.now();
-  if (!force && Date.now() - specCache.at < 5 * 60000 && specCache.map.size && Math.abs(n - specCache.n) < specCache.n * 0.1) return specCache;
   const rows = db.prepare(`SELECT it.tag_id id, t.name, t.kind, COUNT(DISTINCT it.item_id) df FROM item_tags it JOIN tags t ON t.id = it.tag_id GROUP BY it.tag_id`).all();
   const map = new Map();
   const norm = Math.log((n + 1) / 20) || 1;
@@ -228,6 +225,20 @@ export function tagSpecificity(force = false) {
   }
   const overused = rows.filter((r) => r.kind !== 'performer').sort((a, b) => b.df - a.df).slice(0, 45).map((r) => r.name);
   specCache = { at: Date.now(), checked: Date.now(), map, n, overused };
+}
+// How specific each tag is (rare tags say more than ones on every post). Counting it reads every tag of every post,
+// which takes seconds on a big library, so it is counted again only when the library grew by a tenth or after six
+// hours, and then in a quiet moment while the last count keeps being used. A small library counts it right away.
+export function tagSpecificity(force = false) {
+  const db = getDb();
+  const t = Date.now();
+  if (!force && specCache.map.size && t - specCache.checked < 60000) return specCache;
+  const n = db.prepare('SELECT COUNT(*) c FROM items WHERE blocked = 0').get().c || 1;
+  specCache.checked = t;
+  const due = force || !specCache.map.size || t - specCache.at > 6 * 3600000 || Math.abs(n - specCache.n) >= specCache.n * 0.1;
+  if (!due) return specCache;
+  if (force || n < 20000) computeSpec(n);
+  else whenIdle('tagSpecificity', () => computeSpec(n));
   return specCache;
 }
 
@@ -238,6 +249,9 @@ export function specOf(tagId) {
 export function relatedTags(names, limit = 6) {
   const list = (names || []).map((n) => String(n).toLowerCase()).filter(Boolean);
   if (!list.length) return [];
+  return memo(`related:${list.join('|')}:${limit}`, 10 * 60000, () => relatedNow(list, limit), 50 * 60000);
+}
+function relatedNow(list, limit) {
   const spec = tagSpecificity().map;
   const rows = getDb().prepare(`SELECT t2.id, t2.name, COUNT(*) c FROM item_tags a JOIN tags t1 ON t1.id = a.tag_id JOIN item_tags b ON b.item_id = a.item_id JOIN tags t2 ON t2.id = b.tag_id
     WHERE t1.name IN (${list.map(() => '?').join(',')}) AND t2.id != t1.id AND t2.kind != 'performer' AND b.weight >= 0.4 GROUP BY t2.id ORDER BY c DESC LIMIT 80`).all(...list);

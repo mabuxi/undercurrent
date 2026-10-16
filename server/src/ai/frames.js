@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import { log } from '../log.js';
+import { yieldToUser } from '../priority.js';
 
 // Grabs real frames from a video with ffmpeg (when it is installed), so the vision model sees what actually
 // happens across the clip instead of a single poster image.
@@ -43,6 +44,7 @@ export async function videoFrames(url, duration, { count = 4, referer } = {}) {
   const points = count >= 4 ? [0.12, 0.38, 0.62, 0.86] : count === 3 ? [0.2, 0.5, 0.8] : [0.3, 0.7];
   const out = [];
   for (const p of points.slice(0, count)) {
+    await yieldToUser(20000);
     const f = await grab(url, d * p, { referer });
     if (f) out.push(f);
     else if (!out.length) break;

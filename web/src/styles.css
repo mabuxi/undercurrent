@@ -192,6 +192,7 @@ svg.i{width:17px;height:17px;flex-shrink:0}
 .pill-foryou{color:var(--foryou);border-color:rgba(227,154,131,.35)}
 .pill-discovery{color:#231A05;background:var(--discovery);border-color:transparent}
 .pill-popular{color:#F6C35B;border-color:rgba(246,195,91,.4)}
+.pill-kink{color:var(--cv,var(--c,#E39A83));border-color:color-mix(in srgb,var(--cv,var(--c,#E39A83)) 45%,transparent)}
 .match{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11.5px;color:var(--text-2)}
 .meter{width:34px;height:4px;border-radius:2px;background:var(--surface-3);overflow:hidden}
 .meter i{display:block;height:100%;background:var(--cv,var(--c))}
@@ -1558,8 +1559,6 @@ html.narrow .chiprow.all{animation:chipsopen .3s var(--ease-out)}
 .catempty{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:2px}
 .catempty .catchip{border-style:dashed}
 .catempty .catchip svg:last-child{color:var(--text-3);width:12px;height:12px}
-.kinkslink{flex-direction:row;align-items:center;gap:12px}
-.kinkslink>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
 .fantgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
 .fantcard{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:14px;background:var(--surface-2);border:1px solid var(--line);transition:border-color .2s,transform .2s}
 .fantcard:hover{border-color:var(--line-2)}
@@ -1578,7 +1577,6 @@ html.narrow .chiprow.all{animation:chipsopen .3s var(--ease-out)}
   .memtile{padding:10px 12px}
   .memtile b{font-size:24px}
   .catgrid{grid-template-columns:1fr}
-  .kinkslink{flex-wrap:wrap}
 }
 @media (prefers-reduced-motion:reduce){.memtile,.memnav-b,.catchip{transition:none}}
 
@@ -2693,3 +2691,27 @@ html.narrow .brandmark{display:none}
 .ktm.on{background:color-mix(in srgb,var(--cv,var(--c)) 14%,transparent);color:var(--text)}
 .ktrends-graph .trendg{max-height:190px}
 @media (max-width:700px){.ktrends-in{grid-template-columns:1fr}.ktrends-list{flex-direction:row;overflow-x:auto;scrollbar-width:none}.ktm{flex:none}}
+
+/* 0.31: the row of similar posts under a post you were into */
+.simrow{display:flex;flex-direction:column;gap:8px;margin:-6px 0 4px;padding:10px 12px 12px;border-radius:16px;background:var(--surface);border:1px solid var(--line);animation:winin .35s ease both}
+.simrow-h{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--text-2)}
+.simrow-h svg{width:14px;height:14px;color:var(--accent)}
+.simrow-list{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;scroll-snap-type:x proximity;padding-bottom:2px}
+.simrow-list::-webkit-scrollbar{display:none}
+.simtile{all:unset;box-sizing:border-box;cursor:pointer;flex:0 0 clamp(108px,17%,150px);display:flex;flex-direction:column;gap:5px;scroll-snap-align:start;border-radius:12px;padding:3px;transition:transform .15s,background .15s}
+.simtile:hover{background:var(--surface-2)}
+.simtile:active{transform:scale(.97)}
+.simtile:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.simpic{position:relative;display:block;aspect-ratio:16/10;border-radius:10px;overflow:hidden;background:color-mix(in srgb,var(--c) 22%,var(--surface-2))}
+.simpic img,.simpic video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.simtile.on .simpic{box-shadow:0 0 0 2px var(--accent)}
+.simdur,.simback{position:absolute;right:5px;bottom:5px;font-style:normal;font-size:10px;font-weight:700;padding:1px 5px;border-radius:5px;background:rgba(0,0,0,.66);color:#fff;display:inline-flex;align-items:center;gap:2px}
+.simback{left:5px;right:auto}
+.simback svg{width:11px;height:11px}
+.simnow{position:absolute;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.28)}
+.simnow svg{width:22px;height:22px;color:#fff}
+.simtxt{display:flex;align-items:flex-start;gap:5px;font-size:11px;line-height:1.3;color:var(--text-2);min-height:28px}
+.simtxt span{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
+.simtxt .kshape{margin-top:2px}
+.simtile.on .simtxt{color:var(--text)}
+@media (max-width:900px){.simrow{margin:-4px 0 6px;padding:9px 10px 10px}.simtile{flex-basis:118px}}

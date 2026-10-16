@@ -15,7 +15,7 @@ import { touchSession } from './sessions.js';
 import { tagIdeas } from './kinktags.js';
 import { kinkSeries, kinkMovers } from './kinkstats.js';
 import { kinkSubs, addKinkSub, removeKinkSub, dismissKinkSub, searchKinkSubs, maybeSearch } from './kinksubs.js';
-import { listKinks, createKink, updateKink, deleteKink, mergeKinks, unlockKink, listFantasies, saveFantasy, deleteFantasy, setLink, removeLink, kinkIdsForTagNames } from './kinks.js';
+import { listKinks, createKink, updateKink, deleteKink, mergeKinks, unlockKink, listFantasies, saveFantasy, deleteFantasy, setLink, removeLink, kinkIdsForTagNames, kinkIndex, kinksForTags } from './kinks.js';
 import { writeFantasy, tagsForText, conceptsFor } from './fantasywrite.js';
 import { deeperStep, fantasyTags } from './deeper.js';
 import { directMedia } from './direct.js';
@@ -30,6 +30,7 @@ import { runIngest, ingestState, listFollows, follow, unfollow, removeFollow, sy
 import { PROVIDERS, providerState, setProvider, hasKeys } from './sources/providers.js';
 import { extremeFilter, DEFAULT_EXTREME } from './safety.js';
 import { log } from './log.js';
+import { setWaiting, whenIdle, forget, memo } from './priority.js';
 import * as reddit from './sources/reddit.js';
 import * as redgifs from './sources/redgifs.js';
 import { BOORUS } from './sources/booru.js';
@@ -90,7 +91,8 @@ function resolveFilters(f = {}) {
 }
 
 api.post('/feed', wrap((req, res) => {
-  const { filters = {}, exclude = [], limit = 10, mix = 15 } = req.body || {};
+  const { filters = {}, exclude = [], limit = 10, mix = 15, events = [], sessionId } = req.body || {};
+  if (events.length) takeEvents(sessionId, events);
   const rf = resolveFilters(filters);
   const r = buildFeed(rf, { exclude, limit: Math.min(30, limit), mix, capFollows: !rf.search && !rf.author && !rf.community && !rf.following && !rf.saved });
   // Posts about to be shown get a closer look (frames or the image itself), so their tags match what is really in them.
@@ -110,13 +112,26 @@ api.post('/feed/more', wrap(async (req, res) => {
   res.json(await moreRuns.get(key));
 }));
 
+// The page has a spinner on screen (the feed or the video you are on is still loading): background work waits.
+api.post('/waiting', (req, res) => {
+  setWaiting(!!req.body?.on);
+  res.json({ ok: true });
+});
+
 let eventsSinceKinks = 0;
 let kinkRunAt = 0;
 let kinkRun = null;
 api.post('/events', wrap((req, res) => {
   const { sessionId, events = [] } = req.body || {};
+  res.json({ ok: true, signal: takeEvents(sessionId, events) });
+}));
+
+// What you just did (watching, skipping, liking...), applied to your taste. Also sent along with a feed request, so
+// the next posts already follow what you did a second ago.
+function takeEvents(sessionId, events = []) {
   touchSession();
   const list = events.slice(0, 200).map((e) => ({ ...e, sessionId }));
+  if (!list.length) return 0;
   const signal = applyEvents(list);
   // Every few posts seen, the automatic sources are tuned to what you just did (in the background).
   try { noteSeen(list); } catch {}
@@ -128,10 +143,12 @@ api.post('/events', wrap((req, res) => {
   if (eventsSinceKinks >= 30 && !kinkRun && Date.now() - kinkRunAt > 10 * 60000) {
     eventsSinceKinks = 0;
     kinkRunAt = Date.now();
-    kinkRun = refreshKinks().catch(() => null).finally(() => { kinkRun = null; });
+    // In a quiet moment, never while you are waiting for the next post.
+    kinkRun = true;
+    whenIdle('kinks', () => { kinkRun = refreshKinks().catch(() => null).finally(() => { kinkRun = null; }); });
   }
-  res.json({ ok: true, signal });
-}));
+  return signal;
+}
 
 api.get('/items/:id/top', wrap(async (req, res) => {
   const it = getItem(Number(req.params.id));
@@ -226,23 +243,38 @@ api.get('/items/:id/direct', wrap(async (req, res) => {
   res.json({ direct: await directMedia(it, { fresh: req.query.fresh === '1' }) });
 }));
 
+// Posts like this one: the same people first, then the same kinks and the most specific of its tags. For the row of
+// small previews under a post you were into (strip=1) they are the same kind of thing: videos for a video, pictures
+// for a picture.
+const VIDEO_F = new Set(['long', 'short', 'gif']);
+const IMAGE_F = new Set(['image', 'set']);
 api.get('/items/:id/similar', wrap((req, res) => {
   const id = Number(req.params.id);
+  const it = getItem(id);
   const all = tagsForItems([id]).get(id) || [];
   const perf = all.filter((t) => t.kind === 'performer').map((t) => t.name);
   const spec = tagSpecificity().map;
   const tags = all.filter((t) => t.kind !== 'performer' && t.weight >= 0.4).sort((a, b) => b.weight * (spec.get(b.id) ?? 1) - a.weight * (spec.get(a.id) ?? 1)).slice(0, 4).map((t) => t.name);
+  const kinkIds = it ? kinksForTags(all, kinkIndex(listKinks()), it.community).map((k) => k.id).slice(0, 3) : [];
   const exclude = [...String(req.query.exclude || '').split(',').map(Number).filter(Boolean), id];
-  const limit = Math.min(6, Number(req.query.limit) || 3);
-  let items = [];
-  if (perf.length) items = buildFeed({ tags: perf }, { limit: 1, mix: 0, exclude }).items;
+  const strip = req.query.strip === '1';
+  const limit = Math.min(strip ? 8 : 6, Number(req.query.limit) || 3);
+  const base = { noCollections: true, ...(strip && it ? (VIDEO_F.has(it.format) ? { formats: [...VIDEO_F] } : IMAGE_F.has(it.format) ? { formats: [...IMAGE_F, 'gif'] } : {}) : {}) };
+  const got = new Map();
+  const take = (list) => { for (const x of list) if (!got.has(x.id) && !exclude.includes(x.id)) got.set(x.id, x); };
+  const ex = () => [...exclude, ...got.keys()];
+  if (perf.length) take(buildFeed({ ...base, tags: perf }, { limit: strip ? 2 : 1, mix: 0, exclude: ex() }).items);
+  if (kinkIds.length) take(buildFeed({ ...base, anyKinks: kinkIds }, { limit: limit * 4, mix: 0, exclude: ex() }).items);
   if (tags.length) {
-    let more = buildFeed({ tags }, { limit: limit * 4, mix: 0, exclude: [...exclude, ...items.map((x) => x.id)] }).items;
-    if (more.length < limit) more = [...more, ...buildFeed({ tags, relaxed: true }, { limit: limit * 3, mix: 0, exclude: [...exclude, ...items.map((x) => x.id), ...more.map((x) => x.id)] }).items];
-    const overlap = (x) => x.tags.filter((t) => tags.includes(t)).length;
-    items = [...items, ...more.sort((a, b) => overlap(b) * 12 + b.match - (overlap(a) * 12 + a.match)).slice(0, limit - items.length)];
+    take(buildFeed({ ...base, tags }, { limit: limit * 4, mix: 0, exclude: ex() }).items);
+    if (got.size < limit) take(buildFeed({ ...base, tags, relaxed: true }, { limit: limit * 3, mix: 0, exclude: ex() }).items);
   }
-  res.json({ items, tags, performers: perf });
+  const kinkSet = new Set(kinkIds);
+  const sameKinks = (x) => (x.kinks || []).filter((k) => kinkSet.has(k.id)).length;
+  const overlap = (x) => x.tags.filter((t) => tags.includes(t)).length;
+  const withPerf = (x) => (x.performers || []).some((p) => perf.includes(String(p).toLowerCase()));
+  const items = [...got.values()].sort((a, b) => (withPerf(b) ? 40 : 0) + sameKinks(b) * 18 + overlap(b) * 10 + b.match / 4 - ((withPerf(a) ? 40 : 0) + sameKinks(a) * 18 + overlap(a) * 10 + a.match / 4)).slice(0, limit);
+  res.json({ items, tags, performers: perf, kinks: kinkIds });
 }));
 
 api.get('/performers/:name', wrap(async (req, res) => {
@@ -1284,9 +1316,9 @@ api.get('/update/changelog', wrap((req, res) => res.json({ version: config.versi
 api.get('/status', wrap(async (req, res) => {
   const db = getDb();
   const since = Number(req.query.since) || 0;
-  const net = db.prepare('SELECT host, purpose, COUNT(*) n, COALESCE(SUM(bytes_out),0) bytesOut, COALESCE(SUM(bytes_in),0) bytesIn FROM net_log WHERE ts > ? GROUP BY host, purpose ORDER BY n DESC').all(since);
-  for (const r of net) r.purpose = purposeLabel(r.purpose);
-  const counts = db.prepare('SELECT COUNT(*) items, SUM(blocked) blocked, SUM(CASE WHEN ai_status = \'done\' THEN 1 ELSE 0 END) tagged FROM items').get();
+  // Counting the library and the network log reads a lot: kept for twenty seconds, so asking often costs nothing.
+  const net = memo(`status-net:${Math.floor(since / 60000)}`, 20000, () => db.prepare('SELECT host, purpose, COUNT(*) n, COALESCE(SUM(bytes_out),0) bytesOut, COALESCE(SUM(bytes_in),0) bytesIn FROM net_log WHERE ts > ? GROUP BY host, purpose ORDER BY n DESC').all(since).map((r) => ({ ...r, purpose: purposeLabel(r.purpose) })));
+  const counts = memo('status-counts', 20000, () => db.prepare('SELECT COUNT(*) items, SUM(blocked) blocked, SUM(CASE WHEN ai_status = \'done\' THEN 1 ELSE 0 END) tagged FROM items').get());
   res.json({
     version: config.version,
     language: lang(),
@@ -1297,7 +1329,7 @@ api.get('/status', wrap(async (req, res) => {
     model: config.mock ? tr('test model (mock mode)') : activeModel(),
     ollama: await health(),
     running: await running(),
-    tagger: taggerStatus(),
+    tagger: memo('status-tagger', 20000, () => taggerStatus()),
     reddit: { ...rss.rssStatus(), queue: redditQueueSize() },
     ingest: { ...ingestState, log: ingestState.log.slice(0, 12) },
     counts,

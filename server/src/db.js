@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS item_tags (
   origin TEXT NOT NULL DEFAULT 'source',
   PRIMARY KEY (item_id, tag_id, origin)
 );
-CREATE INDEX IF NOT EXISTS idx_item_tags_tag ON item_tags(tag_id);
+CREATE INDEX IF NOT EXISTS idx_item_tags_tag_item ON item_tags(tag_id, item_id);
 
 CREATE TABLE IF NOT EXISTS kinks (
   id INTEGER PRIMARY KEY,
@@ -200,6 +200,12 @@ export function openDb(file = config.dbPath) {
   if (!cols.includes('ai_fit')) db.exec('ALTER TABLE items ADD COLUMN ai_fit INTEGER');
   for (const c of ['g_men INTEGER', 'g_women INTEGER', 'g_trans INTEGER', 'g_src TEXT', 'look_q INTEGER']) if (!cols.includes(c.split(' ')[0])) db.exec(`ALTER TABLE items ADD COLUMN ${c}`);
   db.exec('CREATE INDEX IF NOT EXISTS idx_items_via ON items(via)');
+  // 0.31: the newest posts come straight from an index (the feed's pool went from about 0,4 s to a few ms), and
+  // counting posts per tag reads one index instead of every row. The planner learns about them once.
+  const hadFetched = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_items_fetched'").get();
+  db.exec('CREATE INDEX IF NOT EXISTS idx_items_fetched ON items(fetched_at)');
+  db.exec('DROP INDEX IF EXISTS idx_item_tags_tag');
+  if (!hadFetched) { try { db.exec('ANALYZE'); } catch {} }
   try { db.exec('CREATE INDEX IF NOT EXISTS idx_items_lookq ON items(look_q)'); } catch {}
   const fcols = db.prepare('PRAGMA table_info(follows)').all().map((c) => c.name);
   if (!fcols.includes('topic')) db.exec('ALTER TABLE follows ADD COLUMN topic TEXT');

@@ -1,3 +1,4 @@
+import { userWaiting } from '../priority.js';
 import os from 'node:os';
 import { config } from '../config.js';
 import { getDb, getSetting, setSetting, now } from '../db.js';
@@ -184,7 +185,9 @@ export async function chat(opts) {
     const look = opts.kind === 'look';
     if (look) lane.looks++;
     try {
-      while (lane.interactive > 0 || lane.background.size >= max || (!look && lane.looks > 0) || (opts.kind === 'tag' && lane.hold - (other ? 1 : 0) > 0)) await sleep(300);
+      // You first: nothing new starts in the background while you are waiting for something to show.
+      const t0 = Date.now();
+      while (lane.interactive > 0 || lane.background.size >= max || (!look && lane.looks > 0) || (opts.kind === 'tag' && lane.hold - (other ? 1 : 0) > 0) || (userWaiting() && Date.now() - t0 < 30000)) await sleep(300);
       const ctrl = new AbortController();
       ctrl.kind = opts.kind;
       lane.background.add(ctrl);

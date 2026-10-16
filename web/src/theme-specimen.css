@@ -179,6 +179,7 @@
 :root[data-theme="specimen"] .pill-following{color:var(--following);border-color:var(--line-2)}
 :root[data-theme="specimen"] :is(.pill-discovery,.pill-deeper){color:#131312;background:var(--ink);border-color:var(--ink)}
 :root[data-theme="specimen"] .pill-popular{color:var(--text);border-color:var(--ink)}
+:root[data-theme="specimen"] .pill-kink{color:#131312;background:var(--pink);border-color:var(--pink)}
 :root[data-theme="specimen"] .meter i{background:var(--cv,var(--ink))}
 :root[data-theme="specimen"] :is(.media,.imgbtn,.media-sleep,.viewer img,.viewer video){border-radius:0}
 :root[data-theme="specimen"] :is(.media,.imgbtn){outline:1px solid var(--line-2);outline-offset:-1px}
@@ -396,3 +397,15 @@
 :root[data-theme="specimen"] .lg.link{background:var(--ink);height:1px}
 :root[data-theme="specimen"] .lg.pulse{background:var(--pink)}
 :root[data-theme="specimen"] .kh-name{font-size:clamp(36px,6cqi,72px)}
+/* 0.31: the row of similar posts: a strip of contact prints */
+:root[data-theme="specimen"] .simrow{border:1px solid var(--line-2);background:var(--surface);gap:10px}
+:root[data-theme="specimen"] .simrow-h{font-family:var(--display);font-stretch:var(--wide);font-weight:900;letter-spacing:-.045em;font-size:14px;color:var(--text)}
+:root[data-theme="specimen"] .simrow-h svg{color:var(--pink)}
+:root[data-theme="specimen"] .simrow-list{gap:0;border:1px solid var(--line-2)}
+:root[data-theme="specimen"] .simtile{padding:6px;border-left:1px solid var(--line-2)}
+:root[data-theme="specimen"] .simtile:first-child{border-left:0}
+:root[data-theme="specimen"] .simtile.on{background:var(--pink)}
+:root[data-theme="specimen"] .simtile.on .simpic{box-shadow:none}
+:root[data-theme="specimen"] .simtile.on .simtxt{color:#131312;--kfill:#131312}
+:root[data-theme="specimen"] :is(.simdur,.simback){background:var(--ink);color:#131312;font-family:var(--mono);font-weight:400}
+:root[data-theme="specimen"] .simtxt{font-family:var(--mono);font-size:9.5px;letter-spacing:-.02em}

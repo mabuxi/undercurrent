@@ -22,6 +22,8 @@ export function usePostActions(item, setItem, fx) {
     publishItem(item.id, patch, apply);
   };
   const toast = (m) => cb.current.toast?.(m);
+  // The feed listens for reactions, so it can pick what comes next again right away.
+  const told = (type, value = null) => { try { window.dispatchEvent(new CustomEvent('uc-track', { detail: { itemId: ref.current.id, type, value } })); } catch {} };
 
   async function vote(dir) {
     const it = ref.current;
@@ -32,6 +34,7 @@ export function usePostActions(item, setItem, fx) {
     cb.current.onDown?.(next < 0);
     try {
       const r = await api(`/items/${it.id}/vote`, { method: 'POST', body: { dir: next } });
+      told(next > 0 ? 'up' : next < 0 ? 'down' : 'unvote');
       if (r.synced && next) toast(next > 0 ? t('Upvoted on Reddit too.') : t('Downvoted on Reddit too.'));
       else if (!next && it.vote) toast(it.vote > 0 ? t('Like taken back. What it taught your feed is undone.') : t('Dislike taken back. What it taught your feed is undone.'));
     } catch (e) { toast(e.message); }
@@ -51,6 +54,7 @@ export function usePostActions(item, setItem, fx) {
     if (on) cb.current.strong?.('save');
     try {
       const r = await api(`/items/${it.id}/save`, { method: 'POST', body: { on } });
+      if (on) told('save');
       toast(on ? (r.synced ? t('Saved here and on Reddit.') : t('Saved.')) : t('Removed from saved. What saving it taught your feed is undone.'));
     } catch (e) { toast(e.message); }
   }
@@ -62,6 +66,7 @@ export function usePostActions(item, setItem, fx) {
     publishItem(it.id, { hiddenNow: true }, apply);
     try {
       await api(`/items/${it.id}/less`, { method: 'POST', body: {} });
+      told('less');
       toast(t('Hidden. Pick what you did not like, or leave it.'));
     } catch (e) { toast(e.message); }
   }
@@ -78,6 +83,7 @@ export function usePostActions(item, setItem, fx) {
       await api(`/items/${it.id}/rate`, { method: 'POST', body: { value: n } });
       if (autoUp) await api(`/items/${it.id}/vote`, { method: 'POST', body: { dir: 1 } });
       if (autoDown) await api(`/items/${it.id}/vote`, { method: 'POST', body: { dir: 0 } });
+      told('rate', n);
       if (!n) { toast(autoDown ? t('Heat and upvote taken back. What they taught your feed is undone.') : t('Heat taken back. What it taught your feed is undone.')); return; }
       toast(n >= 4 ? (autoUp ? t('On fire and upvoted. Your feed goes deeper into this.') : t('On fire. Your feed goes deeper into this.')) : (autoUp ? t('Noted how hot this was, and upvoted it. It counts more than an upvote.') : t('Noted how hot this was. It counts more than an upvote.')));
     } catch (e) { toast(e.message); }

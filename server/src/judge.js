@@ -1,3 +1,4 @@
+import { userWaiting } from './priority.js';
 import { getDb, now } from './db.js';
 import { config } from './config.js';
 import { chat, fastModel, holdTagging } from './ai/ollama.js';
@@ -58,5 +59,5 @@ export async function judgeBatch(size = 12) {
 let timer = null;
 export function startJudge() {
   if (timer) return;
-  timer = setInterval(() => { judgeBatch().catch(() => {}); }, 45000);
+  timer = setInterval(() => { if (!userWaiting()) judgeBatch().catch(() => {}); }, 45000);
 }

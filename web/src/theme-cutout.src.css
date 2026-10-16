@@ -157,6 +157,7 @@
 :root[data-theme="cutout"] .pill-following{background:var(--following)}
 :root[data-theme="cutout"] .pill-discovery{background:var(--discovery)}
 :root[data-theme="cutout"] .pill-popular{background:var(--flame-2)}
+:root[data-theme="cutout"] .pill-kink{background:var(--cv,var(--accent))}
 :root[data-theme="cutout"] .pill-deeper{background:var(--discovery)}
 :root[data-theme="cutout"] .meter{background:var(--surface-3);height:5px}
 :root[data-theme="cutout"] .meter i{background:var(--cv,var(--c))}
@@ -413,3 +414,9 @@
 :root[data-theme="cutout"] .win-pic{border-radius:9px}
 :root[data-theme="cutout"] .win.solid .win-pair .kshape{--kfill:#0B0B0B}
 :root[data-theme="cutout"] .toggle input:checked+.tbox{background:var(--accent);box-shadow:0 6px 16px -6px var(--accent)}
+/* 0.31: the row of similar posts */
+:root[data-theme="cutout"] .simrow{border:0;border-radius:28px;padding:14px 16px 16px}
+:root[data-theme="cutout"] .simrow-h{font-family:var(--display);font-weight:700;color:var(--text)}
+:root[data-theme="cutout"] .simpic{border-radius:16px}
+:root[data-theme="cutout"] .simtile{border-radius:18px}
+:root[data-theme="cutout"] .simtile.on .simpic{box-shadow:0 0 0 3px var(--accent)}

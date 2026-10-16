@@ -49,6 +49,14 @@ export function track(itemId, type, value = null) {
   if (queue.length >= 12) flush();
   clearTimeout(timer);
   timer = setTimeout(() => flush(), 1500);
+  // The feed listens, so it can pick the next posts again right after you reacted.
+  try { window.dispatchEvent(new CustomEvent('uc-track', { detail: { itemId, type, value } })); } catch {}
+}
+
+// What is still waiting to be sent, taken out of the queue so it can travel with a feed request instead.
+export function takeEvents() {
+  clearTimeout(timer);
+  return queue.splice(0, queue.length);
 }
 
 export function flushNow() {
@@ -122,7 +130,7 @@ export function proxied(url) {
 
 export const FORMATS = { long: t('Long form'), short: t('Short form'), gif: t('GIFs'), image: t('Images'), set: t('Image sets'), story: t('Stories'), discussion: t('Discussions') };
 export const LEN_HINT = { any: t('everything'), quick: t('video under 2 min · reads under 5 min · GIFs and images'), medium: t('video 2 to 15 min · reads 5 to 15 min · threads'), long: t('video over 15 min · reads over 15 min') };
-export const LABELS = { following: t('Following'), foryou: t('For you'), discovery: t('New to you'), deeper: t('Deeper'), popular: t('Popular') };
+export const LABELS = { following: t('Following'), foryou: t('For you'), discovery: t('New to you'), deeper: t('Deeper'), popular: t('Popular'), kink: t('Your kink') };
 
 export function formatMeta(it) {
   if (it.format === 'long') return `${t('Long form')}${it.duration ? ` · ${fmtDur(it.duration)}` : ''}`;

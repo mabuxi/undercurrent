@@ -142,7 +142,10 @@ export function decayed(row, t = now()) {
   };
 }
 
+let affVer = 0;
+let affCache = { ver: -1, at: 0, map: null };
 export function bump(key, delta, t = now(), countIt = true) {
+  affVer++;
   const db = getDb();
   const row = db.prepare('SELECT * FROM affinity WHERE key = ?').get(key);
   const d = decayed(row, t);
@@ -288,11 +291,16 @@ export function applyEvents(list) {
   return total;
 }
 
+// Your taste, every key decayed to now. Read again whenever something changed it; otherwise the same one is used
+// for a few seconds (the short-term part fades over 45 minutes, so a few seconds change nothing).
 export function affinityMap(t = now()) {
+  if (affCache.map && affCache.ver === affVer && Math.abs(t - affCache.at) < 5000) return affCache.map;
   const map = new Map();
   for (const row of getDb().prepare('SELECT * FROM affinity').all()) map.set(row.key, decayed(row, t));
+  affCache = { ver: affVer, at: t, map };
   return map;
 }
+export function affinityChanged() { affVer++; }
 
 export function topTags({ by = 'long', limit = 30, positive = true } = {}) {
   const m = affinityMap();
@@ -321,6 +329,7 @@ export function rebuildProfile({ dropSession = null } = {}) {
   db.transaction(() => {
     if (dropSession) db.prepare('DELETE FROM events WHERE session_id = ?').run(dropSession);
     db.exec('DELETE FROM affinity; DELETE FROM item_state;');
+    affVer++;
     for (const e of db.prepare('SELECT * FROM events ORDER BY ts, id').all()) {
       applyEvent({ itemId: e.item_id, type: e.type, value: e.value, sessionId: e.session_id }, e.ts, false);
       replayed++;

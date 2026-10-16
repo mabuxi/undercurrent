@@ -1,3 +1,4 @@
+import { userWaiting } from '../priority.js';
 import { tubeReferer } from '../sources/lustpress.js';
 import { config } from '../config.js';
 import { getDb, getSetting } from '../db.js';
@@ -358,7 +359,7 @@ let turn = 0;
 async function loop(slot) {
   for (;;) {
     const pace = PACE[getSetting('taggerPace', 'normal')] || PACE.normal;
-    if (slot >= pace.parallel || Date.now() < tagger.pausedUntil || holdTagging() || !getSetting('taggerOn', config.taggerEnabled)) {
+    if (slot >= pace.parallel || Date.now() < tagger.pausedUntil || holdTagging() || userWaiting() || !getSetting('taggerOn', config.taggerEnabled)) {
       await new Promise((r) => setTimeout(r, config.mock ? 500 : 2000));
       continue;
     }

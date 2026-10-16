@@ -155,6 +155,7 @@
 :root[data-theme="signal"] .pill-following{background:var(--following)}
 :root[data-theme="signal"] .pill-discovery,:root[data-theme="signal"] .pill-deeper{background:var(--discovery)}
 :root[data-theme="signal"] .pill-popular{background:var(--long)}
+:root[data-theme="signal"] .pill-kink{background:var(--cv,var(--pop))}
 :root[data-theme="signal"] .meter{height:8px;border:2px solid var(--line-2);border-radius:2px;background:none}
 :root[data-theme="signal"] .meter i{background:repeating-linear-gradient(-45deg,var(--cv,var(--c)) 0 3px,transparent 3px 5px)}
 :root[data-theme="signal"] :is(.media,.imgbtn,.media-sleep,.viewer img,.viewer video){border:2px solid var(--ink);border-radius:10px}
@@ -418,3 +419,10 @@
 :root[data-theme="signal"] .win.pairwin .win-head::after{height:3px;border-radius:0;bottom:-2px}
 :root[data-theme="signal"] .win.solid.pairwin .win-head::after{display:none}
 :root[data-theme="signal"] .win-pic{border-radius:6px;box-shadow:0 0 0 2px var(--ink)}
+/* 0.31: the row of similar posts: cream outlined stickers */
+:root[data-theme="signal"] .simrow{border:2px solid var(--line-2);border-radius:14px;box-shadow:6px 6px 0 #1A1A18;margin:0 6px 6px 0}
+:root[data-theme="signal"] .simrow-h{font-family:var(--display);font-weight:800;font-size:15px;text-transform:uppercase;letter-spacing:.03em;color:var(--text)}
+:root[data-theme="signal"] .simpic{border:2px solid var(--ink);border-radius:8px}
+:root[data-theme="signal"] .simtile.on .simpic{box-shadow:4px 4px 0 var(--accent)}
+:root[data-theme="signal"] .simtile:nth-child(odd).on{transform:rotate(-2deg)}
+:root[data-theme="signal"] :is(.simdur,.simback){background:var(--ink);color:#0B0B0B;border-radius:4px}

@@ -8,6 +8,7 @@ import { useTranslate, TranslateButton, TranslatedNote } from './Translate.jsx';
 import { useZoomFullscreen } from './Zoom.jsx';
 import { useTkOpen } from '../tk.js';
 import { useApp } from '../context.jsx';
+import { waitingFor } from '../waiting.js';
 
 // The video under the mouse, if any: the arrow keys move that one instead of the one in focus.
 let pointed = null;
@@ -95,6 +96,8 @@ function useFar(ref, onFar) {
   }, [ref]);
 }
 
+// preload: false, 'light' (find the file and read its first bytes, so it starts fast) or 'full' (load it ahead, for
+// the next post or two).
 export function VideoPlayer({ item, active, onPlay, onReady, onFull, onFail, inTk = false, preload = false, exposeRef }) {
   // In the feed nothing plays while the full screen viewer covers it; the viewer's own players are not affected.
   const tkOpen = useTkOpen();
@@ -154,7 +157,9 @@ export function VideoPlayer({ item, active, onPlay, onReady, onFull, onFail, inT
     };
   }, [hasFull, src, hlsUrl, armed]);
 
-  useEffect(() => { if ((active || hover || preload) && !armed) setArmed(true); }, [active, hover, armed, preload]);
+  const full = preload === true || preload === 'full';
+  const light = preload === 'light' && !item.media.hls;
+  useEffect(() => { if ((active || hover || full || light) && !armed) setArmed(true); }, [active, hover, armed, full, light]);
   const wrapRef = useRef(null);
   const boxRef = useRef(null);
   const zoom = useZoomFullscreen(boxRef);
@@ -235,7 +240,7 @@ export function VideoPlayer({ item, active, onPlay, onReady, onFull, onFail, inT
       const moved = v.currentTime !== last;
       last = v.currentTime;
       if (moved && !v.paused && !v.seeking) { still = 0; return; }
-      if (++still < (readyFired.current ? 12 : 10)) return;
+      if (++still < (readyFired.current ? 10 : 7)) return;
       still = 0;
       const s = stall.current;
       s.n++;
@@ -245,9 +250,18 @@ export function VideoPlayer({ item, active, onPlay, onReady, onFull, onFail, inT
         s.resume = readyFired.current && s.n === 1 && v.currentTime > 2 ? v.currentTime : 0;
         setRetry((x) => x + 1);
       } else if (onFail) onFail('stalled');
+      // Still stuck after loading it again twice: once more through the Mac, then say so instead of spinning forever.
+      else if (!triedProxy && src && !hlsUrl && /^https:/.test(src)) { s.n = 0; setTriedProxy(true); setSrc(proxied(src)); }
+      else { setLoading(false); setError(t('This video does not load right now. It may work again later.')); }
     }, 1000);
     return () => clearInterval(iv);
   }, [wantPlay, retry]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const key = `v${item.id}${inTk ? 't' : ''}`;
+    waitingFor(key, !!active && loading && !error && !covered);
+    return () => waitingFor(key, false);
+  }, [active, loading, error, covered, item.id, inTk]);
 
   function onError() {
     if (item.media.kind === 'redgifs' && !refreshed) {
@@ -313,11 +327,13 @@ export function VideoPlayer({ item, active, onPlay, onReady, onFull, onFail, inT
     if (!v) return;
     // Loaded again after it got stuck: back to where it was.
     if (stall.current.resume) { const r = stall.current.resume; stall.current.resume = 0; try { v.currentTime = r; } catch {} return; }
-    // Skip the intro of a longer video when it loads from the start (Settings can turn this off).
+    // Skip the intro of a longer video when it loads from the start (Settings can turn this off). A video loaded
+    // ahead (not on screen yet) jumps right away, so what it loads ahead is from there and it starts at once.
     const sk = skip.current;
     if (skipIntro.current && !sk.off && sk.stage === 0 && v.currentTime < 1) {
       const cut = introCut(item.format, lengthOf(v));
-      if (cut) { sk.stage = 1; sk.cut = cut; }
+      if (cut && !active && !hlsUrl) { sk.stage = 3; try { v.currentTime = cut; } catch {} }
+      else if (cut) { sk.stage = 1; sk.cut = cut; }
     }
   }
 
@@ -364,10 +380,13 @@ export function VideoPlayer({ item, active, onPlay, onReady, onFull, onFail, inT
     const sk = skip.current;
     if (v && sk.stage === 1) {
       sk.stage = 2;
+      const from = v.currentTime;
       try { v.currentTime = sk.cut; } catch { sk.stage = 3; }
       if (sk.stage === 2) {
         clearTimeout(sk.t);
-        sk.t = setTimeout(() => { if (sk.stage === 2) { sk.stage = 3; ready(); } }, 5000);
+        // The jump past the intro may need a whole new download: when it is not there within two and a half
+        // seconds, it goes back to where it already had the video and plays from there instead of making you wait.
+        sk.t = setTimeout(() => { if (sk.stage === 2) { sk.stage = 3; sk.off = true; try { v.currentTime = from; } catch {} ready(); } }, 2500);
         return;
       }
     }
@@ -395,7 +414,7 @@ export function VideoPlayer({ item, active, onPlay, onReady, onFull, onFail, inT
             muted={muted}
             loop={loop}
             playsInline
-            preload={armed ? 'auto' : 'metadata'}
+            preload={armed && (active || hover || full || zoom.fs) ? 'auto' : 'metadata'}
             controls={armed && !inTk}
             controlsList="nofullscreen"
             onError={onError}
@@ -447,7 +466,7 @@ export const DIRECT = new Set(['pornhub', 'redtube', 'youporn', 'eporner']);
 // (that is what the "first click opens your browser" ads do) and cannot navigate this page away.
 const SANDBOX = 'allow-scripts allow-same-origin allow-presentation allow-forms';
 
-export function EmbedPlayer({ item, active, onPlay, onReady, onFull, sandboxed = true }) {
+export function EmbedPlayer({ item, active, onPlay, onReady, onFull, sandboxed = true, preload = false }) {
   const [m, setM] = useState(item.media);
   const thumbs = (m.thumbs?.length ? m.thumbs : [m.poster]).filter(Boolean);
   const [i, setI] = useState(0);
@@ -493,7 +512,12 @@ export function EmbedPlayer({ item, active, onPlay, onReady, onFull, sandboxed =
     } catch { setDead(true); }
   };
 
-  useEffect(() => { if ((active || hover) && expired(m.poster || thumbs[0])) refresh(); }, [active, hover]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if ((active || hover || preload) && expired(m.poster || thumbs[0])) refresh(); }, [active, hover, preload]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Coming up next on a phone: the Mac looks up the video file already, so pressing play starts it at once.
+  useEffect(() => {
+    if (!preload || !tryDirect || direct !== null) return;
+    api(`/items/${item.id}/direct`).catch(() => {});
+  }, [preload, tryDirect]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const previewing = (active || hover) && !playing && thumbs.length > 1;
   useEffect(() => {
@@ -566,7 +590,7 @@ export function EmbedPlayer({ item, active, onPlay, onReady, onFull, sandboxed =
           <iframe ref={iframeRef} key={sandboxed ? 's' : 'u'} src={embedUrl} title={item.title} sandbox={sandboxed ? SANDBOX : undefined} allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" />
         ) : (
           <>
-            {shown && posterOk ? <img src={thumbSrc(shown, proxyAll)} alt="" loading={active ? 'eager' : 'lazy'} referrerPolicy="no-referrer" onError={onPosterError} onLoad={() => onReady?.()} /> : null}
+            {shown && posterOk ? <img src={thumbSrc(shown, proxyAll)} alt="" loading={active || preload ? 'eager' : 'lazy'} referrerPolicy="no-referrer" onError={onPosterError} onLoad={() => onReady?.()} /> : null}
             <Badge format={item.format} />
             {item.duration ? <span className="dur">{fmtDur(item.duration)}</span> : null}
             <span className="provider">{m.provider}</span>
@@ -717,12 +741,12 @@ export function TextBody({ item, onPerson }) {
   );
 }
 
-export function Media({ item, active, near = true, height, onPlay, onReady, onPerson, onLike, onFull, sandboxed }) {
+export function Media({ item, active, near = true, height, onPlay, onReady, onPerson, onLike, onFull, sandboxed, preload = false }) {
   const m = item.media || {};
   useEffect(() => { if (m.kind === 'text' || !m.kind) onReady?.(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   if (!near && m.kind !== 'text') return <div className="media-sleep" style={{ height: height || 320 }} aria-hidden="true" />;
-  if (m.kind === 'embed') return <EmbedPlayer item={item} active={active} onPlay={onPlay} onReady={onReady} onFull={onFull} sandboxed={sandboxed} />;
-  if (m.kind === 'video' || m.kind === 'redgifs') return <VideoPlayer item={item} active={active} onPlay={onPlay} onReady={onReady} onFull={onFull} />;
+  if (m.kind === 'embed') return <EmbedPlayer item={item} active={active} onPlay={onPlay} onReady={onReady} onFull={onFull} sandboxed={sandboxed} preload={preload} />;
+  if (m.kind === 'video' || m.kind === 'redgifs') return <VideoPlayer item={item} active={active} onPlay={onPlay} onReady={onReady} onFull={onFull} preload={preload} />;
   if (m.kind === 'gallery') return <Gallery item={item} onReady={onReady} />;
   if (m.kind === 'image') return <ImageMedia item={item} src={m.src} mid={m.mid} onReady={onReady} />;
   if (m.kind === 'text') return <TextBody item={item} onPerson={onPerson} />;

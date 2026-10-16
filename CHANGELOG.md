@@ -3,6 +3,39 @@
 Every version of Undercurrent, newest first. The app reads this file to show what changed when you update.
 Versions are `0.MINOR.PATCH`: a bigger feature raises MINOR, fixes raise PATCH. Each version is a git tag (`v0.14.0`).
 
+## 0.31.0 · 16 October 2026
+
+### A For You feed that follows you
+- The feed reacts within a post or two: after a like, heat, a save, a long watch, a quick skip or a dislike (and every two posts anyway), the posts after the next two are picked again with what you just did already counted. In the full screen viewer the next three stay put, because they are already loading.
+- It goes deeper into what you are into right now (the kinks of the posts you gave points to in the last minutes count more), but not for too long: after two posts of the same kink in a row (four when you are clearly into it) every next one counts less, so it moves on before it gets samey.
+- Every kink in your list counts for a post, also the ones that are not your top ones; the kinks whose posts you like most count more. A post with one of your kinks is never treated as "new to you".
+- About one post in seven is one of your kinks you have not seen for a while, picked at random (never one you are skipping right now), marked "Your kink". If you go for it, the feed follows.
+- "New to you" is never random: it has to be well received where it was posted, sit next to what you like and have nothing you clearly do not like. The most liked and fastest rising come first.
+- What you are into now counts more than what you were into months ago.
+
+### Similar videos under a post you liked
+- On the feed (not in the full screen viewer, and not while a filter is on): after a like, heat, a save, watching it to the end or about half a minute on it, a row of small previews with the same kinks and similar tags shows under the post, videos for a video and pictures for a picture. They run through their stills while you look at them, and pointing with the mouse at one the app plays itself (not a site's player) plays it without sound.
+- Picking one plays it in the post's place; the row stays, the first one takes you back, and the feed carries on below.
+
+### Kink match
+- A kink's match is now how much you like its posts compared with your average post, from the points you gave them (watching, heat, likes, saves; skips count against), recent posts counting more. 50% is your average. A kink with only a few posts is pulled towards 50%, so one lucky post is not 99%. Its page says from how many posts.
+- The rules that make a kink or fade it stay the same.
+
+### Loading
+- The next videos load ahead: in the full screen viewer the next three are found and ready to start, and once the one on screen plays, the next one (and the one after, when it is a short clip) loads fully. On the feed the next post loads ahead too, and the next videos' files are looked up before you get there.
+- A longer video that loads ahead already starts after its intro, and jumping past an intro never makes you wait more than two and a half seconds (it plays from the start instead).
+- A video that stays stuck tries again through the Mac and then says it does not load, instead of spinning forever (before, you sometimes had to scroll past and back).
+- More posts load as soon as only a few are left after the one on screen.
+
+### You come first
+- While you are waiting for something to show (the feed loading, a video that has not started, its file being looked up), the Mac puts its background work aside: the AI's background jobs, tagging, the quick looks, grabbing video frames, fetching from your sources and kink upkeep all wait until you have something to see.
+- The server answers much faster on a big library (measured on yours): the feed's pool of posts in about 0,1 s instead of about 0,9 s, the side windows in about 0,1 to 0,3 s instead of 1 to 5 s, counting how specific every tag is in about 0,15 s instead of almost 5 s (and only every few hours, in a quiet moment). Your log showed the server busy for up to 30 seconds at a time, which also held up videos that go through the Mac; that work is gone or happens when you are not waiting.
+- The first start after this update builds two new indexes (a few seconds, once).
+
+### Fixes
+- No "going deeper" posts while any filter is on, a kink included: only on the plain feed.
+- The Kinks card in Memory is gone (your kinks have their own tab).
+
 ## 0.30.0 · 14 October 2026
 
 ### A new look: Specimen

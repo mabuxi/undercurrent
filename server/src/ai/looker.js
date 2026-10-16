@@ -1,3 +1,4 @@
+import { userWaiting } from '../priority.js';
 import { config } from '../config.js';
 import { getDb, now, getSetting } from '../db.js';
 import { chat, fastModel, deepModel } from './ollama.js';
@@ -197,6 +198,7 @@ export function startLooker() {
   // so tagging and judging still get their turn on the model.
   let aheadAt = 0;
   const tick = async () => {
+    if (userWaiting()) return;
     if (!getDb().prepare('SELECT 1 FROM items WHERE look_q > 1 LIMIT 1').get()) {
       if (Date.now() - aheadAt < 40000) return;
       aheadAt = Date.now();
@@ -207,5 +209,5 @@ export function startLooker() {
     for (let i = 0; i < 3; i++) if (!(await lookBatch())) break;
   };
   timer = setInterval(() => { tick().catch(() => {}); }, 8000);
-  setInterval(() => { reviewSafety().catch(() => {}); }, 10000);
+  setInterval(() => { if (!userWaiting()) reviewSafety().catch(() => {}); }, 10000);
 }

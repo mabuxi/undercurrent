@@ -264,11 +264,11 @@ function Detail({ nodeKey, brain, reload, onSelect, startEdit = false }) {
         </div>
         <div className="kh-side">
           {match != null ? (
-            <div className="kh-match" title={t('How much of a match it is to you. From 50% it is a kink.')}>
+            <div className="kh-match" title={t('How much you like its posts: the points you gave them (watching, heat, likes, saves) against your average post, recent ones counting more. 50% is your average.')}>
               <b>{match}<small>%</small></b>
               <span>{t('match')}</span>
               <div className="gauge"><i style={{ width: `${match}%` }} /><em style={{ left: '50%' }} /></div>
-              <p className="kh-note">{match >= 50 ? t('From 50% something is a kink; this one is past it.') : full?.mode === 'ai' ? t('Under 50%: the app fades it if it stays there.') : t('Under 50%, but it is kept: only the app\'s own kinks fade by themselves.')}</p>
+              <p className="kh-note">{!full?.points?.posts ? t('Not enough posts with it seen yet to tell.') : `${match >= 50 ? tn(full.points.posts, 'You like its posts more than your average post (from {n} post).', 'You like its posts more than your average post (from {n} posts).') : tn(full.points.posts, 'You like its posts less than your average post (from {n} post).', 'You like its posts less than your average post (from {n} posts).')}${full?.mode === 'ai' && match < 50 ? ` ${t('The app fades it by itself once you stop going for it.')}` : ''}`}</p>
             </div>
           ) : null}
           {manage}

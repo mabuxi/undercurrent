@@ -322,12 +322,6 @@ export default function MemoryView() {
         ) : null}
       </div>
 
-      <div className="card2 kinkslink">
-        <span className="catic" style={{ '--c': '#F2894E' }}><Icon name="map" /></span>
-        <div><h3>{t('Kinks')}</h3><p className="wnote">{t('Your kinks and their groups live in Your map now: see them all, open one for everything about it, rename, regroup, combine or remove them there.')}</p></div>
-        <button type="button" className="ghost-btn small accent" onClick={() => openMode('map')}><Icon name="map" />{t('Open your kinks')}</button>
-      </div>
-
       <div className="memsec" id="mem-fant">
         <div className="sechead"><h3><span className="secic" style={{ '--c': '#F6C35B' }}><Icon name="spark" /></span>{t('Fantasies')}</h3><span className="count">{fantasies.length}</span></div>
         <FantasyIdeas onSaved={refreshMeta} />

@@ -2,6 +2,39 @@
 
 Toutes les versions d’Undercurrent, de la plus récente à la plus ancienne. L’app lit ce fichier quand le français est choisi ; une version sans notes ici s’affiche en anglais (CHANGELOG.md).
 
+## 0.31.0 · 16 octobre 2026
+
+### Un fil Pour vous qui vous suit
+- Le fil réagit en un post ou deux : après un j’aime, de la chaleur, un enregistrement, un long visionnage, un passage rapide ou un je n’aime pas (et de toute façon tous les deux posts), les posts après les deux suivants sont choisis à nouveau en tenant déjà compte de ce que vous venez de faire. Dans la visionneuse plein écran, les trois suivants ne bougent pas, car ils sont déjà en train de charger.
+- Il va plus loin dans ce qui vous plaît en ce moment (les kinks des posts auxquels vous avez donné des points ces dernières minutes comptent davantage), mais pas trop longtemps : après deux posts du même kink d’affilée (quatre quand il vous plaît clairement) chacun des suivants compte un peu moins, pour passer à autre chose avant que ça devienne répétitif.
+- Chaque kink de votre liste compte pour un post, même ceux qui ne sont pas vos préférés ; ceux dont vous aimez le plus les posts comptent davantage. Un post avec un de vos kinks n’est jamais considéré comme « nouveau pour vous ».
+- Environ un post sur sept est un de vos kinks que vous n’avez pas vu depuis un moment, choisi au hasard (jamais un que vous passez en ce moment), marqué « Votre kink ». S’il vous plaît, le fil suit.
+- « Nouveau pour vous » n’est jamais du hasard : il faut que ce soit bien reçu là où ça a été publié, proche de ce que vous aimez, et sans rien que vous n’aimez clairement pas. Les plus aimés et ceux qui montent le plus vite passent en premier.
+- Ce qui vous plaît maintenant compte plus que ce qui vous plaisait il y a des mois.
+
+### Des vidéos similaires sous un post qui vous a plu
+- Sur le fil (pas dans la visionneuse plein écran, et pas quand un filtre est actif) : après un j’aime, de la chaleur, un enregistrement, une vidéo regardée jusqu’au bout ou environ une demi-minute dessus, une rangée de petits aperçus avec les mêmes kinks et des tags proches s’affiche sous le post, des vidéos pour une vidéo et des images pour une image. Elles font défiler leurs images tant que vous les regardez, et pointer avec la souris une vidéo que l’app lit elle-même (pas le lecteur d’un site) la lit sans le son.
+- En choisir une la lit à la place du post ; la rangée reste, la première vous ramène au post de départ, et le fil continue en dessous.
+
+### Correspondance des kinks
+- La correspondance d’un kink indique maintenant à quel point vous aimez ses posts par rapport à votre post moyen, d’après les points que vous leur avez donnés (visionnage, chaleur, j’aime, enregistrements ; les passages rapides comptent contre), les posts récents comptant davantage. 50 % correspond à votre moyenne. Un kink avec peu de posts est ramené vers 50 %, pour qu’un seul post chanceux ne donne pas 99 %. Sa page indique sur combien de posts c’est calculé.
+- Les règles qui créent ou estompent un kink ne changent pas.
+
+### Chargement
+- Les vidéos suivantes se chargent à l’avance : dans la visionneuse plein écran, les trois suivantes sont trouvées et prêtes à démarrer, et dès que celle à l’écran joue, la suivante (et celle d’après quand c’est un clip court) se charge entièrement. Sur le fil, le post suivant se charge aussi à l’avance, et les fichiers des vidéos suivantes sont cherchés avant que vous y arriviez.
+- Une vidéo plus longue chargée à l’avance démarre déjà après son intro, et sauter une intro ne vous fait jamais attendre plus de deux secondes et demie (elle démarre alors depuis le début).
+- Une vidéo qui reste bloquée réessaie en passant par le Mac, puis indique qu’elle ne se charge pas, au lieu de tourner indéfiniment (avant, il fallait parfois la dépasser puis revenir).
+- D’autres posts se chargent dès qu’il n’en reste que quelques-uns après celui à l’écran.
+
+### Vous d’abord
+- Pendant que vous attendez que quelque chose s’affiche (le fil qui charge, une vidéo qui n’a pas démarré, son fichier en cours de recherche), le Mac met de côté son travail en arrière-plan : les tâches de fond de l’IA, le tagging, les coups d’œil rapides, l’extraction d’images des vidéos, la récupération depuis vos sources et l’entretien des kinks attendent que vous ayez quelque chose à voir.
+- Le serveur répond bien plus vite sur une grande bibliothèque (mesuré sur la vôtre) : la réserve de posts du fil en environ 0,1 s au lieu d’environ 0,9 s, les fenêtres latérales en environ 0,1 à 0,3 s au lieu de 1 à 5 s, le calcul de la spécificité de chaque tag en environ 0,15 s au lieu de presque 5 s (et seulement toutes les quelques heures, dans un moment calme). Votre journal montrait le serveur occupé jusqu’à 30 secondes d’affilée, ce qui bloquait aussi les vidéos qui passent par le Mac ; ce travail a disparu ou se fait quand vous n’attendez pas.
+- Le premier démarrage après cette mise à jour crée deux nouveaux index (quelques secondes, une seule fois).
+
+### Corrections
+- Plus de posts « pour aller plus loin » quand un filtre est actif, kink compris : seulement sur le fil sans filtre.
+- La carte Kinks de Mémoire a disparu (vos kinks ont leur propre onglet).
+
 ## 0.30.0 · 14 octobre 2026
 
 ### Une nouvelle apparence : Spécimen

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { PostFx, HeatFx } from './PostFx.jsx';
 import { ago, api, fmtNum, formatMeta, LABELS, rgba, track, imgSrc } from '../api.js';
 import { useApp } from '../context.jsx';
@@ -138,7 +138,9 @@ function useNear(ref) {
   return near;
 }
 
-function useVisibility(ref, id, onLong, ready, members, paused) {
+// A minute on a post is being into it; half a minute is enough for a video or pictures (they say it faster).
+const LONG_MS = { long: 30000, short: 30000, gif: 30000, image: 25000, set: 25000 };
+function useVisibility(ref, id, onLong, ready, members, paused, onSeen, format) {
   const [seen, setActive] = useState(false);
   // While the full screen viewer covers the feed, nothing in the feed plays or counts time.
   const active = seen && !paused;
@@ -157,7 +159,7 @@ function useVisibility(ref, id, onLong, ready, members, paused) {
   // Scrolling past a post before it even started: a strong "not for me".
   const shownAt = useRef(0);
   useEffect(() => {
-    if (active) { shownAt.current = Date.now(); return undefined; }
+    if (active) { shownAt.current = Date.now(); onSeen?.(id); return undefined; }
     const at = shownAt.current;
     shownAt.current = 0;
     if (at && !impressed.current) {
@@ -175,7 +177,7 @@ function useVisibility(ref, id, onLong, ready, members, paused) {
       track(id, 'impression');
       for (const m of members || []) if (m !== id) track(m, 'impression');
     }
-    longTimer.current = setTimeout(() => onLong?.('dwell'), 60000);
+    longTimer.current = setTimeout(() => onLong?.('dwell'), LONG_MS[format] || 60000);
     return () => {
       clearTimeout(longTimer.current);
       if (started.current) {
@@ -197,7 +199,11 @@ export function identity(it) {
   return { name: it.author || it.community || it.source, handle: it.author, sub: [it.community] };
 }
 
-export default function Post({ item: initial, focus = false, onStrong, onWeak, onImmersive }) {
+// Being clearly into a post: a like, heat, a save, a long watch. Playing it with sound, opening the comments or a
+// performer also count, but a stronger reaction after one of those still counts as one.
+const WEAK = new Set(['play', 'comments', 'performer']);
+
+function Post({ item: initial, focus = false, onStrong, onWeak, onImmersive, onSeen, preload = false }) {
   const { toast, setFilters, runSearch, kinks: allKinks, refreshMeta } = useApp();
   const [item, setItem] = useState(initial);
   const itemRef = useRef(initial);
@@ -254,8 +260,9 @@ export default function Post({ item: initial, focus = false, onStrong, onWeak, o
   const onHeat = (v, phase) => setHeat((cur) => (cur && cur.phase === 'live' ? { ...cur, v, phase } : { v, phase, key: Date.now(), y: fxY(), x: fxX() }));
   const fired = useRef(false);
   const strong = (why) => {
-    if (fired.current) return;
-    fired.current = true;
+    const level = WEAK.has(why) ? 'weak' : 'strong';
+    if (fired.current === 'strong' || fired.current === level) return;
+    fired.current = level;
     onStrong?.(item, why);
   };
   // A dislike, hide or block takes back the similar posts it brought in ("going deeper").
@@ -271,7 +278,7 @@ export default function Post({ item: initial, focus = false, onStrong, onWeak, o
   const ref = useRef(null);
   const [ready, setReady] = useState(false);
   const tkOpen = useTkOpen();
-  const active = useVisibility(ref, item.id, strong, ready, item.collection?.members, tkOpen);
+  const active = useVisibility(ref, item.id, strong, ready, item.collection?.members, tkOpen, onSeen, item.format);
   const near = useNear(ref);
   const mediaRef = useRef(null);
   const lastH = useRef(null);
@@ -411,7 +418,7 @@ export default function Post({ item: initial, focus = false, onStrong, onWeak, o
         </button>
         <div className="right">
           {item.oc ? <span className="ocbadge" title={t('The poster marked this as their own original content')}>{t('Original content')}</span> : null}
-          <span className={`pill pill-${item.label}`}>{LABELS[item.label]}</span>
+          <span className={`pill pill-${item.label}`} style={item.spot ? { '--c': item.spot.color } : undefined} title={item.spot ? item.spot.name : undefined}>{LABELS[item.label]}</span>
           <span className="match" title={t('Match with you')}><span className="meter" style={{ '--c': c }}><i style={{ width: `${item.match}%` }} /></span>{item.match}%</span>
         </div>
       </header>
@@ -430,7 +437,7 @@ export default function Post({ item: initial, focus = false, onStrong, onWeak, o
         </div>
       ) : null}
       {!isText ? <p className="ptitle"><Linkify text={trTitle.text || item.title} source={item.source} onPerson={openPerson} /><TranslateButton tr={trTitle} small /><TranslatedNote tr={trTitle} /></p> : null}
-      <div ref={mediaRef} className="pmedia" onClickCapture={onMediaClick}><PostFx fx={fx} /><HeatFx heat={heat} /><Media item={item} active={active} near={near} height={lastH.current} onPlay={item.media?.kind === 'embed' ? undefined : () => strong('play')} onReady={() => setReady(true)} onPerson={openPerson} onLike={item.media?.kind === 'embed' ? undefined : likeByTap} onFull={onImmersive ? () => onImmersive(itemRef.current) : undefined} sandboxed={!unblocked} /></div>
+      <div ref={mediaRef} className="pmedia" onClickCapture={onMediaClick}><PostFx fx={fx} /><HeatFx heat={heat} /><Media item={item} active={active} preload={preload} near={near} height={lastH.current} onPlay={item.media?.kind === 'embed' ? undefined : () => strong('play')} onReady={() => setReady(true)} onPerson={openPerson} onLike={item.media?.kind === 'embed' ? undefined : likeByTap} onFull={onImmersive ? () => onImmersive(itemRef.current) : undefined} sandboxed={!unblocked} /></div>
       {!isText && item.body ? <p className="ptext caption"><Linkify text={trBody.text || item.body} source={item.source} onPerson={openPerson} /><TranslateButton tr={trBody} small /><TranslatedNote tr={trBody} /></p> : null}
       {item.aiSummary && !isText ? <p className="aisum">{item.aiSummary}</p> : null}
       <div className={`chipwrap${over && !allTags ? ' over' : ''}${hovTags ? ' hov' : ''}`} ref={tagWrap} style={hovTags ? { minHeight: tagH } : undefined} onPointerMove={tagIn} onPointerLeave={tagOut}>
@@ -515,3 +522,5 @@ export default function Post({ item: initial, focus = false, onStrong, onWeak, o
     </article>
   );
 }
+
+export default memo(Post);

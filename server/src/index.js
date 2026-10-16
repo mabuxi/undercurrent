@@ -11,6 +11,7 @@ import { startTagger } from './ai/tagger.js';
 import { startScheduler, ensureDefaults } from './ingest.js';
 import { health, activeModel } from './ai/ollama.js';
 import { refreshKinks } from './ai/assistant.js';
+import { beginUser, whenIdle } from './priority.js';
 import { log, logFile } from './log.js';
 import { ensureScoreVersion } from './profile.js';
 import { cleanupTitles } from './store.js';
@@ -173,6 +174,16 @@ app.use('/api', (req, res, next) => {
     if (late >= SLOW_MS && Date.now() - told > 60000) { told = Date.now(); log('warn', `The server was busy for ${Math.round(late)} ms without answering`); }
   }, 500).unref();
 }
+// What you are waiting on right now (the feed, a video's link or file): while one of these is on its way, background
+// work steps aside (see priority.js).
+const USER_WAITS = /^\/(feed(\/more)?$|items\/\d+\/(direct|refresh-media|similar)$|media\/)/;
+app.use('/api', (req, res, next) => {
+  if (!USER_WAITS.test(req.path)) return next();
+  const done = beginUser();
+  res.on('finish', done);
+  res.on('close', done);
+  next();
+});
 app.use('/api', api);
 
 if (fs.existsSync(config.webDist)) {
@@ -201,9 +212,9 @@ const server = app.listen(config.port, config.host, async () => {
   startSuggestions();
   startJudge();
   startLooker();
-  setTimeout(() => refreshKinks().catch((e) => { if (!e.yielded) log('warn', 'Kink refresh failed', e.message); }), 90000);
+  setTimeout(() => whenIdle('kinks', () => refreshKinks().catch((e) => { if (!e.yielded) log('warn', 'Kink refresh failed', e.message); })), 90000);
   // Model downloads that were cut off (the app was quit halfway) carry on by themselves.
   setTimeout(async () => { try { const { pullModels } = await import('./setup.js'); if (getSetting('modelsChosen', false)) { const r = await pullModels(); if (r.missing?.length) log('info', `Downloading the models that are still missing: ${r.missing.join(', ')}`); } } catch {} }, 15000);
   setTimeout(async () => { try { const { backfillGender } = await import('./gender.js'); const { getSetting: gs, setSetting: ss, getDb: gd } = await import('./db.js'); if ((gs('genderGuessV', 1) || 1) < 2) { gd().exec("UPDATE items SET g_src = NULL WHERE g_src IN ('guess', 'none')"); ss('genderGuessV', 2); } const n = backfillGender(30000); if (n) log('info', `Guessed who is in ${n} posts (men, women, trans) until the AI looks closer`); } catch (e) { log('warn', 'Gender backfill failed', e.message); } }, 5000);
-  setInterval(() => refreshKinks().catch((e) => log('warn', 'Kink refresh failed', e.message)), 15 * 60000);
+  setInterval(() => whenIdle('kinks', () => refreshKinks().catch((e) => log('warn', 'Kink refresh failed', e.message))), 15 * 60000);
 });

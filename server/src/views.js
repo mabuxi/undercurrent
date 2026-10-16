@@ -1,3 +1,4 @@
+import { memo } from './priority.js';
 import { getDb, now } from './db.js';
 import { buildFeed, presentOne } from './rank.js';
 import { hydrate, followed, relatedTags } from './store.js';
@@ -521,7 +522,8 @@ export function windows({ cursor = 0, count = 4, side = 0, sessionId = null, see
   EXCLUDE = [...exclude.map(Number).filter(Boolean), ...served.ids.keys()];
   MEDIA = new Set(served.media.keys());
   const aff = affinityMap();
-  const performers = getDb().prepare("SELECT t.id, t.name, COUNT(*) n, (SELECT thumb FROM performers p WHERE p.name = t.name) thumb FROM tags t JOIN item_tags it ON it.tag_id = t.id JOIN items i ON i.id = it.item_id WHERE t.kind = 'performer' AND i.blocked = 0 GROUP BY t.id HAVING n >= 2 ORDER BY n DESC LIMIT 40").all()
+  // Who appears most in your library: counting it reads a lot, so it is kept for ten minutes.
+  const performers = memo('performers', 10 * 60000, () => getDb().prepare("SELECT t.id, t.name, COUNT(*) n, (SELECT thumb FROM performers p WHERE p.name = t.name) thumb FROM tags t JOIN item_tags it ON it.tag_id = t.id JOIN items i ON i.id = it.item_id WHERE t.kind = 'performer' AND i.blocked = 0 GROUP BY t.id HAVING n >= 2 ORDER BY n DESC LIMIT 40").all(), 50 * 60000)
     .map((p) => ({ ...p, a: (aff.get(`t:${p.id}`)?.long || 0) + 0.3 * (aff.get(`t:${p.id}`)?.short || 0) })).sort((a, b) => b.a - a.a || b.n - a.n);
   const ctx = {
     kinks, groups, children, fantasies: listFantasies(), pairs: kinkPairs(kinks), aff, sessionId, performers,

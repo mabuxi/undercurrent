@@ -6,7 +6,7 @@ import { providerState } from './sources/providers.js';
 import { config } from './config.js';
 import { mentionsIn } from './people.js';
 import { genderPrefs, allowance, kindOf, stableRand, sureOf } from './gender.js';
-import { affinityMap } from './profile.js';
+import { affinityMap, engagement } from './profile.js';
 import { listKinks, kinkIndex, kinksForTags, listFantasies } from './kinks.js';
 import { getSearchSpec, getProfileItems, pool, invalidatePool } from './searchstate.js';
 import { starCard } from './sources/stars.js';
@@ -16,9 +16,33 @@ import { tr } from './i18n.js';
 const FORMAT_KEYS = ['long', 'short', 'gif', 'image', 'set', 'story', 'discussion'];
 const GROUP = { long: 'video', short: 'clips', gif: 'clips', image: 'images', set: 'images', story: 'text', discussion: 'text' };
 
+// What a tag is worth to you: months of taste, the last week and the last 45 minutes. What you are into now counts
+// more than what you were into months ago (0.31: the week counts more, the months less).
 function tagValue(v) {
   if (!v) return 0;
-  return 0.45 * Math.tanh(v.long / 4) + 0.2 * Math.tanh(v.lately / 3) + 0.35 * Math.tanh(v.short / 2);
+  return 0.38 * Math.tanh(v.long / 4) + 0.27 * Math.tanh(v.lately / 3) + 0.35 * Math.tanh(v.short / 2);
+}
+
+// What you saw in this sitting (the last 40 minutes), newest last, with the kinks of each post: the feed goes deeper
+// into what you are into right now, but not for too long in a row.
+function seenNow(kidx, t) {
+  const rows = getDb().prepare("SELECT item_id, MAX(ts) ts FROM events WHERE type = 'impression' AND item_id IS NOT NULL AND ts > ? GROUP BY item_id ORDER BY ts DESC LIMIT 15").all(t - 40 * 60000);
+  const ids = rows.map((r) => r.item_id);
+  const tags = tagsForItems(ids);
+  const comm = new Map(ids.length ? getDb().prepare(`SELECT id, community FROM items WHERE id IN (${ids.map(() => '?').join(',')})`).all(...ids).map((r) => [r.id, r.community]) : []);
+  const count = getDb().prepare("SELECT COUNT(DISTINCT item_id) c FROM events WHERE type = 'impression' AND ts > ?").get(t - 40 * 60000).c;
+  // How into each kink you are right now: the points you gave its posts in this sitting, the last minutes counting
+  // most (a like with a good watch is about 0,5; three of them nearly 1; a few quick skips go below 0).
+  const eng = engagement(t - 45 * 60000, { limit: 400, minPoints: -1e9 });
+  const etags = tagsForItems(eng.map((e) => e.item_id));
+  const ecomm = new Map(eng.length ? getDb().prepare(`SELECT id, community FROM items WHERE id IN (${eng.map(() => '?').join(',')})`).all(...eng.map((e) => e.item_id)).map((r) => [r.id, r.community]) : []);
+  const sum = new Map();
+  for (const e of eng) {
+    const w = Math.exp(-(t - e.last) / (20 * 60000));
+    for (const k of kinksForTags(etags.get(e.item_id) || [], kidx, ecomm.get(e.item_id))) sum.set(k.id, (sum.get(k.id) || 0) + e.p * w);
+  }
+  const heat = new Map([...sum].map(([id, p]) => [id, Math.tanh(p / 8)]));
+  return { count, heat, kinks: ids.reverse().map((id) => kinksForTags(tags.get(id) || [], kidx, comm.get(id)).map((k) => k.id)) };
 }
 
 export function scoreItem(item, tags, aff, fol, t = now(), spec = tagSpecificity().map, kinkTags = null) {
@@ -257,6 +281,29 @@ export function buildFeed(filters = {}, { exclude = [], limit = 12, mix = 15, ca
   const kidx = kinkIndex(kinks);
   const kinkTags = new Set(kinks.filter((k) => !k.isGroup && (k.status === 'active' || k.origin === 'user')).flatMap((k) => k.tags.map((x) => x.id)));
   const topIds = new Set([...aff].filter(([k, v]) => k.startsWith('t:') && (v.long || 0) > 0.5).sort((a, b) => (b[1].long || 0) - (a[1].long || 0)).slice(0, 40).map(([k]) => Number(k.slice(2))));
+  // The plain feed: nothing asked for in particular (only formats or the feed window may be set). Only there does it
+  // follow your mood of the moment, rotate your kinks and keep you from seeing one thing for too long.
+  const plain = !sq && !only && (f.kink == null || f.kink === '') && !f.pair?.length && !f.allKinks?.length && !f.anyKinks?.length && !f.fantasy && !f.tags?.length && !f.q && !f.author && !f.community && !f.saved && !f.following && !f.onlyNew && !f.sources?.length && !f.minMatch;
+  // Every kink in your list counts for a post (it is something you like, even when it is not your top one); the ones
+  // whose posts you like most count more. heat is how much you are into it in this sitting (-1 to 1).
+  const sitting = plain ? seenNow(kidx, t) : { count: 0, kinks: [], heat: new Map() };
+  const mine = new Map(kinks.filter((k) => !k.isGroup && (k.status === 'active' || k.origin === 'user')).map((k) => [k.id, { k, score: k.points?.score ?? 50, heat: sitting.heat.get(k.id) || 0 }]));
+  const kinkPart = (ks) => {
+    let base = 0;
+    let hot = 0;
+    let cold = 0;
+    let top = null;
+    for (const k of ks) {
+      const m = mine.get(k.id);
+      if (!m) continue;
+      base = Math.max(base, 0.08 + 0.22 * Math.max(0, (m.score - 50) / 50));
+      if (m.heat > hot) { hot = m.heat; top = m; }
+      cold = Math.min(cold, m.heat);
+    }
+    return { base, mom: plain ? 0.5 * Math.tanh(hot * 1.8) + 0.3 * cold : 0, hot, top };
+  };
+  // Tags you clearly do not like: new things are never picked from them.
+  const badTags = new Set([...aff].filter(([k, v]) => k.startsWith('t:') && (v.long || 0) < -0.35).map(([k]) => Number(k.slice(2))));
   const kinkSet = (id) => {
     const tags = kinks.find((k) => k.id === Number(id))?.tags || [];
     const set = new Set(tags.map((x) => x.id));
@@ -358,7 +405,9 @@ export function buildFeed(filters = {}, { exclude = [], limit = 12, mix = 15, ca
       if (it.aiFit < 20 && !f.q && !f.author && !f.community && !f.saved) continue;
       bonus += (it.aiFit - 50) / 140;
     }
-    scored.push({ it, tags, s, ks, value: s.raw + bonus });
+    const kp = kinkPart(ks);
+    bonus += kp.base + kp.mom;
+    scored.push({ it, tags, s, ks, kp, value: s.raw + bonus });
   }
   qualityRanks(scored, t);
   if (!f.saved) for (const x of scored) x.value += qualityBoost(x);
@@ -411,10 +460,14 @@ export function buildFeed(filters = {}, { exclude = [], limit = 12, mix = 15, ca
   let knownTags = 0;
   for (const [k, v] of aff) if (k.startsWith('t:') && v.n >= 3) knownTags++;
   const coldStart = knownTags < 15;
-  const isNew = (x) => !coldStart && x.s.familiarity < 0.35 && x.tags.length > 0;
-  // Discovery: new things for you, but ones other people liked; the worst received are left out when the source says so.
-  const discoveryPool = scored.filter((x) => (coldStart ? x.s.familiarity < 0.2 : isNew(x)) && (!x.qKnown || x.q >= 0.25))
-    .sort((a, b) => (b.s.tagPart + 0.35 * (b.q ?? 0.5)) - (a.s.tagPart + 0.35 * (a.q ?? 0.5)) || b.it.score - a.it.score);
+  // A post with one of your kinks is never "new to you", however few of its tags you met before.
+  const isNew = (x) => !coldStart && x.s.familiarity < 0.35 && x.tags.length > 0 && !x.kp.base;
+  // Discovery: new to you, but never random. It has to be well received where it was posted (other people liked it),
+  // sit next to what you like (your tags or kinks count for it, none against it) and have nothing you clearly do not
+  // like. The most liked and fastest rising come first.
+  const discoveryPool = scored.filter((x) => (coldStart ? x.s.familiarity < 0.2 : isNew(x)) && x.s.tagPart >= 0 && (!x.qKnown || x.q >= 0.55)
+    && !x.tags.some((tg) => tg.weight >= 0.4 && badTags.has(tg.id)) && !x.ks.some((k) => (mine.get(k.id)?.heat ?? 0) < -0.3))
+    .sort((a, b) => (0.55 * (b.q ?? 0.5) + 0.35 * (b.vel ?? 0.5) + 0.6 * b.s.tagPart + (b.ks.length ? 0.15 : 0)) - (0.55 * (a.q ?? 0.5) + 0.35 * (a.vel ?? 0.5) + 0.6 * a.s.tagPart + (a.ks.length ? 0.15 : 0)) || b.it.score - a.it.score);
   const mainPool = onlyNew ? discoveryPool : scored.filter((x) => !isNew(x) || x.s.followed || f.saved || f.author || f.community);
   mainPool.sort((a, b) => b.value - a.value);
   const out = [];
@@ -422,10 +475,48 @@ export function buildFeed(filters = {}, { exclude = [], limit = 12, mix = 15, ca
   const every = mix > 0 && !onlyNew ? Math.max(2, Math.round(100 / mix)) : Infinity;
   let di = 0;
   const recent = () => out.slice(-3);
+  // How many of the last ten posts (seen in this sitting or picked just now) had each kink: after two in a row (four
+  // when you are clearly into it right now) every next one of the same kink counts a little less, so the feed goes
+  // deep but moves on before it gets samey.
+  const repeats = () => {
+    const reps = new Map();
+    if (!plain) return reps;
+    for (const ids of [...sitting.kinks, ...out.map((o) => o.ks.map((k) => k.id))].slice(-10)) for (const id of new Set(ids)) reps.set(id, (reps.get(id) || 0) + 1);
+    return reps;
+  };
+  const tooMuch = (x, reps) => {
+    let pen = 0;
+    for (const k of x.ks) {
+      const m = mine.get(k.id);
+      const allow = 2 + (m?.heat > 0.3 ? 2 : m?.heat > 0.15 ? 1 : 0);
+      pen = Math.max(pen, 0.15 * Math.max(0, (reps.get(k.id) || 0) + 1 - allow));
+    }
+    return pen;
+  };
+  // Now and then (about one post in seven) one of your kinks you have not seen for a while, picked at random (the ones
+  // you like most a bit more often, never one you are skipping right now), with its best post. If you go for it, the
+  // feed follows.
+  const spotUsed = new Set();
+  const pickSpot = () => {
+    const recent = new Set([...sitting.kinks.slice(-12), ...out.map((o) => o.ks.map((k) => k.id))].flat());
+    const cands = [...mine.values()].filter((m) => m.score >= 40 && m.heat > -0.15 && !recent.has(m.k.id) && !spotUsed.has(m.k.id));
+    for (let tries = 0; tries < 4 && cands.length; tries++) {
+      const total = cands.reduce((a, m) => a + 0.35 + (m.score - 40) / 60, 0);
+      let r = Math.random() * total;
+      let pick = cands[cands.length - 1];
+      for (const m of cands) { r -= 0.35 + (m.score - 40) / 60; if (r <= 0) { pick = m; break; } }
+      cands.splice(cands.indexOf(pick), 1);
+      spotUsed.add(pick.k.id);
+      const best = mainPool.filter((x) => !used.has(x.it.id) && x.ks.some((k) => k.id === pick.k.id) && (!x.qKnown || x.q >= 0.3)).sort((a, b) => b.value - a.value)[0];
+      if (best) { used.add(best.it.id); mainPool.splice(mainPool.indexOf(best), 1); return { ...best, spot: pick.k }; }
+    }
+    return null;
+  };
   const pickMain = () => {
     let best = null;
     let bestV = -Infinity;
     const window = mainPool.slice(0, 120);
+    const reps = repeats();
     // Every kind of content keeps at least about 15% of the feed, even when you engage with it less.
     const under = new Set();
     if (!f.formats?.length && out.length >= 4) {
@@ -437,6 +528,7 @@ export function buildFeed(filters = {}, { exclude = [], limit = 12, mix = 15, ca
       if (used.has(x.it.id)) continue;
       let v = x.value;
       if (under.has(GROUP[x.it.format])) v += 0.18;
+      if (plain) v -= tooMuch(x, reps);
       for (const r of recent()) {
         if (r.it.community && r.it.community === x.it.community) v -= 0.05;
         if (r.it.format === x.it.format) v -= 0.07;
@@ -460,6 +552,10 @@ export function buildFeed(filters = {}, { exclude = [], limit = 12, mix = 15, ca
     if (!next && popularPool.length && (out.length + 3) % 5 === 0) {
       while (pi < popularPool.length && used.has(popularPool[pi].it.id)) pi++;
       if (pi < popularPool.length) { next = popularPool[pi++]; used.add(next.it.id); label = 'popular'; const at = mainPool.indexOf(next); if (at >= 0) mainPool.splice(at, 1); }
+    }
+    if (!next && plain && (sitting.count + out.length) % 7 === 4) {
+      next = pickSpot();
+      if (next) label = 'kink';
     }
     if (!next && (out.length + 1) % every === 0) {
       while (di < discoveryPool.length && used.has(discoveryPool[di].it.id)) di++;
@@ -553,6 +649,8 @@ const GENERIC_WHY = /^(gay|straight|hetero|lesbian|bi|bisexual|men|man|male|wome
 // your balance setting), and near-duplicates ("gay" next to "verified amateurs gay") are shown once.
 export function why(x) {
   const reasons = [];
+  if (x.label === 'kink' && x.spot) reasons.push(tr('One of your kinks you have not seen for a while: {name}.', { name: x.spot.label || x.spot.name }));
+  if (x.kp?.top && x.kp.hot >= 0.2 && x.label !== 'kink') reasons.push(tr('You are into {name} right now.', { name: x.kp.top.k.label || x.kp.top.k.name }));
   if (x.label === 'discovery') reasons.push(x.tags.length ? tr("New to you: you haven't spent time on {what} yet.", { what: x.tags.slice(0, 2).map((t) => t.name).join(` ${tr('or')} `) }) : tr("New to you: you haven't spent time on this yet."));
   if (x.s.followed) reasons.push(tr('From {name}, which you follow.', { name: x.it.author && x.it.source !== 'reddit' ? x.it.author : x.it.community }));
   const strongKinks = x.ks.filter((k) => (k.allTime + k.lately) / 2 >= 58).sort((a, b) => (b.allTime + b.lately) - (a.allTime + a.lately)).slice(0, 2);
@@ -612,7 +710,8 @@ export function present(x) {
     label: x.label,
     why: why(x),
     tags: rankTags(x.tags).slice(0, 26).map((t) => t.name),
-    kinks: x.ks.slice(0, 3).map((k) => ({ id: k.id, name: k.label || k.name, color: k.color })),
+    kinks: (x.spot ? [x.spot, ...x.ks.filter((k) => k.id !== x.spot.id)] : x.ks).slice(0, 3).map((k) => ({ id: k.id, name: k.label || k.name, color: k.color })),
+    spot: x.spot ? { id: x.spot.id, name: x.spot.label || x.spot.name, color: x.spot.color } : undefined,
     lengthCat: lengthCat(x.it)
   };
 }

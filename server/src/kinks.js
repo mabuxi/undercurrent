@@ -1,3 +1,4 @@
+import { whenIdle } from './priority.js';
 import { kinkLabel } from './translate.js';
 import { getDb, now, tagId, normalizeTag, getSetting, setSetting } from './db.js';
 import { affinityMap, engagement } from './profile.js';
@@ -59,8 +60,11 @@ export function listKinks({ includeHidden = false } = {}) {
   // Points: everything you did with posts of each kink, all time, the last 7 days and the last day.
   try {
     const pts = kinkPoints(out);
-    for (const k of out) k.points = pts.get(k.id) || { all: 0, lately: 0, now: 0, shareAll: 0, shareLately: 0, shareNow: 0 };
-  } catch { for (const k of out) k.points = { all: 0, lately: 0, now: 0, shareAll: 0, shareLately: 0, shareNow: 0 }; }
+    for (const k of out) k.points = pts.get(k.id) || { all: 0, lately: 0, now: 0, shareAll: 0, shareLately: 0, shareNow: 0, score: null, posts: 0 };
+  } catch { for (const k of out) k.points = { all: 0, lately: 0, now: 0, shareAll: 0, shareLately: 0, shareNow: 0, score: null, posts: 0 }; }
+  // The match shown for a kink is how much you like its posts (see likeScore); the rules that make or fade a kink
+  // keep their own measure (ruleMatch).
+  for (const k of out) { k.ruleMatch = k.match; k.match = k.isGroup ? null : k.points.score; }
   return out;
 }
 
@@ -311,8 +315,12 @@ export function deleteFantasy(id) {
 // appear together in everything fetched anyway (lift), and scaled by how much evidence there is.
 let pairCache = { at: 0, key: '', list: [] };
 export function kinkPairs(kinks = listKinks()) {
-  const key = kinks.map((k) => k.id).join(',');
+  const key = kinks.map((k) => k.id).sort((a, b) => a - b).join(',');
   if (pairCache.key === key && now() - pairCache.at < 10 * 60000) return pairCache.list;
+  if (pairCache.key === key && now() - pairCache.at < 6 * 3600000) {
+    whenIdle('kinkPairs', () => { pairCache = { at: now(), key, list: computePairs(kinks) }; });
+    return pairCache.list;
+  }
   const list = computePairs(kinks);
   pairCache = { at: now(), key, list };
   return list;

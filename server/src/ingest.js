@@ -1,3 +1,4 @@
+import { yieldToUser } from './priority.js';
 import { config } from './config.js';
 import { getDb, getSetting, setSetting, now } from './db.js';
 import { upsertItem, setState } from './store.js';
@@ -263,7 +264,8 @@ export async function runIngest({ force = false, only = null } = {}) {
   ingestState.lastError = null;
   let added = 0;
   let blocked = 0;
-  const pause = () => (config.mock ? null : new Promise((r) => setTimeout(r, 600)));
+  // A scheduled run steps aside while you are waiting for something to show; one you asked for does not.
+  const pause = async () => { if (!force) await yieldToUser(); if (!config.mock) await new Promise((r) => setTimeout(r, 600)); };
   try {
     ensureDefaults();
     const cutoff = now() - config.ingestIntervalMin * 60000;

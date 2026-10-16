@@ -14,6 +14,7 @@ import { soundOn, setSound, onSound } from '../sound.js';
 import { t, tn } from '../i18n.js';
 import { tapOnly } from '../tapguard.js';
 import { KShape } from '../shapes.jsx';
+import { waitingFor } from '../waiting.js';
 
 // The full screen viewer on a phone, like TikTok: one post fills the screen, a swipe up or down snaps to the next or
 // the previous one, nothing else in between (no windows), and the tab bar is out of the way. Everything a post can do
@@ -22,6 +23,7 @@ import { KShape } from '../shapes.jsx';
 
 const KINDS = new Set(['video', 'redgifs', 'embed', 'image', 'gallery']);
 export const inViewer = (it) => KINDS.has(it?.media?.kind);
+const isVideoKind = (it) => ['video', 'redgifs', 'embed'].includes(it?.media?.kind);
 const SANDBOX = 'allow-scripts allow-same-origin allow-presentation allow-forms';
 const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
@@ -48,12 +50,15 @@ function TkEmbed({ item, active, preload, onReady, onStart, vref, onPlay, sandbo
     refreshed.current = true;
     try { const r = await api(`/items/${item.id}/refresh-media`, { method: 'POST', body: {} }); if (r.media) setM(r.media); } catch {}
   };
+  // The video file is asked for once, as soon as the post is on screen or coming up next.
+  const asked = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => () => { mounted.current = false; }, []);
   useEffect(() => {
-    if (direct !== undefined || !(active || preload)) return undefined;
-    let alive = true;
-    const give = setTimeout(() => { if (alive) setDirect((d) => (d === undefined ? null : d)); }, 9000);
-    api(`/items/${item.id}/direct`).then((r) => { if (alive) setDirect(r.direct || null); }).catch(() => { if (alive) setDirect(null); });
-    return () => { alive = false; clearTimeout(give); };
+    if (direct !== undefined || !(active || preload) || asked.current) return;
+    asked.current = true;
+    const give = setTimeout(() => { if (mounted.current) setDirect((d) => (d === undefined ? null : d)); }, 9000);
+    api(`/items/${item.id}/direct`).then((r) => { if (mounted.current) setDirect(r.direct || null); }).catch(() => { if (mounted.current) setDirect(null); }).finally(() => clearTimeout(give));
   }, [active, preload, direct, item.id]);
   // A phone player that got stuck asks the Mac for a fresh link once before going back to the site's player.
   const [tries, setTries] = useState(0);
@@ -543,7 +548,7 @@ function PersonPic({ name, thumb, lookup = false, platform = 'any', color }) {
   return <img className="tk-pic" src={imgSrc(src)} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBad(true)} />;
 }
 
-function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext, onLeave }) {
+function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext, onLeave, onStarted }) {
   const { toast, refreshMeta, setFilters, runSearch, kinks: allKinks } = useApp();
   const [item, setItem] = useState(() => withChanges(initial));
   const [fx, setFx] = useState(null);
@@ -568,7 +573,7 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
   const stageRef = useRef(null);
   const zoomRef = useRef(null);
   const fired = useRef(false);
-  const strong = (why) => { if (fired.current) return; fired.current = true; onStrong?.(item, why); };
+  const strong = (why) => { const level = ['play', 'comments', 'performer'].includes(why) ? 'weak' : 'strong'; if (fired.current === 'strong' || fired.current === level) return; fired.current = level; onStrong?.(item, why); };
   const weak = () => { fired.current = false; onWeak?.(item); };
   // The heart shows where you double-tapped; other reactions in the middle.
   const fxAt = useRef(null);
@@ -611,6 +616,14 @@ function Slide({ item: initial, active, preload, onStrong, onWeak, lock, onNext,
   useEffect(() => {
     if (active && ready && !impressed.current) { impressed.current = true; track(item.id, 'impression'); shownAt.current = Date.now(); }
   }, [active, ready, item.id]);
+  // The viewer knows when the one on screen plays, so it can start loading the next ones without slowing it down.
+  useEffect(() => { if (active && (started || (ready && !isVideoKind(item)))) onStarted?.(item.id); }, [active, started, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+  // A spinner on the post you are on: the Mac puts its background work aside until it plays.
+  useEffect(() => {
+    const key = `tk${item.id}`;
+    waitingFor(key, !!active && !started && !hidden && isVideoKind(item));
+    return () => waitingFor(key, false);
+  }, [active, started, hidden, item.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isEmbed = item.media?.kind === 'embed';
   const isVideo = item.media?.kind === 'video' || item.media?.kind === 'redgifs' || (isEmbed && native);
@@ -1004,6 +1017,8 @@ export default function Immersive({ items, startId, onClose, onMore, loading, do
   const startAt = Math.max(0, list.findIndex((x) => x.id === startId));
   const [cur, setCur] = useState(startAt);
   const curId = useRef(list[startAt]?.id);
+  // Which post on screen has started playing: only then do the next ones load fully, so they never slow it down.
+  const [startedId, setStartedId] = useState(null);
   const [locks, setLocks] = useState(() => new Set());
   const lock = useCallback((key, on) => setLocks((s) => { if (s.has(key) === on) return s; const n = new Set(s); if (on) n.add(key); else n.delete(key); return n; }), []);
   const sc = useRef(null);
@@ -1183,6 +1198,17 @@ export default function Immersive({ items, startId, onClose, onMore, loading, do
   };
 
 
+  // The next three are always ready to start: their video file is found and its first part read (light). Once the one
+  // on screen plays, the next one (and the one after, when it is a short clip) loads ahead fully.
+  const playing = startedId != null && startedId === list[cur]?.id;
+  const preloadOf = (i, it) => {
+    const d = i - cur;
+    if (d < 1 || d > 3) return false;
+    if (!playing) return 'light';
+    if (d === 1) return 'full';
+    if (d === 2 && it.format !== 'long') return 'full';
+    return 'light';
+  };
   const go = (d) => { const el = sc.current; if (el) el.scrollTo({ top: (cur + d) * el.clientHeight, behavior: reduced() ? 'auto' : 'smooth' }); };
   // Scrolling with two fingers or the wheel is the browser's own. Only when a short turn of a mouse wheel was not
   // enough to leave the post (it springs back), it goes on to the next one once the wheel stops.
@@ -1225,8 +1251,8 @@ export default function Immersive({ items, startId, onClose, onMore, loading, do
       <div ref={sc} className={`tk-scroll${locks.size ? ' locked' : ''}`} onScroll={onScroll}>
         {list.map((it, i) => (
           <section key={it.id} className="tk-slide" data-id={it.id} data-source={it.source} data-kind={it.media?.kind} aria-hidden={i !== cur}>
-            {Math.abs(i - cur) <= 2
-              ? <Slide item={it} active={i === cur} preload={i === cur + 1} onStrong={onStrong} onWeak={onWeak} lock={lock} onNext={() => go(1)} onLeave={close} />
+            {i >= cur - 1 && i <= cur + 3
+              ? <Slide item={it} active={i === cur} preload={preloadOf(i, it)} onStrong={onStrong} onWeak={onWeak} lock={lock} onNext={() => go(1)} onLeave={close} onStarted={setStartedId} />
               : <div className="tk-s tk-far">{Math.abs(i - cur) <= 6 && coverOf(it.media) ? <img className="tk-farimg" src={imgSrc(coverOf(it.media))} alt="" loading="lazy" referrerPolicy="no-referrer" draggable={false} /> : null}</div>}
           </section>
         ))}

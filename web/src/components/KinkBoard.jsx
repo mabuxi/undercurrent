@@ -130,7 +130,7 @@ function KinkCard({ k, onOpen }) {
       <div className="kc-top">
         <KShape id={k.id} color={k.color} size={44} className="kc-shape" />
         <span className="grow" />
-        {k.match != null ? <span className={`kc-match${k.match >= 50 ? ' ok' : ''}`} title={t('How much of a match it is to you. From 50% it is a kink.')}>{k.match}%</span> : null}
+        {k.match != null ? <span className={`kc-match${k.match >= 50 ? ' ok' : ''}`} title={t('How much you like its posts: the points you gave them (watching, heat, likes, saves) against your average post, recent ones counting more. 50% is your average.')}>{k.match}%</span> : null}
         <button type="button" className="kc-edit notch-btn" onClick={(e) => { e.stopPropagation(); onOpen(k); }} aria-label={t('Edit {name}', { name: k.name })} title={t('Edit')}><Icon name="edit" /></button>
       </div>
       <div className="kc-name">

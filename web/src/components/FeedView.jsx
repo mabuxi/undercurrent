@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, FORMATS, flushNow, imgSrc } from '../api.js';
+import { api, FORMATS, flushNow, imgSrc, takeEvents, track } from '../api.js';
 import { useApp, MOODS, crumbList } from '../context.jsx';
 import { Icon } from '../icons.jsx';
 import Post from './Post.jsx';
@@ -8,6 +8,8 @@ import Immersive, { inViewer, TK_MODES, tkModeOf } from './Immersive.jsx';
 import ErrorBoundary from './ErrorBoundary.jsx';
 import { refreshWindows, DEEPER, isFiltered } from './SideColumn.jsx';
 import { begin, end } from '../activity.js';
+import { waitingFor } from '../waiting.js';
+import SimilarRow from './SimilarRow.jsx';
 import { Avatar } from './Panels.jsx';
 import { t, tn, getLang } from '../i18n.js';
 
@@ -322,7 +324,15 @@ export default function FeedView() {
   const relaxed = useRef(false);
   const retryTimer = useRef(null);
   const prefetching = useRef(false);
-  const [deeper, setDeeper] = useState({});
+  // Rows of similar posts under posts you were into, by the post they hang under: { items, why, sel }.
+  const [strips, setStrips] = useState({});
+  const stripOf = useRef(new Map());
+  // The post on screen (its place in the feed), what has been on screen, and the feed as it is right now.
+  const [curIdx, setCurIdx] = useState(0);
+  const curRef = useRef(0);
+  const seenIds = useRef(new Set());
+  const itemsRef = useRef([]);
+  itemsRef.current = items;
   // The full screen viewer on a phone: which post it opened on.
   const [tk, setTk] = useState(null);
   const tkRef = useRef(null);
@@ -331,6 +341,9 @@ export default function FeedView() {
   const tkStay = useRef(false);
   const strongDone = useRef(new Set());
   const deeperCount = useRef(0);
+  const retuning = useRef(false);
+  const retuneT = useRef(null);
+  const sinceRetune = useRef(0);
   const shown = useRef(new Set());
   const busy = useRef(false);
   const sentinel = useRef(null);
@@ -424,7 +437,11 @@ export default function FeedView() {
     setFresh(0);
     setItems([]);
     setWins([]);
-    setDeeper({});
+    setStrips({});
+    stripOf.current = new Map();
+    seenIds.current = new Set();
+    curRef.current = 0;
+    setCurIdx(0);
     if (tkStay.current && tkRef.current) setTk((x) => (x ? { ...x, gen: (x.gen || 0) + 1 } : x));
     else setTk(null);
     tkStay.current = false;
@@ -451,30 +468,121 @@ export default function FeedView() {
     return () => { window.removeEventListener('uc-search-done', on); window.removeEventListener('uc-search-progress', on); };
   }, [filters.search, reset, done]);
 
-  const WHY = { dwell: t('You stayed on this'), play: t('You played this'), up: t('You liked this'), save: t('You saved this'), rate: t('You rated this high'), comments: t('You opened the comments'), performer: t('You looked at who is in this') };
+  const WHY = { dwell: t('You stayed on this'), up: t('You liked this'), save: t('You saved this'), rate: t('You found this hot'), complete: t('You watched this to the end'), rewatch: t('You watched this again'), follow: t('You followed them') };
+  const WEAK_WHY = new Set(['play', 'comments', 'performer']);
   const searchingRef = useRef(searching);
-  searchingRef.current = searching;
-  // "Going deeper" (similar posts after one you were into) is for the feed: a search shows only what you searched for.
+  searchingRef.current = searching || isFiltered(filters);
+  // Into a post (a like, heat, a save, a long watch, watched to the end): a row of small previews of posts like it
+  // shows under it. Only on the plain feed: with a search, a kink or any other filter on, the feed shows only what you
+  // asked for. A post played from a row belongs to that row.
   const onStrong = useCallback(async (item, why) => {
-    if (searchingRef.current || deeperCount.current > 40 || strongDone.current.has(item.id)) return;
-    strongDone.current.add(item.id);
+    if (searchingRef.current || WEAK_WHY.has(why)) return;
+    const host = stripOf.current.get(item.id) ?? item.id;
+    if (deeperCount.current > 40 || strongDone.current.has(host)) return;
+    const hostItem = itemsRef.current.find((x) => x.id === host);
+    if (!hostItem) return;
+    strongDone.current.add(host);
     deeperCount.current++;
-    begin(`sim${item.id}`, t('Finding similar posts'));
+    begin(`sim${host}`, t('Finding similar posts'), { quiet: true });
     try {
-      const r = await api(`/items/${item.id}/similar?limit=${why === 'dwell' ? 2 : 3}&exclude=${[...shown.current].slice(-300).join(',')}`);
-      const fresh = (r.items || []).filter((x) => !shown.current.has(x.id));
-      if (!fresh.length) return;
-      fresh.forEach((x) => shown.current.add(x.id));
-      const label = r.performers?.length && fresh[0].performers?.some((p) => r.performers.includes(String(p).toLowerCase())) ? t('more with {name}', { name: r.performers[0] }) : t('going deeper into {tags}', { tags: (r.tags || []).slice(0, 2).join(t(' and ')) });
-      setDeeper((cur) => ({ ...cur, [item.id]: { why: `${WHY[why] || t('You were into this')}, ${label}`, items: fresh } }));
-    } catch {} finally { end(`sim${item.id}`); }
+      const r = await api(`/items/${item.id}/similar?strip=1&limit=6&exclude=${[...shown.current].slice(-300).join(',')}`);
+      const fresh = (r.items || []).filter((x) => !shown.current.has(x.id) && x.id !== host);
+      if (fresh.length < 2) { strongDone.current.delete(host); return; }
+      fresh.forEach((x) => { shown.current.add(x.id); stripOf.current.set(x.id, host); });
+      stripOf.current.set(host, host);
+      setStrips((cur) => ({ ...cur, [host]: { why: `${WHY[why] || t('You were into this')} · ${t('more like it')}`, items: [hostItem, ...fresh], sel: host } }));
+    } catch { strongDone.current.delete(host); } finally { end(`sim${host}`); }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // A dislike, hide or block takes back the "going deeper" posts it brought in.
+  // A dislike, hide or block of the post takes its row away; of a post played from the row, it goes back to the post.
   const onWeak = useCallback((item) => {
-    strongDone.current.delete(item.id);
-    setDeeper((cur) => { if (!cur[item.id]) return cur; const n = { ...cur }; delete n[item.id]; return n; });
+    const host = stripOf.current.get(item.id) ?? item.id;
+    setStrips((cur) => {
+      const st = cur[host];
+      if (!st) return cur;
+      const n = { ...cur };
+      if (item.id === host) { delete n[host]; strongDone.current.delete(host); }
+      else n[host] = { ...st, items: st.items.filter((x) => x.id !== item.id), sel: st.sel === item.id ? host : st.sel };
+      return n;
+    });
   }, []);
+  const pickInStrip = useCallback((host, it) => {
+    setStrips((cur) => (cur[host] ? { ...cur, [host]: { ...cur[host], sel: it.id } } : cur));
+    if (it.id !== host) track(it.id, 'open');
+  }, []);
+
+  // Which post is on screen: the next ones load ahead, and only posts after the next few may still change.
+  const onSeen = useCallback((id) => {
+    seenIds.current.add(id);
+    const host = stripOf.current.get(id) ?? id;
+    const i = itemsRef.current.findIndex((x) => x.id === host);
+    if (i >= 0 && i !== curRef.current) { curRef.current = i; setCurIdx(i); }
+  }, []);
+
+  // The feed reacts right away: after you react to a post (or every two posts), the posts after the next two (three in
+  // the full screen viewer) are picked again with what you just did already counted, so it follows you within a post
+  // or two. The next ones never change under you (they are loading already), and nothing below a post you scrolled
+  // back to is touched.
+  const firstFree = (list, from) => {
+    let i = from + 1;
+    let n = 0;
+    const keep = tkRef.current ? 3 : 2;
+    while (i < list.length && n < keep) { if (!tkRef.current || inViewer(list[i])) n++; i++; }
+    return i;
+  };
+  const retuneRef = useRef(null);
+  retuneRef.current = async () => {
+    if (retuning.current || busy.current || searchingRef.current) return;
+    const list = itemsRef.current;
+    const cut = firstFree(list, curRef.current);
+    const tail = list.slice(cut);
+    if (!tail.length || tail.some((x) => seenIds.current.has(x.id) || strips[x.id])) return;
+    retuning.current = true;
+    const my = gen.current;
+    try {
+      const drop = new Set(tail.flatMap((x) => [x.id, ...(x.collection?.members || [])]));
+      const keepShown = [...shown.current].filter((id) => !drop.has(id));
+      const r = await api('/feed', { method: 'POST', body: { filters: relaxed.current ? { ...filters, relaxed: true } : filters, exclude: keepShown, limit: Math.min(12, Math.max(6, tail.length)), mix, events: takeEvents() } });
+      if (my !== gen.current || !r.items?.length) return;
+      const now = itemsRef.current;
+      const at = now.findIndex((x) => x.id === tail[0].id);
+      if (at < 0) return;
+      const from = Math.max(at, firstFree(now, curRef.current));
+      const keep = now.slice(0, from);
+      const keepIds = new Set(keep.flatMap((x) => [x.id, ...(x.collection?.members || [])]));
+      const fresh = r.items.filter((x) => !keepIds.has(x.id));
+      if (!fresh.length) return;
+      for (const x of now.slice(from)) for (const id of [x.id, ...(x.collection?.members || [])]) shown.current.delete(id);
+      for (const x of fresh) for (const id of [x.id, ...(x.collection?.members || [])]) shown.current.add(id);
+      const next = [...keep, ...fresh];
+      itemsRef.current = next;
+      setItems(next);
+    } catch {} finally { retuning.current = false; }
+  };
+  useEffect(() => {
+    const on = (e) => {
+      const { type, value, itemId } = e.detail || {};
+      const strongType = ['up', 'down', 'save', 'rate', 'less', 'complete', 'rewatch', 'follow'].includes(type);
+      if (type === 'impression') { if (++sinceRetune.current < 2) return; }
+      else if (!strongType && type !== 'skip' && !(type === 'dwell' && (Number(value) >= 15000 || Number(value) < 2500))) return;
+      sinceRetune.current = 0;
+      clearTimeout(retuneT.current);
+      retuneT.current = setTimeout(() => retuneRef.current?.(), strongType ? 400 : 900);
+      // Watching a video to the end (or again) is being into it too.
+      if ((type === 'complete' || type === 'rewatch') && !tkRef.current) {
+        const it = itemsRef.current.find((x) => x.id === Number(itemId)) || [...Object.values(strips)].flatMap((st) => st.items).find((x) => x.id === Number(itemId));
+        if (it) onStrong(it, type);
+      }
+    };
+    window.addEventListener('uc-track', on);
+    return () => { window.removeEventListener('uc-track', on); clearTimeout(retuneT.current); };
+  }, [onStrong, strips]);
+
+  // Only a few posts left after the one on screen: the next ones load now, long before you reach the end.
+  useEffect(() => { if (!done && !busy.current && items.length && items.length - curIdx <= 5) loadMoreRef.current?.(); }, [curIdx, items.length, done]);
+
+  // The feed loading with nothing on screen yet: the Mac puts its background work aside until it shows.
+  useEffect(() => { waitingFor('feed', loading && !items.length); return () => waitingFor('feed', false); }, [loading, items.length]);
 
   useEffect(() => {
     const el = sentinel.current;
@@ -518,6 +626,10 @@ export default function FeedView() {
   // The feed follows the viewer in the background (so what is above the post has loaded and settled by the time you
   // come back), and leaving the viewer puts it exactly on the post you were last on.
   const toPost = useCallback((id) => {
+    // The viewer is on this post: the feed knows where you are, for loading ahead and picking what comes next.
+    const vi = itemsRef.current.findIndex((x) => x.id === id);
+    if (vi >= 0 && vi !== curRef.current) { curRef.current = vi; setCurIdx(vi); }
+    if (id) seenIds.current.add(id);
     const el = id && document.querySelector(`.feed article.post[data-id="${id}"]`);
     if (!el) return;
     const top = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--toph'), 10) || 60;
@@ -534,14 +646,22 @@ export default function FeedView() {
   const flat = [];
   const phoneWins = isFiltered(filters) ? wins.filter((w) => !DEEPER.has(w.type)) : wins;
   const phoneSolids = narrow ? solidSet(phoneWins) : new Set();
+  // The next post loads ahead fully, the one after it too unless it is a long video, the third only gets ready.
+  const preloadOf = (i, it) => {
+    if (tk) return false;
+    const d = i - curIdx;
+    if (d === 1) return 'full';
+    if (d === 2) return it.format === 'long' ? 'light' : 'full';
+    if (d === 3) return 'light';
+    return false;
+  };
   items.forEach((it, i) => {
-    flat.push(it);
-    list.push(<ErrorBoundary key={it.id} name="Post"><Post item={it} focus={opts.focus === it.id} onStrong={onStrong} onWeak={onWeak} onImmersive={imm} /></ErrorBoundary>);
-    const d = deeper[it.id];
-    if (d) {
-      list.push(<div key={`d${it.id}`} className="deeper"><span className="deeper-why">{d.why}</span></div>);
-      d.items.forEach((x) => { const dx = { ...x, label: 'deeper' }; flat.push(dx); list.push(<ErrorBoundary key={x.id} name="Post"><Post item={dx} onStrong={onStrong} onWeak={onWeak} onImmersive={imm} /></ErrorBoundary>); });
-    }
+    // A post with a row of similar posts shows the one picked in the row.
+    const st = strips[it.id];
+    const here = st && st.sel !== it.id ? st.items.find((x) => x.id === st.sel) || it : it;
+    flat.push(here);
+    list.push(<ErrorBoundary key={`${it.id}:${here.id}`} name="Post"><Post item={here} focus={opts.focus === it.id} onStrong={onStrong} onWeak={onWeak} onImmersive={imm} onSeen={onSeen} preload={preloadOf(i, here)} /></ErrorBoundary>);
+    if (st && st.items.length > 1) list.push(<ErrorBoundary key={`s${it.id}`} name="Similar" quiet><SimilarRow strip={st} onPick={(x) => pickInStrip(it.id, x)} /></ErrorBoundary>);
     // On a phone a window comes after every 3 to 5 posts.
     const slot = WIN_AFTER.indexOf(i + 1);
     if (narrow && slot >= 0 && phoneWins[slot]) {
@@ -558,7 +678,7 @@ export default function FeedView() {
       {error ? <div className="empty">{error}</div> : null}
       {wider && items.length ? <div className="deeper"><span className="deeper-why">{t('Few exact matches left, now also showing close matches')}</span></div> : null}
       {fresh ? <button type="button" className="freshbar" onClick={() => { reset(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>{t('New results from your sources are in · Show them')}</button> : null}
-      {tk ? <ErrorBoundary name="Viewer"><Immersive items={flat} startId={tk.id} gen={tk.gen || 0} onClose={closeTk} onCurrent={toPost} onMore={() => loadMoreRef.current?.()} loading={loading || finding} done={done} onStrong={onStrong} onWeak={onWeak} mode={tkMode} onMode={setTkMode} chips={tkChips} onClearChip={clearTkChip} onClearAll={clearTkAll} /></ErrorBoundary> : null}
+      {tk ? <ErrorBoundary name="Viewer"><Immersive items={flat} startId={tk.id} gen={tk.gen || 0} onClose={closeTk} onCurrent={toPost} onMore={() => loadMoreRef.current?.()} loading={loading || finding} done={done} mode={tkMode} onMode={setTkMode} chips={tkChips} onClearChip={clearTkChip} onClearAll={clearTkAll} /></ErrorBoundary> : null}
       <div className="sentinel" ref={sentinel}>
         {finding || loading || waiting ? (
           <span className="finding"><span className="spin" />{finding ? t('Finding more like this on your sources…') : waiting ? t('Nothing left that matches. Checking your sources once more shortly…') : t('Loading more…')}</span>

@@ -1,3 +1,4 @@
+import { userWaiting } from './priority.js';
 import { getDb, now, getSetting, setSetting } from './db.js';
 import { config } from './config.js';
 import { chat, deepModel, fastModel } from './ai/ollama.js';
@@ -196,6 +197,7 @@ let timer = null;
 export function startSuggestions() {
   if (timer) return;
   const tick = async () => {
+    if (userWaiting()) return;
     try { await suggestCombos(); } catch {}
     // Only to fill an empty list; the set itself changes every two sessions.
     try { if (!listSuggestions('fantasy', { limit: 1 }).length) await suggestFantasies(); } catch {}

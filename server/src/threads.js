@@ -1,3 +1,4 @@
+import { userWaiting } from './priority.js';
 import { getDb, now } from './db.js';
 import { config } from './config.js';
 import { chat, fastModel } from './ai/ollama.js';
@@ -176,6 +177,7 @@ let timer = null;
 export function startThreads() {
   if (timer) return;
   const tick = async () => {
+    if (userWaiting()) return;
     try { await rankThreads(); await fillReplies(); } catch {}
   };
   setTimeout(tick, 30000);
